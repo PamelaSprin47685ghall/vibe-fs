@@ -49,6 +49,9 @@ open PluginHostInterop
 
 module PluginTransforms =
 
+    [<Import("outboundViewStore", "wanxiangli/pair-hint")>]
+    let private outboundViewStore: obj = jsNative
+
 
     // The real Host session contains ONLY its negotiation question. This
     // process-live view is what the model receives instead, reusing the last
@@ -1552,7 +1555,7 @@ module PluginTransforms =
 
             do! runOrdinaryStages stages frame
             projectionSessionIdOpt |> Option.iter (fun sid -> negotiationRememberMessages sid outObj)
-            OutboundViewCapture.recordMessages outObj?messages
+            outboundViewStore?recordMessages(outObj?messages) |> ignore
 
         }
 

@@ -3,6 +3,9 @@ namespace Wanxiangshu.Repository.Knowledge.Casebook
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Persistence.EventStore
+
+
 
 /// DSL-class: DurableFact — CASE-003: one typed observation captured from the
 /// final execution layer (builtin read/glob/grep Host execution). Never
@@ -108,6 +111,9 @@ module Observations =
 /// later resolution/refresh/evict events — never via revision/wall_clock LWW.
 module CasebookProjection =
 
+    [<Import("casebookIndex", "wanxiangli/casebook")>]
+    let private casebookIndex: obj = jsNative
+
     [<Import("CasebookIndexLaw", "wanxiangli/casebook")>]
     let private casebookLawClass: obj = jsNative
 
@@ -190,6 +196,23 @@ module CasebookProjection =
     /// Evicted facts (tombstones are events too). The victim choice is
     /// wanxiangli/casebook `evictionVictims` (CUT-27); this only removes them.
     /// 从事件存储投影并应用 LRU 淘汰后的案例表（无状态薄读取）。
+    let evict (capacity: int) (cases: Map<string, Case>) : Map<string, Case> * string list =
+        let victims =
+            cases
+            |> Map.toArray
+            |> Array.map (fun (sessionId, case) ->
+                createObj [ "sessionId" ==> sessionId; "accessOrder" ==> case.AccessOrder ])
+            |> fun items -> unbox<string array> (casebookLaw?evictionVictims (capacity, items))
+            |> Array.toList
+
+        let remaining = victims |> List.fold (fun acc id -> Map.remove id acc) cases
+        remaining, victims
+
+    /// CASE-008: LRU eviction — keep the capacity most-recently-accessed
+    /// Cases; the evicted session ids are returned so the caller can append
+    /// Evicted facts (tombstones are events too). The victim choice is
+    /// wanxiangli/casebook `evictionVictims` (CUT-27); this only removes them.
+    /// 从事件存储投影并应用 LRU 淘汰后的案例表（无状态薄读取）。
     let projectCases (store: IEventStore) (capacity: int) : Map<string, Case> =
         match store.TryCurrent "Casebook" with
         | None -> Map.empty
@@ -204,17 +227,5 @@ module CasebookProjection =
         let indexCases =
             ordered
             |> Array.map (fun case -> createObj [ "sessionId" ==> case.Identity; "question" ==> case.Q ])
-        let position = unbox<int> (law?locate (indexCases, shelfmark))
+        let position = unbox<int> (casebookIndex?locate (indexCases, shelfmark))
         Ok(if position < 0 then None else Some ordered.[position])
-
-    let evict (capacity: int) (cases: Map<string, Case>) : Map<string, Case> * string list =
-        let victims =
-            cases
-            |> Map.toArray
-            |> Array.map (fun (sessionId, case) ->
-                createObj [ "sessionId" ==> sessionId; "accessOrder" ==> case.AccessOrder ])
-            |> fun items -> unbox<string array> (casebookLaw?evictionVictims (capacity, items))
-            |> Array.toList
-
-        let remaining = victims |> List.fold (fun acc id -> Map.remove id acc) cases
-        remaining, victims

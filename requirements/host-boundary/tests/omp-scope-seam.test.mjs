@@ -1,3 +1,4 @@
+import { JournalHandle__get_Journal } from '../../../dist/Persistence/Journal/Surface.js'
 // Host physical canary: raw OMP adapter seam / host-shape
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -7,6 +8,11 @@ import { AgentRole, JsonSchema } from '../../../dist/Host/Ports/Vocabulary.js'
 import { AgentRoleSpec } from '../../../dist/Host/Ports/Lifecycle.js'
 import { ContextEdit } from '../../../dist/Host/Ports/TurnTransforms.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { outboundViewStore } from 'wanxiangli/pair-hint'
+import { acquireSharedForWorkspace } from '../../../dist/OpenCode/Host/WorkspaceSharedJournal.js'
+import { AgentJournalModule_snapshot } from '../../../dist/Persistence/Journal/AgentJournal.js'
+import { SessionIdModule_create } from '../../../dist/Foundation/Identity.js'
+import { AgentProjection_tryFind } from '../../../dist/Composition/Durable/Projection.js'
 import {
   resetScopeState,
   onTurnStart,
@@ -1094,5 +1100,239 @@ test('WHAT[context-compression-049] OMP real native provider hook freezes old ca
 
   } finally {
     rmSync(workspace,{recursive:true,force:true})
+  }
+})
+
+
+test('WHAT[context-compression-043] OMP resetScope refusal on missing snapshot, nativePayload archival via before_provider_request, single-drain, and session_shutdown cleanup', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { execFileSync } = await import('node:child_process')
+  const workspace = mkdtempSync(join(tmpdir(), 'omp-043-wire-'))
+  execFileSync('git', ['init', '-q', workspace])
+
+  let journalHandle = null
+  try {
+    const env = createOmpTestEnvironment()
+    const sid = 'omp-sess-043-main'
+    clearSessionState(sid)
+    outboundViewStore.clearSession(sid)
+
+    const model = { provider: 'anthropic', id: 'claude-3-5-sonnet' }
+    const liveCtx = {
+      cwd: workspace,
+      model,
+      sessionManager: {
+        getSessionId: () => sid,
+        getSessionDir: () => workspace,
+        getHeader: () => ({ parentSession: null }),
+      },
+    }
+
+    // Activate OMP adapter and boot session
+    await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+    await env.eventHandlers.get('session_start')({}, liveCtx)
+
+    const reset = env.registeredTools.find((x) => x.name === 'resetScope')
+    assert.ok(reset, 'resetScope tool must be registered on OMP')
+
+    // Acquire shared journal for physical projection & blob verification
+    const journalAcquire = await acquireSharedForWorkspace(workspace, process.pid, new Date().toISOString())
+    assert.ok(journalAcquire?.ok, 'acquireSharedForWorkspace must succeed')
+    journalHandle = journalAcquire.journal
+
+    // -------------------------------------------------------------------------
+    // 1. 缺快照明确拒绝且不产生 epoch / 预算更新 (Fail-closed invariant)
+    // -------------------------------------------------------------------------
+    assert.equal(isScopeInitialized(sid), false, 'precondition: scope must not be initialized')
+    assert.equal(turnBudget(sid), 0, 'precondition: budget must be 0')
+    assert.equal(outboundViewStore.tryGetSealed(sid), undefined, 'precondition: no sealed snapshot')
+
+    const premature = await reset.execute(
+      'call-omp-unarchived-043',
+      { newScopeObjective: 'unarchived objective', newScopeTurnBudget: 5, kpiCompletion: 'met' },
+      null,
+      null,
+      liveCtx,
+    )
+
+    assert.ok(premature && premature.details, 'outcome must include details')
+    assert.equal(premature.details.refused, true, 'missing snapshot must refuse resetScope')
+    assert.equal(premature.details.archived, false, 'must not be archived')
+    assert.match(
+      premature.content[0].text,
+      /resetScope refused: the preceding real provider request has no complete archived system\/messages\/model observation/,
+      'must return exact typed refusal text without silent degradation',
+    )
+
+    // Memory invariants: untouched
+    assert.equal(isScopeInitialized(sid), false, 'scope must not become initialized on refusal')
+    assert.equal(turnBudget(sid), 0, 'budget must not be updated on refusal')
+
+    // Journal projection: no PrefixEpoch committed
+    const snap1 = AgentJournalModule_snapshot(JournalHandle__get_Journal(journalHandle))
+    const proj1 = AgentProjection_tryFind(SessionIdModule_create(sid), snap1.AgentProjections)
+    assert.equal(proj1?.PrefixEpoch, undefined, 'journal must have no prefix epoch committed on refusal')
+
+    // -------------------------------------------------------------------------
+    // 2. 真实 before_provider_request 封存 nativePayload (toolsCaptured = true)
+    // -------------------------------------------------------------------------
+    const providerHook = env.eventHandlers.get('before_provider_request')
+    assert.ok(providerHook, 'before_provider_request hook must be registered')
+
+    const nativePayload = {
+      messages: [
+        { role: 'system', content: 'SYSTEM_OMP_OBSERVED_043' },
+        { role: 'user', content: 'USER_OMP_PROMPT_SENTINEL_043' },
+      ],
+      tools: [
+        { name: 'read', description: 'Read file tool' },
+        { name: 'write', description: 'Write file tool' },
+      ],
+      system: ['SYSTEM_OMP_OBSERVED_043'],
+    }
+
+    await providerHook({ payload: structuredClone(nativePayload) }, liveCtx)
+
+    // Sealed snapshot check in outboundViewStore
+    const sealed = outboundViewStore.tryGetSealed(sid)
+    assert.ok(sealed, 'before_provider_request must seal an outbound snapshot in outboundViewStore')
+    assert.equal(sealed.sessionId, sid)
+    assert.equal(sealed.toolsCaptured, true, 'native payload capture must set toolsCaptured=true')
+    assert.ok(sealed.nativePayload, 'nativePayload must be preserved in sealed snapshot')
+    assert.equal(sealed.nativePayload.tools.length, 2)
+    assert.equal(sealed.nativePayload.tools[0].name, 'read')
+    assert.equal(sealed.nativePayload.tools[1].name, 'write')
+    assert.deepEqual(sealed.system, ['SYSTEM_OMP_OBSERVED_043'])
+
+    // -------------------------------------------------------------------------
+    // 3. 经实际注册 resetScope 工具成功归档、单次排空 (Single-Drain)
+    // -------------------------------------------------------------------------
+    const committed = await reset.execute(
+      'call-omp-archive-success-043',
+      {
+        newScopeObjective: 'first verified omp scope',
+        newScopeTurnBudget: 8,
+        kpiCompletion: 'met',
+        oldScopeVerboseVerbatimExperience: 'Old experience verbatim sentinel 043',
+      },
+      null,
+      null,
+      liveCtx,
+    )
+
+    assert.ok(committed && committed.details)
+    assert.equal(committed.details.archived, true, 'resetScope must report archived: true on success')
+    assert.equal(committed.details.objective, 'first verified omp scope')
+    assert.equal(committed.details.turnBudget, 8)
+    assert.match(committed.content[0].text, /Scope reset. Objective: first verified omp scope/)
+
+    // Memory invariants: updated
+    assert.equal(isScopeInitialized(sid), true, 'memory scope must be initialized')
+    assert.equal(turnBudget(sid), 8, 'budget must be 8')
+
+    // Single-drain invariant: sealed snapshot must have been discarded from store
+    assert.equal(
+      outboundViewStore.tryGetSealed(sid),
+      undefined,
+      'outboundViewStore.discardSealed must have cleared sealed snapshot',
+    )
+
+    // -------------------------------------------------------------------------
+    // 4. 通过 Journal 真实投影 / Blob 读取断言内容
+    // -------------------------------------------------------------------------
+    const snap2 = AgentJournalModule_snapshot(JournalHandle__get_Journal(journalHandle))
+    const proj2 = AgentProjection_tryFind(SessionIdModule_create(sid), snap2.AgentProjections)
+    assert.ok(proj2?.PrefixEpoch, 'PrefixEpoch must exist in projection')
+    const epoch = proj2.PrefixEpoch
+    assert.equal(epoch.EpochId?.fields?.[0] ?? epoch.EpochId, 1n, 'epoch id advanced to 1n')
+    assert.ok(epoch.LastScopeArchive, 'LastScopeArchive must exist')
+    const archive = epoch.LastScopeArchive
+    assert.equal(archive.TargetEpochId?.fields?.[0] ?? archive.TargetEpochId, 1n)
+    assert.ok(archive.ArchiveRef, 'ArchiveRef must exist')
+
+    // Read blob content directly from journal writer BlobWriter
+    const blobRes = await JournalHandle__get_Journal(journalHandle).writer.BlobWriter.Read(archive.ArchiveRef)
+    assert.equal(blobRes.tag, 0, 'BlobWriter.Read must succeed (tag 0 = Ok)')
+    const blobJson = blobRes.fields[0]
+    assert.ok(typeof blobJson === 'string' && blobJson.length > 0)
+    const parsedBlob = JSON.parse(blobJson)
+    assert.equal(parsedBlob.sessionId, sid)
+    assert.equal(parsedBlob.toolsCaptured, true)
+    assert.ok(parsedBlob.nativePayload)
+    assert.equal(parsedBlob.nativePayload.tools[0].name, 'read')
+    assert.equal(parsedBlob.nativePayload.messages[1].content, 'USER_OMP_PROMPT_SENTINEL_043')
+
+    // -------------------------------------------------------------------------
+    // 5. 验证新 callID 无新观测拒绝 (无法复用已归档快照)
+    // -------------------------------------------------------------------------
+    const secondWithoutObservation = await reset.execute(
+      'call-omp-second-premature-043',
+      { newScopeObjective: 'second premature', newScopeTurnBudget: 4, kpiCompletion: 'met' },
+      null,
+      null,
+      liveCtx,
+    )
+
+    assert.ok(secondWithoutObservation && secondWithoutObservation.details)
+    assert.equal(secondWithoutObservation.details.refused, true, 'must be refused without new observation')
+    assert.equal(secondWithoutObservation.details.archived, false)
+    assert.match(
+      secondWithoutObservation.content[0].text,
+      /resetScope refused: the preceding real provider request has no complete archived system\/messages\/model observation/,
+    )
+    assert.equal(turnBudget(sid), 8, 'budget remains 8; refusal does not overwrite memory')
+
+    // -------------------------------------------------------------------------
+    // 6. 按真实契约区分幂等重放 (相同 callID 重放返回成功，不推进 epoch)
+    // -------------------------------------------------------------------------
+    const replay = await reset.execute(
+      'call-omp-archive-success-043',
+      { newScopeObjective: 'first verified omp scope', newScopeTurnBudget: 8, kpiCompletion: 'met' },
+      null,
+      null,
+      liveCtx,
+    )
+    assert.ok(replay)
+    assert.match(replay.content[0].text, /Scope reset. Objective: first verified omp scope/)
+    const snap3 = AgentJournalModule_snapshot(JournalHandle__get_Journal(journalHandle))
+    const proj3 = AgentProjection_tryFind(SessionIdModule_create(sid), snap3.AgentProjections)
+    assert.equal(proj3?.PrefixEpoch?.EpochId?.fields?.[0] ?? proj3?.PrefixEpoch?.EpochId, 1n, 'idempotent replay must not advance epoch')
+
+    // -------------------------------------------------------------------------
+    // 7. session_shutdown 清理隔离
+    // -------------------------------------------------------------------------
+    const sid2 = 'omp-sess-043-other'
+    const liveCtx2 = {
+      cwd: workspace,
+      model,
+      sessionManager: {
+        getSessionId: () => sid2,
+        getSessionDir: () => workspace,
+        getHeader: () => ({ parentSession: null }),
+      },
+    }
+    const beforeStart = env.eventHandlers.get('before_agent_start')
+    assert.ok(beforeStart, 'before_agent_start handler must be registered')
+    await beforeStart({ systemPrompt: ['SYSTEM_2'] }, liveCtx2)
+    await providerHook({ payload: structuredClone(nativePayload) }, liveCtx2)
+    assert.ok(outboundViewStore.tryGetSealed(sid2), 'sid2 has sealed snapshot before shutdown')
+
+    // Trigger session_shutdown
+    const shutdownHandler = env.eventHandlers.get('session_shutdown')
+    assert.ok(shutdownHandler, 'session_shutdown handler must be registered')
+    await shutdownHandler({}, liveCtx)
+
+    // Verify session_shutdown cleared all sessions from outboundViewStore
+    assert.equal(outboundViewStore.tryGetSealed(sid), undefined, 'sid must be purged by session_shutdown')
+    assert.equal(outboundViewStore.tryGetSealed(sid2), undefined, 'sid2 must be purged by session_shutdown')
+  } finally {
+    if (journalHandle && typeof journalHandle.Dispose === 'function') {
+      try {
+        journalHandle.Dispose()
+      } catch {}
+    }
+    rmSync(workspace, { recursive: true, force: true })
   }
 })

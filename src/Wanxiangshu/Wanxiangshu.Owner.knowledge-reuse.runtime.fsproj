@@ -29,9 +29,9 @@
     <Compile Include="Repository/Knowledge/Casebook/SettlementSurface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/FetchSurface.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/FetchSurface.fs"/>
-    <Compile Include="Repository/Knowledge/Casebook/Surface.fsi"/>
-    <Compile Include="Repository/Knowledge/Casebook/Surface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/IndexSurface.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/IndexSurface.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Surface.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/Surface.fs"/>
   </ItemGroup>
 </Project>

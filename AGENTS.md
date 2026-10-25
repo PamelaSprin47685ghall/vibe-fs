@@ -670,6 +670,25 @@ CUT36_OMP_REAL_SMOKE=1 \
   - 静态门禁：`fsharp-control-pyramid.mjs` 0 nested decisions 全绿；`architecture.mjs` 与 `adapter-thinness.mjs` 仅含既有基线已知红态 `Host/FissionPort.fs(.fsi)` namespace-tier 违例，无任何新增违例。
 - **状态台账与前向推进。** 本包完成 `CasebookIndex` 状态抽取，两仓分别提交并推送远端（库端 main，主仓 master）。本包完成公开索引状态机迁出，Casebook 剩余持久化提交追溯状态（如 `BookkeeperLedger` 等）仍留在主仓待后续包迁出，继续保持 clean-break 推进过程台账清晰，绝不虚构整体 DONE。
 
+### 6.14 OutboundViewCapture 状态抽取（2026-10-25）
+- **一份状态，一个自治 owner。** 原主仓 `OutboundViewCapture.fs/.fsi`（进程内出站请求视图暂存字典 `sessions`，含 `Pending` 待定三元组与 `Sealed` 已封存快照）及其全部领域行为已彻底迁入 `wanxiangli/pair-hint` 的自治对象 `OutboundViewStore`（并导出全局单例 `outboundViewStore`，实现在 `wanxiangli/src/pair-hint/OutboundViewStore.fs`）。渐进式非空检查封存（`checkAndSeal`，标记 `toolsCaptured=false`）、重入覆写重置、原生请求原子直封（`recordNativeRequest`，标记 `toolsCaptured=true`，带残缺校验与防御性深拷贝）、单次排空（`discardSealed`）、会话清理（`clearSession`）以及稳定快照 JSON 序列化（`serializeSnapshot`，严格契约 `providerID`, `modelID`, `variant`, `toolsCaptured`, `nativePayload`）完全由库侧对象维护，主仓不再维护私有出站快照状态容器与旧类型。
+- **旧 owner 彻底退出与消费者切换。** 主仓物理删除旧实现与签名文件（`OutboundViewCapture.fs` 与 `OutboundViewCapture.fsi`），从 `compile-order.txt` 及 `Wanxiangshu.Owner.context-compression.context-scope.fsproj` 编译条目中彻底移除。全部 4 个宿主消费者（`ResetScopeTool.fs`、`PluginHooks.fs`、`PluginTransforms.fs`、`Omp/Adapter.fs`）统一改接 `wanxiangli/pair-hint` 导出的 `outboundViewStore`，全仓不保留任何旧 facade、类型别名或兼容 shim。
+- **契约与反例设计事实。** 库侧在 `Wanxiangli.PairHint.fsproj` 中将 `OutboundViewStore.fs` 编入 `PairHint.fs` 之前（保持后者为最终编译项以固定 bundle 入口 `PairHint.js`），配置 `PackageExport` 导出类与单例；更新 `index.d.ts` 与 `wanxiangli/src/pair-hint/AGENTS.md`；在 `wanxiangli/src/pair-hint/tests/016.test.mjs` 中构建了渐进封存、重入重置、原生直封与残缺拒绝、深拷贝防外部篡改、单次排空、会话隔离清理、JSON 序列化契约及 `startTemporaryFromFrozen` 消费等 9 项反例测试；在 `requirements/context-compression/tests/043.test.mjs` 建立了针对 WHAT[043] 的完整回归套件。
+- **逐层验证事实与闭环凭据。**
+  - 库侧构建与单测：`node wanxiangli/scripts/build.mjs pair-hint --force` 编译全绿（0 error）；`node --test wanxiangli/src/pair-hint/tests/*.test.mjs` 全部 61 项单元测试 100% 通过（含新增针对渐进封存、原生直封与深拷贝隔离的 `tests/016.test.mjs` 10 项全绿）；导出门禁 `node wanxiangli/scripts/tests/exports.test.mjs` SPEC[build-008] 3 项全绿。
+  - 独立产包真实消费：通过 `npm pack` 生成真实 tarball（`wanxiangli-0.67.0.tgz`），在独立干净临时目录下经 Node.js ESM、Bun ESM 动态执行及 TypeScript strict（`tsc --project tsconfig.json`）静态类型检查，100% 消费断言成功通过，临时脚手架与产包彻底清理。
+  - 宿主构建与核心回归：在 `/tmp/wxs-build.lock` 保护下 `node scripts/build.mjs` 编译全绿（generation 198，1392 items in 46351ms，150 surfaces，778 emitted modules linked，0 error）。
+  - 核心回归套件实跑全绿：
+    - `context-compression/043`：8 passed, 0 failed（包含 6 项库契约与 2 项宿主真实表面 ResetScopeTool 接线反例与正例测试：无封存快照时拒绝重置并返回明确错误文本，单例建立封存快照后经真实 journal 归档成功并单次排空）；
+    - `context-compression/038`：3 passed, 0 failed；
+    - `host-boundary/omp-scope-seam`：18 passed, 0 failed（全量真实通过）；
+    - `host-boundary/scope-hni-physical`：23 passed, 0 failed（全量真实通过）。
+  - 静态门禁与基线反证：
+    - `fsharp-control-pyramid.mjs`：本包涉及修改文件 0 违规，全仓仅含既有 Interaction/Dispatch/Send.fs 等历史基线红态；
+    - `architecture.mjs` 与 `adapter-thinness.mjs`：仅含既有基线已知红态 `Host/FissionPort.fs(.fsi)` namespace-tier 违规，无任何新增违例；
+    - `owner-impact-corpus.json`：经核验已彻底清理，无任何 `OutboundViewCapture` 残留条目。
+- **状态台账与两仓主线对齐。** 本包完成 `OutboundViewCapture` 状态抽取，两仓分别完成精确暂存并推送到远端主线（库端 `main`，主仓 `master`）。本包使进程内出站请求视图暂存字典及其全部封存与单次排空行为彻底由库侧自治单例拥有，宿主不再保留任何旧状态容器与类型。
+
 ## 7. 迁移来源文件全量清单与保留/删除边界
 
 迁移指南已合入本文件，保留既有协作规则，不再维护独立指南；正式需求仍按各自合同维护。
