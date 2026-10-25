@@ -130,3 +130,29 @@ test('WHAT[host-boundary-016] mutation_canary_duplicate_completed_is_absorbed', 
   assert.equal(received.length, 1)
 })
 }
+
+test('WHAT[host-boundary-016] PluginHost 共享总线引用计数在同一工作区复用且完全释放后归零（防包装泄漏回归）', async () => {
+  const { TerminalWiring } = await import('../../../dist/OpenCode/Host/TerminalWiring.js');
+  const workspace = '/tmp/test-wxs-shared-terminal-' + Math.random().toString(36).slice(2);
+
+  // 1. 首次获取
+  const candidate1 = TerminalWiring.createSource();
+  const acquired1 = await TerminalWiring.tryAcquireForWorkspace(workspace, candidate1);
+  assert.ok(acquired1, '首个实例成功获取或注册共享终端源');
+  const [key1, source1] = acquired1;
+
+  // 2. 第二次获取相同工作区，断言引用严格一致
+  const candidate2 = TerminalWiring.createSource();
+  const acquired2 = await TerminalWiring.tryAcquireForWorkspace(workspace, candidate2);
+  assert.ok(acquired2);
+  const [key2, source2] = acquired2;
+  assert.equal(key1, key2);
+  assert.ok(Object.is(source1, source2), '相同工作区的共享终端源严格保持同一引用');
+
+  // 3. 释放两次，引用计数彻底归零
+  TerminalWiring.release(key1, source1);
+  TerminalWiring.release(key2, source2);
+
+  // 4. 再次安全释放为 no-op
+  TerminalWiring.release(key2, source2);
+});

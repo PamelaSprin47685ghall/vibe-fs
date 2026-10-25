@@ -108,12 +108,12 @@ module PluginHost =
             // the first registry of that workspace, so the root and worktree
             // plugin instances share one terminal truth.
             let candidate = Events.newTerminalSource ()
-            let! shared = SharedTerminalBus.tryAcquireForWorkspace workspaceDirectory candidate
+            let! shared = TerminalWiring.tryAcquireForWorkspace workspaceDirectory candidate
 
-            let hostEventPort, terminalKey =
+            let hostEventPort, terminalKey, finalSource =
                 match shared with
-                | Some(key, source) -> Events.HostEventPort(source), Some key
-                | None -> Events.HostEventPort(candidate), None
+                | Some(key, source) -> Events.HostEventPort(source), Some key, source
+                | None -> Events.HostEventPort(candidate), None, candidate
 
             let eventPort = hostEventPort :> IEventObservationPort
 
@@ -134,6 +134,6 @@ module PluginHost =
                     sessionPort :> ISessionHostPort,
                     snapshotPort,
                     terminalKey,
-                    Some(hostEventPort :> ISessionTerminalSource)
+                    Some finalSource
                 )
         }

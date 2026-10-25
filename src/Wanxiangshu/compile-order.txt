@@ -781,12 +781,10 @@ Context/Companion/CompressionSurface.fsi
 Context/Companion/CompressionSurface.fs
 Foundation/TerminalSignal.fsi
 Foundation/TerminalSignal.fs
-Execution/Session/TerminalRegistry.fsi
-Execution/Session/TerminalRegistry.fs
+OpenCode/Host/TerminalWiring.fsi
+OpenCode/Host/TerminalWiring.fs
 OpenCode/Host/Events.fsi
 OpenCode/Host/Events.fs
-OpenCode/Host/SharedTerminalBus.fsi
-OpenCode/Host/SharedTerminalBus.fs
 OpenCode/Host/EventsSurface.fsi
 OpenCode/Host/EventsSurface.fs
 OpenCode/Signals/HostSignal.fsi

@@ -24,7 +24,7 @@ open Wanxiangshu.Host.Ports
 /// its own sticky cache and its own listener list. That is deliberate isolation,
 /// not a second production truth. The production truth is the single instance
 /// the composition root creates (`OpenCode/Host/PluginHost.fs`) and shares per
-/// workspace through `SharedTerminalBus`; the probes never join that bus, so a
+/// workspace through `TerminalWiring`; the probes never join that bus, so a
 /// probe can neither observe nor disturb a production terminal fact, and a
 /// production terminal fact can never leak into a probe's sticky replay.
 module SessionsSurface =
