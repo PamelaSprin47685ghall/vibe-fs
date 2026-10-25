@@ -599,7 +599,76 @@ CUT36_OMP_REAL_SMOKE=1 \
 - **未闭合边界。** context-compression-001 的 GAP-104（模型容量权威独立审计）仍为 TODO。尚未进行真实 provider 会话 canary，不宣称运行中的 OpenCode 实例已热更新。本次 node scripts/check.mjs 仍有既有 25 项红态：Host/FissionPort.fs namespace-tier 1 项及并行改动涉及的 control-pyramid 24 项，不把它们算成本包通过。
 
 
----
+
+
+### 6.10 Casebook BookkeeperStaging 状态抽取（2026-10-25）
+- **一份状态，一个自治 owner。** 原主仓 `BookkeeperStaging.fs` 与 `.fsi` 保存可变暂存事务槽位字典 `slots` 与变更标记 `Touched`。现已彻底迁入 `wanxiangli/casebook` 的进程内自治对象 `BookkeeperStaging`（提供类及全局唯一单例 `bookkeeperStaging`）。暂存槽位的生命周期（`beginTransaction`、`snapshot`、`apply`、`take`、`touched`、`abort`）由库侧对象独占拥有与维护；`apply(tx, None, None)` 无论字段是否变化均无条件标记 `touched=true`；未 touched 的 `take` 被拒且保留 slot，重入 `begin` 覆盖同一 tx 时重置 `touched=false`。宿主消费者（`BookkeeperRuntime.fs`、`BookkeeperSurface.fs`、`BookkeeperTool.fs`）统一导入并向该单例发送消息，主仓不再维护私有暂存副本。
+- **旧 owner 彻底退出。** 主仓物理删除 `BookkeeperStaging.fs` 与 `BookkeeperStaging.fsi`，从 `compile-order.txt` 及 `Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj` 编译条目中移除。同步清理 `scripts/checks/owner-impact-corpus.json` 中指涉该已退出 owner 文件的 8 行条目；`scripts/owner-impact-report.mjs` 确认无内嵌陈旧常量。
+- **逐层验证事实。**
+  - 库侧：Fable 编译与 casebook 家族 21 项单测全部通过（包含新增针对 slots/touched/take 契约边界的 `tests/006.test.mjs` 12 项断言全绿）。
+  - 独立消费：通过 `npm pack` 生成真实 tarball，在独立干净临时目录下经由 Node.js ESM、Bun ESM 动态执行及 TypeScript（`tsc --noEmit --module NodeNext --moduleResolution NodeNext --strict`）静态类型检查，100% 消费断言成功通过。
+  - 宿主侧：在 `/tmp/wxs-build.lock` 保护下 `node scripts/build.mjs` 成功编译（generation 192，1400 items，150 surfaces，782 emitted modules linked）。`knowledge-reuse` 核心条款套件全部验证通过（006: 19 pass / 1 todo; 010: 12 pass / 1 todo; 013: 31 pass / 1 todo；BookkeeperTool 接线 034: 2 pass）。
+- **未闭合边界与剩余状态台账。** 本首包仅完成暂存事务（slots/Touched）抽取，**绝不记整体 DONE**。主仓 Casebook 其余状态（如 `SessionDraft`、`BookkeeperLedger` 提交与追溯状态、Casebook 维护与接入运行时等）仍留在主仓待后续包迁出。既有架构门禁红态（如 `FissionPort.fs` namespace-tier 1 项）为分支已知历史状态，未因本包产生退化。
+
+- **审计修复与槽位泄漏防范（2026-10-25 补充闭环）**：
+  - **清槽防泄漏**：修复 `BookkeeperRuntime.fs` 中 `Coordination.awaitCompletion` 在 `Ok()` 但 `touched=false`（未写入）分支下漏调 `staging?abort(txId)` 导致孤儿槽位和 Q/A 驻留泄漏的缺陷；在返回 Error 前显式执行 abort 清槽。
+  - **文档与契约校正**：修正 `BookkeeperSurface.fsi` 中称其为“staged transaction owner”的历史陈旧注释，明确状态由库侧自治对象管理。
+  - **库侧保值测试**：`wanxiangli/src/casebook/tests/006.test.mjs` 补齐 `apply(undefined, undefined)` 在已有问答时无条件保留原值且将 `touched` 标记为 true 的反例。
+  - **宿主回归全绿**：`requirements/knowledge-reuse/tests/006.test.mjs` 补充回归用例，实证 did not write 发生时错误如期返回且该 txId 的 snapshot 查不到（槽已被清理）；同时对比实证未 touched 的 `take` 自身拒绝但仍保留 slot（库语义不变）。
+  - **六动词接线验证**：真实 `006` 与 `034` 测试实证 Fable 动态 obj 跨包方法调用（`beginTransaction`、`snapshot`、`apply`、`take`、`touched`、`abort`）100% 连通可靠。
+  - **当前状态**：首包完满闭环，保持未迁出的剩余状态（SessionDraft/Ledger/Index）台账清晰，不虚构整体 DONE。
+
+### 6.11 TerminalRegistry 与 SharedTerminalBus 状态抽取（2026-10-25）
+- **一份状态，一个自治 owner。** 原主仓 `TerminalRegistry.fs/.fsi`（会话级终端事件去重、FIFO sticky 缓存与监听器队列）与 `SharedTerminalBus.fs/.fsi`（跨工作区共享终端源引用计数与复用）状态已彻底迁入 `wanxiangli/terminal` 的自治对象 `TerminalRegistry` 与 `TerminalBus`。去重计算（Completed runId 判定）、sticky 历史缓存（上限 256）、订阅生命周期和多实例引用计数完全由库侧对象维护，宿主组合层不再保留任何私有终端字典。
+- **旧 owner 彻底退出。** 主仓物理删除两组旧实现与签名文件（`TerminalRegistry.fs/.fsi`、`SharedTerminalBus.fs/.fsi`），从 `compile-order.txt` 及 `session-ontology.execution-session-ownership`、`host-boundary.host-signal-adapter` fsproj 中清理编译项；更新 `requirements/host-boundary/WHAT.md` [026] 条款对齐中立 `TerminalWiring` 接入规范。
+- **审计缺陷自修与契约回归根治。** 
+  - **引用同一性保证与对称编解码**：独立静态审计查出 `PluginHost.fs:createHost` 在返回元组第 5 项时将 `source` 包装为 `Events.HostEventPort(source)`，导致下游 `PluginRuntimeScope.fs` 在 `release` 时向 `TerminalBus` 传入包装对象，在 `ReferenceEquals` 下恒为 false，致使总线引用计数无法归零并发生泄漏。已行使自修权修复为返回 `Some finalSource`，确保入总线与出总线对象引用严格同一。并在 `TerminalWiring.fs` 中完成宿主 F# 可区分联合 `TerminalOutcome` 与库侧中立 `TerminalOutcome` 的对称编解码：存入库总线时提取 `runId` 并将完整宿主 DU 作为 payload 封装，监听器解构时直接无损取出宿主 DU，彻底根除 Fable 解构时的 `fields[0]` 访问异常。
+  - **delegation/025 历史回放误接根治**：定位并根除了 `TerminalWiring.SubscribeFutureTerminalListener` 误调 `reg?SubscribeProcessTerminal`（会回放已有 sticky 历史事件）导致的接线回归，精准更正为调用 `reg?SubscribeProcessFutureTerminal`（严格只接收未来事件，绝不回放陈旧执行结果），并修复了回调形参 `fun _sid o ->`，使 `requirements/delegation/tests/025.test.mjs` 实测全绿通过（21 pass, 0 fail, 1 todo GAP-153）。
+  - **PluginHost 真实端到端 oracle 闭环**：在 `requirements/host-boundary/tests/016.test.mjs` 中构建了真正调用 `createHost(workspace, ...)` 并提取元组第 5 项 `sharedTerminalPort` 的端到端测试，断言相同工作区多次获取严格保持 `Object.is` 引用同一性、伪装包装对象释放无法提前移除条目、正常释放两次后条目彻底归零清理且再次获取分配新 candidate，实证彻底消除了包装泄漏风险。
+- **逐层验证事实。**
+  - 库侧：Fable 编译全绿，单测 7 项全部通过（`tests/001.test.mjs` 7 pass / 0 fail，含 SubscribeProcessFutureTerminal 严禁回放 sticky 历史反例），`exports.test.mjs` SPEC[build-008] 3 项全绿。
+  - 独立产包消费：`npm pack` 生成真实 tarball，在独立空临时目录下通过 Node.js ESM 动态导入、Bun ESM 动态导入及 TypeScript strict（`tsc --project tsconfig.json`）静态类型检查，100% 成功通过，临时脚手架与产包彻底清理。
+  - 宿主侧：排队锁 `/tmp/wxs-build.lock` 保护下 `node scripts/build.mjs` 成功编译（0 error）。
+  - 核心回归套件实跑：
+    - `host-boundary/016`：12 pass, 0 fail, 0 skipped, 0 todo（含 PluginHost 端到端引用同一性防泄漏 oracle 及 future 订阅严禁回放历史断言）；
+    - `delegation/025`：21 pass, 0 fail, 0 skipped, 1 todo (GAP-153，未来订阅排除陈旧执行断言全绿通过)；
+    - `host-boundary/026`：3 pass, 0 fail, 1 skipped (既有 integration tier not enabled 条件跳过), 0 todo；
+    - `delegation/029`：2 pass, 0 fail, 0 skipped, 1 todo (GAP-153)。
+  - 架构门禁：`fsharp-control-pyramid.mjs` 0 nested decisions 全绿；`architecture.mjs` 与 `adapter-thinness.mjs` 仅含既有基线已知红态 `Host/FissionPort.fs(.fsi)` namespace-tier 违例，无任何新增违规；`owner-impact-report.mjs` 确认基线稳定。
+- **状态台账与前向推进。** 本包两仓分别提交并推送远端（库端 main，主仓 master）。本包完成终端去重与共享总线抽取，继续保持 clean-break 推进过程台账清晰。
+
+
+### 6.12 SessionDraft 状态抽取（2026-10-25）
+- **一份状态，一个自治 owner。** 原主仓 `SessionDraft.fs/.fsi`（进程内委托会话草稿暂存字典 `drafts`）状态与全部领域行为已彻底迁入 `wanxiangli/casebook` 的自治对象 `SessionDraftStore`（并导出全局单例 `sessionDraftStore`）。草稿问答轮次演进（未答覆写 Q、已答追加新轮、覆写末轮 A、空草稿补空 Q 轮次）、原子取出消费（`tryTake` 取出即删，返回只读原生数组快照防泄露）、会话隔离清理（`clear` 幂等）以及案例定稿字段计算（`lastQuestion`、`lastAnswer`、`transcript` 逐字格式化）完全由库侧对象维护，主仓不再维护私有草稿字典与类型。
+- **旧 owner 彻底退出。** 主仓物理删除两项旧实现与签名文件（`SessionDraft.fs` 与 `SessionDraft.fsi`），从 `compile-order.txt` 及 `Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj` 编译条目中彻底移除；同步清理 `scripts/checks/owner-impact-corpus.json` 中指涉该已退出文件的 8 处条目。宿主全部消费者（`Lifecycle.fs` 与 `PluginLifecycleSurface.fs`）统一改接 `wanxiangli/casebook` 的公开单例 `sessionDraftStore`，全仓不保留任何旧 facade、类型别名或兼容 shim。
+- **契约与反例设计事实。** 库侧在 `Wanxiangli.Casebook.fsproj` 中将 `SessionDraftStore.fs` 插入 `CasebookIndexLaw.fs` 之前（保持后者为最终编译项以固定 bundle 入口），导出类与单例；在 `index.d.ts` 中导出原生数组快照类型（`CasebookDraftTurn`、`CasebookDraftSnapshot`）与完整 TS 签名；在 `wanxiangli/src/casebook/tests/010.test.mjs` 中构建了独立实例隔离、Q 覆写/追加、A 覆写/空补、tryTake 原子消费与再次取出为 undefined、clear 幂等与隔离、lastQ/lastA 选择及 transcript 逐字格式化等完整边界反例。
+- **逐层验证事实。**
+  - 库侧：Fable 编译全绿；单测 `wanxiangli/src/casebook/tests/*.test.mjs` 22 项全绿（006: 7 pass, 008: 2 pass, 010: 9 pass, 012: 4 pass，全量实测 22 passed / 0 failed；010 包含空字符串答案 `Some ""` 算已答且 `lastAnswer` 必须返回 `""`、快照原生数组外改隔离等完整反例）；`exports.test.mjs` SPEC[build-008] 3 项全绿。casebook 家族全部 3 包总计 31 passed / 0 failed。
+  - 独立产包消费：`npm pack` 生成真实 tarball（`wanxiangli-0.67.0.tgz`），在独立干净临时目录下经 Node.js ESM、Bun ESM 动态执行及 TypeScript strict（`tsc --noEmit`）静态类型检查，100% 成功通过，临时脚手架与产包彻底清理。
+  - 宿主构建与核心回归：在 `/tmp/wxs-build.lock` 保护下 `node scripts/build.mjs` 编译全绿（generation 197，1396 items in 44567ms，150 surfaces, 780 emitted modules linked，0 error）。核心回归套件实跑全绿：
+    - `knowledge-reuse/010`：14 passed, 0 failed, 1 todo (GAP-160)（包含两处宿主真实链回归：`PluginLifecycleSurface.takeEngineerDraft` 消费单例草稿并返回原生快照数组、再次消费返回 undefined；`Lifecycle.tryFinalizeDraft` 与 `cleanupDraft` 真实消费同一单例）；
+    - `knowledge-reuse/013`：31 passed, 0 failed, 1 todo (GAP-160)；
+    - `knowledge-reuse/006`：20 passed, 0 failed, 1 todo (GAP-160)；
+    - `repository-programming/034*`（BookkeeperTool 接线）：2 passed, 0 failed。
+  - 静态门禁：`fsharp-control-pyramid.mjs` 0 nested decisions 全绿；`architecture.mjs` 与 `adapter-thinness.mjs` 仅含既有基线已知红态 `Host/FissionPort.fs(.fsi)` namespace-tier 违例，无任何新增违例。
+- **状态台账与前向推进。** 本包完成 `SessionDraft` 状态抽取，两仓分别提交并推送远端（库端 main，主仓 master）。本包仅完成草稿暂存职责迁出，Casebook 其余状态（如 `BookkeeperLedger` 提交追溯状态、Casebook 维护与接入运行时、Index 存储等）仍保留在主仓，继续保持 clean-break 推进过程台账清晰，绝不虚构整体 DONE。
+
+### 6.13 CasebookIndex 状态抽取（2026-10-25）
+- **一份状态，一个自治 owner。** 原主仓 `Index.fs/.fsi`（进程内公开 Casebook 索引状态机）持有的私有 `frozen: Snapshot option` 与 `dirty: bool` 状态及其演进行为已彻底迁入 `wanxiangli/casebook` 的自治对象 `CasebookIndex`（并导出全局单例 `casebookIndex`，实现在 `wanxiangli/src/casebook/CasebookIndexLaw.fs` 以固定 entry bundle `CasebookIndexLaw.js` 严格契约）。快照冻结（首次即使为空集合亦产生 `epoch = 0n` 且 `dirty = false`；后续仅在 `dirty = true` 或条目次序/内容变动时自增推进 epoch）、失效标记（`invalidate`）、防御性浅拷贝条目隔离、稳定公开 shelfmark 计算与定位完全由库侧对象维护，宿主组合层不再保留任何私有索引状态容器。
+- **旧 owner 彻底退出与薄投影读取边界。** 主仓物理删除旧实现与签名文件（`Index.fs` 与 `Index.fsi`），从 `compile-order.txt`、`Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj` 编译条目以及 `owner-impact-corpus.json` 中彻底移除。对 `IEventStore` 的读取与淘汰（`projectCases` 与 `resolve`）作为无状态薄辅助函数移入 `Model.fs` 的 `CasebookProjection` 模块，确保 `resolve` 直读最新存储投影的语义保持不变，宿主无反向依赖，全仓不保留任何旧 facade 或双重状态容器。
+- **逐层验证事实与闭环凭据。**
+  - 库侧：Fable 编译全绿（`node wanxiangli/scripts/build.mjs casebook --force` 生成 `dist/casebook/CasebookIndexLaw.js`）；单测全绿，`wanxiangli/src/casebook/tests/*.test.mjs` 29 项全部通过（006: 7 pass, 008: 2 pass, 010: 9 pass, 012: 4 pass, 014: 7 pass；覆盖初始 null、空集合首次冻结 epoch=0n、无变动不推进、invalidate 强制推进、内容/顺序变动推进、快照外部修改隔离、多实例与单例隔离、locate/shelfmark 确定性等全部边界）；伴随包 access 4 pass、maintenance 5 pass，casebook 家族全部 3 包总计 38 pass / 0 fail；导出门禁 `wanxiangli/scripts/tests/exports.test.mjs` SPEC[build-008] 3 项全绿。
+  - 独立产包消费：`npm pack` 生成真实 tarball（`wanxiangli-0.67.0.tgz`），在独立干净临时目录下经 Node.js ESM、Bun ESM 动态执行及 TypeScript strict（`tsc --project tsconfig.json`）静态类型检查，100% 成功通过，临时脚手架与产包彻底清理。
+  - 宿主构建与核心回归：在 `/tmp/wxs-build.lock` 保护下 `node scripts/build.mjs` 编译全绿（1432 files in 1594ms, 0 error）。核心回归套件实跑全绿：
+    - `knowledge-reuse/008`：1 pass, 0 fail, 1 todo (GAP-160)；
+    - `knowledge-reuse/011`：7 pass, 0 fail, 1 todo (GAP-160)；
+    - `knowledge-reuse/012`：5 pass, 0 fail, 0 todo（Shelfmark 稳定性、epoch 推进与 UTF-8 解析全绿）；
+    - `knowledge-reuse/013`：31 pass, 0 fail, 1 todo (GAP-160)；
+    - `knowledge-reuse/006`：20 pass, 0 fail, 1 todo (GAP-160)；
+    - `knowledge-reuse/010`：14 pass, 0 fail, 1 todo (GAP-160)；
+    - `repository-programming/034*`（工具接线）：2 pass, 0 fail。
+  - 静态门禁：`fsharp-control-pyramid.mjs` 0 nested decisions 全绿；`architecture.mjs` 与 `adapter-thinness.mjs` 仅含既有基线已知红态 `Host/FissionPort.fs(.fsi)` namespace-tier 违例，无任何新增违例。
+- **状态台账与前向推进。** 本包完成 `CasebookIndex` 状态抽取，两仓分别提交并推送远端（库端 main，主仓 master）。本包完成公开索引状态机迁出，Casebook 剩余持久化提交追溯状态（如 `BookkeeperLedger` 等）仍留在主仓待后续包迁出，继续保持 clean-break 推进过程台账清晰，绝不虚构整体 DONE。
 
 ## 7. 迁移来源文件全量清单与保留/删除边界
 

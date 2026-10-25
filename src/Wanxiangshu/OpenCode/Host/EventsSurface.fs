@@ -137,7 +137,7 @@ module EventsSurface =
         task {
             let candidate = Events.newTerminalSource ()
 
-            match! SharedTerminalBus.tryAcquireForWorkspace (Some workspace) candidate with
+            match! TerminalWiring.tryAcquireForWorkspace (Some workspace) candidate with
             | Some(_, source) -> return box source
             | None -> return null
         }
@@ -145,5 +145,5 @@ module EventsSurface =
     let releaseSharedForWorkspace (workspace: string) (port: obj) : Task<unit> =
         task {
             let! key = RuntimePath.forWorkspace workspace
-            SharedTerminalBus.release (Some key) (Some(port :?> ISessionTerminalSource))
+            TerminalWiring.release (Some key) (Some(port :?> ISessionTerminalSource))
         }

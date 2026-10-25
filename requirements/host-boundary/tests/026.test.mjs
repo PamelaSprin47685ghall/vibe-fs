@@ -72,7 +72,8 @@ test('WHAT[host-boundary-026] host session contract compiles independently witho
     'OpenCode/Signals/HostSignalAdapter.fs',
     'OpenCode/Signals/HostSignalSubscribe.fs',
     'OpenCode/Host/Events.fs',
-    'OpenCode/Host/SharedTerminalBus.fs',
+    'OpenCode/Host/TerminalWiring.fs',
+    'OpenCode/Host/TerminalWiring.fsi',
     'Foundation/Diagnostic.fs',
     'OpenCode/Host/ReliabilityDiagnostics.fs',
     'OpenCode/Host/ReliabilityDiagnosticsSurface.fs',
@@ -216,7 +217,11 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
   assert.ok(signalAdapter.compile.includes('OpenCode/Signals/HostSignalAdapter.fs'))
   assert.ok(signalAdapter.compile.includes('OpenCode/Signals/HostSignalSubscribe.fs'))
   assert.ok(signalAdapter.compile.includes('OpenCode/Host/Events.fs'))
-  assert.ok(signalAdapter.compile.includes('OpenCode/Host/SharedTerminalBus.fs'))
+  assert.ok(signalAdapter.compile.includes('OpenCode/Host/TerminalWiring.fs'))
+  // .fsi is interface, compile list only includes implementation files
+    assert.ok(signalAdapter.compile.includes('OpenCode/Host/TerminalWiring.fs'))
+  assert.ok(!signalAdapter.compile.includes('OpenCode/Host/SharedTerminalBus.fs'))
+  assert.ok(!signalAdapter.compile.includes('Execution/Session/TerminalRegistry.fs'))
 
   const sessionRuntime = requireShard('host-session-runtime')
   assert.ok(sessionRuntime.compile.includes('OpenCode/Host/SessionQuiescenceGate.fs'))
@@ -311,6 +316,7 @@ test('WHAT[host-boundary-026] tool registration compiles without signal routing 
     'src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs',
     'src/Wanxiangshu/OpenCode/Host/Events.fs',
     'src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs',
+    'src/Wanxiangshu/OpenCode/Host/TerminalWiring.fs',
     'src/Wanxiangshu/Execution/Failure/Model.fs',
     'src/Wanxiangshu/Persistence/Journal/RuntimePath.fs',
   ])
@@ -328,6 +334,7 @@ test('WHAT[host-boundary-026] tool registration compiles without signal routing 
       'src/Wanxiangshu/OpenCode/Signals/HostSignal.fs',
       'src/Wanxiangshu/OpenCode/Host/Events.fs',
       'src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs',
+      'src/Wanxiangshu/OpenCode/Host/TerminalWiring.fs',
     ])
       assert.ok(!consumerSources.has(unrelated), `${id} must not acquire ${unrelated}`)
   }

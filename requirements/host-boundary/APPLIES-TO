@@ -61,7 +61,7 @@
 /src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs
 /src/Wanxiangshu/OpenCode/Host/SessionSnapshotSurface.fs
 /src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs
-/src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs
+/src/Wanxiangshu/OpenCode/Host/TerminalWiring.fs
 /src/Wanxiangshu/Execution/Delegation/Fork/JoinResultRendererSurface.fs
 /src/Wanxiangshu/OpenCode/Plugin/Plugin.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs

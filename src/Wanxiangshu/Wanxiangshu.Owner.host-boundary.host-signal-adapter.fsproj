@@ -29,10 +29,10 @@
     <Compile Include="OpenCode/Signals/HostSignalSubscribe.fs"/>
     <Compile Include="OpenCode/Host/HostSignalSubscribeSurface.fsi"/>
     <Compile Include="OpenCode/Host/HostSignalSubscribeSurface.fs"/>
+    <Compile Include="OpenCode/Host/TerminalWiring.fsi"/>
+    <Compile Include="OpenCode/Host/TerminalWiring.fs"/>
     <Compile Include="OpenCode/Host/Events.fsi"/>
     <Compile Include="OpenCode/Host/Events.fs"/>
-    <Compile Include="OpenCode/Host/SharedTerminalBus.fsi"/>
-    <Compile Include="OpenCode/Host/SharedTerminalBus.fs"/>
     <Compile Include="OpenCode/Host/EventsSurface.fsi"/>
     <Compile Include="OpenCode/Host/EventsSurface.fs"/>
   </ItemGroup>

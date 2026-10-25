@@ -5,7 +5,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Execution.Session
 open Wanxiangshu.Host.Ports
 
 module Events =
@@ -13,7 +12,7 @@ module Events =
     /// A fresh terminal source. The product owns the terminal facts; this is
     /// the only adapter-side place that names the product's implementation, and
     /// it names it only to obtain an instance — never to hold one.
-    let newTerminalSource () : ISessionTerminalSource = TerminalRegistry()
+    let newTerminalSource () : ISessionTerminalSource = TerminalWiring.createSource()
 
     let private notifyOne (listener: HostSignal -> Task) (signal: HostSignal) : Task =
         task {
@@ -47,7 +46,7 @@ module Events =
     /// The one event port.
     ///
     /// The terminal facts, the sticky cache and the listener list live in the
-    /// product's terminal registry (`Execution/Session/TerminalRegistry`): the
+    /// terminal registry (`wanxiangli/terminal`): the
     /// host does not own a terminal outcome, it only observes one. This port is
     /// the host-facing face of that registry — it holds no second copy of the
     /// sticky cache, of the idempotence cache or of the listener registry, so

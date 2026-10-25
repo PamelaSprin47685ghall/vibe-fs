@@ -785,12 +785,10 @@ Context/Companion/CompressionSurface.fsi
 Context/Companion/CompressionSurface.fs
 Foundation/TerminalSignal.fsi
 Foundation/TerminalSignal.fs
-Execution/Session/TerminalRegistry.fsi
-Execution/Session/TerminalRegistry.fs
+OpenCode/Host/TerminalWiring.fsi
+OpenCode/Host/TerminalWiring.fs
 OpenCode/Host/Events.fsi
 OpenCode/Host/Events.fs
-OpenCode/Host/SharedTerminalBus.fsi
-OpenCode/Host/SharedTerminalBus.fs
 OpenCode/Host/EventsSurface.fsi
 OpenCode/Host/EventsSurface.fs
 OpenCode/Signals/HostSignal.fsi
@@ -1130,10 +1128,6 @@ Repository/Knowledge/Casebook/Replay.fsi
 Repository/Knowledge/Casebook/Replay.fs
 Repository/Knowledge/Casebook/ObservationCollector.fsi
 Repository/Knowledge/Casebook/ObservationCollector.fs
-Repository/Knowledge/Casebook/SessionDraft.fsi
-Repository/Knowledge/Casebook/SessionDraft.fs
-Repository/Knowledge/Casebook/BookkeeperStaging.fsi
-Repository/Knowledge/Casebook/BookkeeperStaging.fs
 Repository/Knowledge/Casebook/BookkeeperRuntime.fsi
 Repository/Knowledge/Casebook/BookkeeperRuntime.fs
 Repository/Knowledge/Casebook/BookkeeperPolicy.fsi
@@ -1144,8 +1138,6 @@ Execution/Tool/ExecuteGate.fsi
 Execution/Tool/ExecuteGate.fs
 Repository/Knowledge/Casebook/Workflow.fsi
 Repository/Knowledge/Casebook/Workflow.fs
-Repository/Knowledge/Casebook/Index.fsi
-Repository/Knowledge/Casebook/Index.fs
 Repository/Knowledge/Casebook/ToolPlan.fsi
 Repository/Knowledge/Casebook/ToolPlan.fs
 Repository/Programming/Js/ToolsBindings.fsi

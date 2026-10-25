@@ -9,7 +9,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Process
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
 
@@ -20,6 +19,9 @@ open Wanxiangshu.Repository.Programming.Js
 /// `BookkeeperPolicy`; this binding keeps the sandbox call and the host tool
 /// shape.
 module JsBookkeeperTool =
+
+    [<Import("bookkeeperStaging", "wanxiangli/casebook")>]
+    let private staging: obj = jsNative
 
     let private prose language path = BookkeeperPolicy.prose language path
 
@@ -39,7 +41,7 @@ module JsBookkeeperTool =
                 args.OptionalText "program"
                 |> Result.requireSome (prose language BookkeeperPolicy.Path.ProgramRequired)
 
-            let! question, answer = BookkeeperStaging.snapshot txId
+            let! question, answer = unbox<Result<string * string, string>> (staging?snapshot (txId))
             return txId, program, question, answer
         }
 
@@ -57,7 +59,7 @@ module JsBookkeeperTool =
                 |> Result.mapError (fun failure -> BookkeeperPolicy.failed language (JsFailure.reason failure))
 
             do!
-                BookkeeperStaging.apply txId staged.Question staged.Answer
+                unbox<Result<unit, string>> (staging?apply (txId, staged.Question, staged.Answer))
                 |> Result.mapError (fun err -> BookkeeperPolicy.failed language err)
 
             return BookkeeperPolicy.succeeded language value

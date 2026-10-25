@@ -86,4 +86,10 @@ module CasebookProjection =
     /// CASE-008: LRU eviction — keep the capacity most-recently-accessed
     /// Cases; the evicted session ids are returned so the caller can append
     /// Evicted facts (tombstones are events too).
+    /// 从事件存储投影并应用 LRU 淘汰后的案例表（无状态薄读取）。
+    val projectCases: store: IEventStore -> capacity: int -> Map<string, Case>
+
+    /// 解析公开 shelfmark 到内部 Case。
+    val resolve: store: IEventStore -> capacity: int -> shelfmark: string -> Result<Case option, string>
+
     val evict: capacity: int -> cases: Map<string, Case> -> Map<string, Case> * string list

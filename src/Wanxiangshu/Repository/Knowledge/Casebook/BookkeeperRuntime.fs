@@ -30,6 +30,9 @@ type ICasebookSessionPort =
 /// against process-local staging, then AbortSession.
 module BookkeeperRuntime =
 
+    [<Import("bookkeeperStaging", "wanxiangli/casebook")>]
+    let private staging: obj = jsNative
+
     type private LiveAttachment =
         { TxId: string
           OwnerSessionId: string
@@ -251,18 +254,19 @@ module BookkeeperRuntime =
 
                 match waited with
                 | Error err ->
-                    BookkeeperStaging.abort txId
+                    staging?abort (txId) |> ignore
                     do! retire sessions childId
                     return Error err
                 // LC-029: the staged transaction starts with the initial
                 // Q/A, so a terminal that never wrote through it has not
                 // delivered. Keep waiting instead of passing the original
                 // values off as this run's commitment.
-                | Ok() when BookkeeperStaging.touched txId ->
-                    let taken = BookkeeperStaging.take txId
+                | Ok() when unbox<bool> (staging?touched (txId)) ->
+                    let taken = unbox<Result<string * string, string>> (staging?take (txId))
                     do! retire sessions childId
                     return taken
                 | Ok() ->
+                    staging?abort (txId) |> ignore
                     do! retire sessions childId
                     return Error "bookkeeper program did not write the staged case"
             }
@@ -282,7 +286,7 @@ module BookkeeperRuntime =
                 match res with
                 | Error reason ->
                     disposeSub ()
-                    BookkeeperStaging.abort txId
+                    staging?abort (txId) |> ignore
                     do! retire sessions childId
                     return Error reason
                 | Ok() -> return! awaitCompletion sessions txId childId completion disposeSub
@@ -335,7 +339,7 @@ module BookkeeperRuntime =
                 match PromptAuthority.validateInheritedIdentitySeedAgainstActiveOwner activeOwner identitySeed with
                 | Error rejection ->
                     disposeSub ()
-                    BookkeeperStaging.abort txId
+                    staging?abort (txId) |> ignore
                     do! retire sessions childId
                     return Error(sprintf "bookkeeper identity seed rejected: %A" rejection)
                 | Ok participantIdentity ->
@@ -377,7 +381,7 @@ module BookkeeperRuntime =
                 | Error error -> return Error error
                 | Ok identitySeed ->
                     let txId = Guid.NewGuid().ToString("N")
-                    BookkeeperStaging.beginTransaction txId q a
+                    staging?beginTransaction (txId, q, a) |> ignore
 
                     match!
                         runtime.Port.CreateSiblingSession(
@@ -387,7 +391,7 @@ module BookkeeperRuntime =
                         )
                     with
                     | Error error ->
-                        BookkeeperStaging.abort txId
+                        staging?abort (txId) |> ignore
                         return Error error
                     | Ok childId ->
                         return!

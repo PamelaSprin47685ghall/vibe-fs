@@ -24,7 +24,7 @@ const assertRecoveryClosure = (inventory, root) => {
         assert.doesNotMatch(file, /\/(?:Persistence\/(?:Journal|EventStore)|Composition\/Durable|Process|OpenCode\/Tools)\//,
           `recovery must not acquire durable composition or physical implementations: ${file}`)
       }
-      assert.doesNotMatch(file, /\/(?:PluginRuntimeScope|ToolRuntimeScope|HostSignalBootstrap|SharedTerminalBus)\.fs$/,
+      assert.doesNotMatch(file, /\/(?:PluginRuntimeScope|ToolRuntimeScope|HostSignalBootstrap|SharedTerminalBus|TerminalWiring)\.fs$/,
         `recovery must not acquire a concrete host runtime: ${file}`)
     }
     for (const reference of project.references) visit(reference)

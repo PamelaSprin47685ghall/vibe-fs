@@ -465,7 +465,7 @@ type PluginRuntimeScope
             // released, after scheduler/background/process-local detach drains.
             let! journalFailure = captureTaskFailure (SharedAgentJournal.releaseAsync journal)
             remember journalFailure
-            remember (captureSyncFailure (fun () -> SharedTerminalBus.release sharedTerminalKey sharedTerminalPort))
+            remember (captureSyncFailure (fun () -> TerminalWiring.release sharedTerminalKey sharedTerminalPort))
             sharedTerminalKey <- None
             sharedTerminalPort <- None
 

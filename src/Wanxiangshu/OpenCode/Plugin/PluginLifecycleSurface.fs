@@ -1,11 +1,15 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Repository.Knowledge.Casebook
 
 module PluginLifecycleSurface =
+
+    [<Import("sessionDraftStore", "wanxiangli/casebook")>]
+    let private sessionDraftStore: obj = jsNative
 
     let create (input: obj) : Task<obj> =
         task {
@@ -54,15 +58,16 @@ module PluginLifecycleSurface =
             |> Option.map SessionId.value
             |> Option.defaultWith (fun () -> invalidOp "owner has no attached Engineer")
 
-        match CasebookDraftStore.tryTake delegateSessionId with
+        let draftOpt: obj option = sessionDraftStore?tryTake(delegateSessionId)
+        match draftOpt with
         | None -> null
         | Some draft ->
+            let turns: obj array = draft?turns
             box
                 {| sessionId = delegateSessionId
                    turns =
-                    draft.Turns
-                    |> List.map (fun turn ->
+                    turns
+                    |> Array.map (fun turn ->
                         box
-                            {| question = turn.Q
-                               answer = Option.toObj turn.A |})
-                    |> List.toArray |}
+                            {| question = turn?Q
+                               answer = Option.toObj (turn?A) |}) |}
