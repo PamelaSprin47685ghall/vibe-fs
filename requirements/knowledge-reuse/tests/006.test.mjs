@@ -659,6 +659,30 @@ test('WHAT[knowledge-reuse-006] duplicate answer setter rolls back both staged f
 
 test('WHAT[knowledge-reuse-006] awaitCompletion unwritten provider aborts staged transaction and take retains untouched slot', async () => {
   const { bookkeeperStaging } = await import('wanxiangli/casebook')
+  const { mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const eventStore = await import('../../../dist/Persistence/EventStore/Surface.js')
+  const casebook = await import('../../../dist/Repository/Knowledge/Casebook/Surface.js')
+  const bookkeeper = await import('../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js')
+  const bookkeeperRefresh = await import('../../../dist/Repository/Knowledge/Casebook/BookkeeperRefreshSurface.js')
+  const { installBookkeeperRuntime } = await import('./support/bookkeeper-session-support.mjs')
+
+  const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
+  const sandbox = () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-'))
+    const handle = eventStore.create(dir, 'bookkeeper-mechanical')
+    return {
+      dir,
+      handle,
+      cleanup: () => {
+        eventStore.dispose(handle)
+        rmSync(dir, { recursive: true, force: true })
+      },
+    }
+  }
+  const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
+
   // 1. 验证库语义：未 touched 的 take 被拒绝，但 slot 依然保持
   const staging = bookkeeperStaging
   const txUntouched = 'tx-test-untouched-retained'
@@ -694,11 +718,7 @@ test('WHAT[knowledge-reuse-006] awaitCompletion unwritten provider aborts staged
       const sid = bookkeeper.sessionValue(childSession)
       const tx = bookkeeper.txIdFor(sid)
       txCaptured.push(tx)
-      // 运行一个合法程序，但不调用 setQuestion/setAnswer（未写入）
-      await bookkeeperTool.runProgram(
-        sid,
-        bookkeeperRequest('class Js extends JsProgram { async run() { return { changed: false }; } }')
-      )
+      // 不调用 bookkeeperTool.runProgram，模拟 provider 完成但未写入任何暂存内容（touched 保持 false）
       for (const callback of terminals) callback(bookkeeper.sessionId(sid), bookkeeper.completed(sid))
       return bookkeeper.acceptedPrompt()
     }
@@ -710,6 +730,7 @@ test('WHAT[knowledge-reuse-006] awaitCompletion unwritten provider aborts staged
     writeFileSync(join(dir, 'a.txt'), 'changed-unwritten', 'utf8')
     await installBookkeeperRuntime(unwrittenPort, ['s-unwritten'])
     const refreshed = await bookkeeperRefresh.refreshStale(handle, dir, 's-unwritten')
+    console.error('REFRESHED_DEBUG:', JSON.stringify(refreshed))
     assert.equal(refreshed.ok, false)
     assert.match(String(refreshed.error), /did not write the staged case/)
     assert.equal(txCaptured.length, 1)

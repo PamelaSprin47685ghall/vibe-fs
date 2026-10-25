@@ -602,7 +602,6 @@ CUT36_OMP_REAL_SMOKE=1 \
 
 
 ### 6.10 Casebook BookkeeperStaging 状态抽取（2026-10-25）
-
 - **一份状态，一个自治 owner。** 原主仓 `BookkeeperStaging.fs` 与 `.fsi` 保存可变暂存事务槽位字典 `slots` 与变更标记 `Touched`。现已彻底迁入 `wanxiangli/casebook` 的进程内自治对象 `BookkeeperStaging`（提供类及全局唯一单例 `bookkeeperStaging`）。暂存槽位的生命周期（`beginTransaction`、`snapshot`、`apply`、`take`、`touched`、`abort`）由库侧对象独占拥有与维护；`apply(tx, None, None)` 无论字段是否变化均无条件标记 `touched=true`；未 touched 的 `take` 被拒且保留 slot，重入 `begin` 覆盖同一 tx 时重置 `touched=false`。宿主消费者（`BookkeeperRuntime.fs`、`BookkeeperSurface.fs`、`BookkeeperTool.fs`）统一导入并向该单例发送消息，主仓不再维护私有暂存副本。
 - **旧 owner 彻底退出。** 主仓物理删除 `BookkeeperStaging.fs` 与 `BookkeeperStaging.fsi`，从 `compile-order.txt` 及 `Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj` 编译条目中移除。同步清理 `scripts/checks/owner-impact-corpus.json` 中指涉该已退出 owner 文件的 8 行条目；`scripts/owner-impact-report.mjs` 确认无内嵌陈旧常量。
 - **逐层验证事实。**
@@ -618,7 +617,6 @@ CUT36_OMP_REAL_SMOKE=1 \
   - **宿主回归全绿**：`requirements/knowledge-reuse/tests/006.test.mjs` 补充回归用例，实证 did not write 发生时错误如期返回且该 txId 的 snapshot 查不到（槽已被清理）；同时对比实证未 touched 的 `take` 自身拒绝但仍保留 slot（库语义不变）。
   - **六动词接线验证**：真实 `006` 与 `034` 测试实证 Fable 动态 obj 跨包方法调用（`beginTransaction`、`snapshot`、`apply`、`take`、`touched`、`abort`）100% 连通可靠。
   - **当前状态**：首包完满闭环，保持未迁出的剩余状态（SessionDraft/Ledger/Index）台账清晰，不虚构整体 DONE。
-
 ---
 
 ## 7. 迁移来源文件全量清单与保留/删除边界
