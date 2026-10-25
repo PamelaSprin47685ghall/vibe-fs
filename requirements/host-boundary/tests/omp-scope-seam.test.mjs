@@ -12,6 +12,7 @@ import {
   onTurnStart,
   turnBudget,
   isScopeInitialized,
+  isPreviousScopePending,
   clearSessionState,
   bindDelegation,
   askNegotiation,
@@ -227,7 +228,7 @@ test('WHAT[context-compression-034] OMP system projection supplies protocol fact
   assert.doesNotMatch(scopeLines[0], /由模型自己判断|\[System:/)
 })
 
-test('WHAT[context-compression-034] request copy appends the reminder to the operator prompt and every non-reset tool result until a reset lands', async () => {
+test('WHAT[context-compression-034] before first reset OMP adds one fresh agent strong steer without rewriting user or tool bytes', async () => {
   const env = createOmpTestEnvironment()
   await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
   const sid = 'ses_omp_scope_reminder'
@@ -242,13 +243,14 @@ test('WHAT[context-compression-034] request copy appends the reminder to the ope
 
   const result = await env.eventHandlers.get('context')({ messages }, sessionCtx)
   assert.ok(result && result.messages, 'context handler returns the request copy')
-  assert.ok(
-    contentText(result.messages[0].content).endsWith(SEP + USER_REMINDER),
-    'the operator prompt in the request copy must end with the initialization reminder',
-  )
-
-  assert.ok(contentText(result.messages[2].content).endsWith(SEP + USER_REMINDER),
-    'the provider request, not the tool-result hook, repeats the initialization reminder')
+  assert.equal(contentText(result.messages[0].content), 'ship the scope port')
+  assert.equal(contentText(result.messages[2].content), 'file body')
+  assert.equal(result.messages.length, 4)
+  const initialSteer = result.messages[3]
+  assert.equal(initialSteer.attribution, 'agent')
+  assert.equal(initialSteer.strong, true)
+  assert.equal(initialSteer.steering, true)
+  assert.equal(contentText(initialSteer.content), USER_REMINDER)
   assert.equal(contentText(messages[2].content), 'file body', 'raw history stays unchanged')
 
   const hook = env.eventHandlers.get('tool_result')
@@ -977,6 +979,7 @@ test('WHAT[context-compression-049] OMP real native provider hook freezes old ca
       {newScopeObjective:'validate new parser',newScopeTurnBudget:10,
        kpiCompletion:'met',oldScopeVerboseVerbatimExperience:'Old sentinel 314159'},null,null,liveCtx)
     assert.equal(first.details?.archived,true,JSON.stringify(first))
+    assert.equal(isPreviousScopePending(sid),false,'first ever reset has no mandatory predecessor consultation')
     const [accepted, parallelDuplicate] = await Promise.all([
       ask.execute('prior-049',
         {questions:'What precise evidence rejected the new parser?'},null,null,liveCtx),
@@ -1051,6 +1054,7 @@ test('WHAT[context-compression-049] OMP real native provider hook freezes old ca
       {newScopeObjective:'start the next real epoch',newScopeTurnBudget:4,kpiCompletion:'met'},
       null,null,liveCtx)
     assert.equal(newReset.details?.archived,true,JSON.stringify(newReset))
+    assert.equal(isPreviousScopePending(sid),true,'second reset establishes a real previous-Scope mandatory question')
     releaseOldAnswer()
     await new Promise(resolve=>setTimeout(resolve,25))
     assert.equal(steers.length,1,'a late answer from a retired target epoch must not be delivered')

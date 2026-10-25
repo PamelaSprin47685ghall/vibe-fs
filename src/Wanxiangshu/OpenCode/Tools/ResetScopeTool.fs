@@ -81,7 +81,8 @@ module ResetScopeTool =
             // 3. append 成功后才更新内存：resetScopeState，并进入 askPreviousScope pending，且标记 hasPreviousScope
             OutboundViewCapture.discardSealed ctx.SessionId
             Surface.resetScopeState ctx.SessionId budget
-            Surface.beginAskPreviousScope ctx.SessionId
+            if not (Set.isEmpty epoch.ReanchoredScopes) then
+                Surface.beginAskPreviousScope ctx.SessionId
             Surface.setHasPreviousScope ctx.SessionId true
 
             // Tool results stay raw; the provider-request view receives its budget suffix.

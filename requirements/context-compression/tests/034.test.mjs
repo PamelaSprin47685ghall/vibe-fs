@@ -24,7 +24,7 @@ test('WHAT[context-compression-033] reset removes old OMP tool results and prese
   assert.deepEqual(planFilter(messages).map(s=>s.index),[0,3,4,5,6])
 })
 
-test('WHAT[context-compression-034] reset preserves prompt identity and budget until a new operator prompt arrives', () => {
+test('WHAT[context-compression-034] new operator prompts after reset preserve the committed budget and scope', () => {
   const sid='scope-034-budget'
   clearSessionState(sid)
   const first=user('first',1000)
@@ -39,8 +39,9 @@ test('WHAT[context-compression-034] reset preserves prompt identity and budget u
   assert.equal(turnBudget(sid),3)
   const second=user('second',2000)
   const next=planRequest(sid,[first,assistant(call('reset','resetScope')),second])
-  assert.equal(next.budget,0)
-  assert.equal(next.initialized,false)
+  assert.equal(next.budget,3)
+  assert.equal(next.initialized,true)
+  assert.equal(next.strong,null)
   resetScopeState(sid,8)
   assert.equal(turnBudget(sid),8)
   clearSessionState(sid)
@@ -63,8 +64,8 @@ test('WHAT[context-compression-034] HNI planning carries the exact mandatory ini
   const sid='scope-034-reminder'
   const plan=planRequest(sid,[user('new')])
   const reminder='[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]'
-  assert.equal(plan.hints[0].tail,reminder)
-  assert.equal(plan.hints[0].kind,'user')
+  assert.equal(plan.strong,reminder)
+  assert.deepEqual(plan.hints,[], 'mandatory initialization has no historical message or tool-result suffix')
   clearSessionState(sid)
 })
 
