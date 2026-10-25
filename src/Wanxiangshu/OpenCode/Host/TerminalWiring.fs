@@ -10,6 +10,12 @@ open Wanxiangshu.Foundation.TerminalSignal
 
 [<RequireQualifiedAccess>]
 module TerminalWiring =
+    [<Import("TerminalRegistry", "wanxiangli/terminal")>]
+    let private terminalRegistryCtor: obj = jsNative
+
+    [<Import("TerminalBus", "wanxiangli/terminal")>]
+    let private terminalBusCtor: obj = jsNative
+
 
     let private writeStderr (msg: string) =
         let proc = emitJsExpr<obj> () "process"
@@ -30,12 +36,10 @@ module TerminalWiring =
             match err with
             | :? exn as e -> report e
             | other -> report (Exception(string other)))
-        let ctor = emitJsExpr<obj> () "require('wanxiangli/terminal').TerminalRegistry"
-        createNew ctor (jsReport)
+        createNew terminalRegistryCtor (jsReport)
 
     let private globalBusInstance: obj =
-        let ctor = emitJsExpr<obj> () "require('wanxiangli/terminal').TerminalBus"
-        createNew ctor ()
+        createNew terminalBusCtor ()
 
     let wrapRegistry (registry: obj) : ISessionTerminalSource =
         { new ISessionTerminalSource with
