@@ -621,14 +621,19 @@ CUT36_OMP_REAL_SMOKE=1 \
 ### 6.11 TerminalRegistry 与 SharedTerminalBus 状态抽取（2026-10-25）
 - **一份状态，一个自治 owner。** 原主仓 `TerminalRegistry.fs/.fsi`（会话级终端事件去重、FIFO sticky 缓存与监听器队列）与 `SharedTerminalBus.fs/.fsi`（跨工作区共享终端源引用计数与复用）状态已彻底迁入 `wanxiangli/terminal` 的自治对象 `TerminalRegistry` 与 `TerminalBus`。去重计算（Completed runId 判定）、sticky 历史缓存（上限 256）、订阅生命周期和多实例引用计数完全由库侧对象维护，宿主组合层不再保留任何私有终端字典。
 - **旧 owner 彻底退出。** 主仓物理删除两组旧实现与签名文件（`TerminalRegistry.fs/.fsi`、`SharedTerminalBus.fs/.fsi`），从 `compile-order.txt` 及 `session-ontology.execution-session-ownership`、`host-boundary.host-signal-adapter` fsproj 中清理编译项；更新 `requirements/host-boundary/WHAT.md` [026] 条款对齐中立 `TerminalWiring` 接入规范。
-- **审计缺陷自修（引用同一性保证与对称编解码）。** 
-  - 独立静态审计查出 `PluginHost.fs:createHost` 在返回元组第 5 项时将 `source` 包装为 `Events.HostEventPort(source)`，导致下游 `PluginRuntimeScope.fs` 在 `release` 时向 `TerminalBus` 传入包装对象，在 `ReferenceEquals` 下恒为 false，致使总线引用计数无法归零并发生泄漏。已行使自修权修复为返回 `Some finalSource`，确保入总线与出总线对象引用严格同一。
-  - 在 `TerminalWiring.fs` 中完成宿主 F# 可区分联合 `TerminalOutcome` 与库侧中立 `TerminalOutcome` 的对称编解码：存入库总线时提取 `runId` 并将完整宿主 DU 作为 payload 封装，监听器解构时直接无损取出宿主 DU，彻底根除 Fable 解构时的 `fields[0]` 访问异常。
+- **审计缺陷自修与契约回归根治。** 
+  - **引用同一性保证与对称编解码**：独立静态审计查出 `PluginHost.fs:createHost` 在返回元组第 5 项时将 `source` 包装为 `Events.HostEventPort(source)`，导致下游 `PluginRuntimeScope.fs` 在 `release` 时向 `TerminalBus` 传入包装对象，在 `ReferenceEquals` 下恒为 false，致使总线引用计数无法归零并发生泄漏。已行使自修权修复为返回 `Some finalSource`，确保入总线与出总线对象引用严格同一。并在 `TerminalWiring.fs` 中完成宿主 F# 可区分联合 `TerminalOutcome` 与库侧中立 `TerminalOutcome` 的对称编解码：存入库总线时提取 `runId` 并将完整宿主 DU 作为 payload 封装，监听器解构时直接无损取出宿主 DU，彻底根除 Fable 解构时的 `fields[0]` 访问异常。
+  - **delegation/025 历史回放误接根治**：定位并根除了 `TerminalWiring.SubscribeFutureTerminalListener` 误调 `reg?SubscribeProcessTerminal`（会回放已有 sticky 历史事件）导致的接线回归，精准更正为调用 `reg?SubscribeProcessFutureTerminal`（严格只接收未来事件，绝不回放陈旧执行结果），并修复了回调形参 `fun _sid o ->`，使 `requirements/delegation/tests/025.test.mjs` 实测全绿通过（21 pass, 0 fail, 1 todo GAP-153）。
+  - **PluginHost 真实端到端 oracle 闭环**：在 `requirements/host-boundary/tests/016.test.mjs` 中构建了真正调用 `createHost(workspace, ...)` 并提取元组第 5 项 `sharedTerminalPort` 的端到端测试，断言相同工作区多次获取严格保持 `Object.is` 引用同一性、伪装包装对象释放无法提前移除条目、正常释放两次后条目彻底归零清理且再次获取分配新 candidate，实证彻底消除了包装泄漏风险。
 - **逐层验证事实。**
-  - 库侧：Fable 编译全绿，单测 6 项全部通过（`tests/001.test.mjs` 6 pass / 0 fail），`exports.test.mjs` SPEC[build-008] 3 项全绿。
+  - 库侧：Fable 编译全绿，单测 7 项全部通过（`tests/001.test.mjs` 7 pass / 0 fail，含 SubscribeProcessFutureTerminal 严禁回放 sticky 历史反例），`exports.test.mjs` SPEC[build-008] 3 项全绿。
   - 独立产包消费：`npm pack` 生成真实 tarball，在独立空临时目录下通过 Node.js ESM 动态导入、Bun ESM 动态导入及 TypeScript strict（`tsc --project tsconfig.json`）静态类型检查，100% 成功通过，临时脚手架与产包彻底清理。
-  - 宿主侧：排队锁 `/tmp/wxs-build.lock` 保护下 `node scripts/build.mjs` 成功编译（0 error，generation 195，781 emitted modules linked）。
-  - 回归套件：`host-boundary/016`（含新增共享总线引用递减归零物理回归断言，11 pass / 0 fail）、`host-boundary/026`（3 pass / 0 fail / 1 skipped）、`delegation/029`（2 pass / 0 fail / 1 todo）全部通过。
+  - 宿主侧：排队锁 `/tmp/wxs-build.lock` 保护下 `node scripts/build.mjs` 成功编译（0 error）。
+  - 核心回归套件实跑：
+    - `host-boundary/016`：12 pass, 0 fail, 0 skipped, 0 todo（含 PluginHost 端到端引用同一性防泄漏 oracle 及 future 订阅严禁回放历史断言）；
+    - `delegation/025`：21 pass, 0 fail, 0 skipped, 1 todo (GAP-153，未来订阅排除陈旧执行断言全绿通过)；
+    - `host-boundary/026`：3 pass, 0 fail, 1 skipped (既有 integration tier not enabled 条件跳过), 0 todo；
+    - `delegation/029`：2 pass, 0 fail, 0 skipped, 1 todo (GAP-153)。
   - 架构门禁：`fsharp-control-pyramid.mjs` 0 nested decisions 全绿；`architecture.mjs` 与 `adapter-thinness.mjs` 仅含既有基线已知红态 `Host/FissionPort.fs(.fsi)` namespace-tier 违例，无任何新增违规；`owner-impact-report.mjs` 确认基线稳定。
 - **状态台账与前向推进。** 本包两仓分别提交并推送远端（库端 main，主仓 master）。本包完成终端去重与共享总线抽取，继续保持 clean-break 推进过程台账清晰。
 

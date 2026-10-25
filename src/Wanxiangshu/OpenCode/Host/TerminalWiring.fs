@@ -56,14 +56,14 @@ module TerminalWiring =
         { new ISessionTerminalSource with
             member _.SubscribeTerminal(sessionId, listener) =
                 let sid = SessionId.value sessionId
-                let rawUnsub = reg?SubscribeTerminal(sid, fun o -> listener sessionId (fromNeutralOutcome o))
+                let rawUnsub = reg?SubscribeTerminal(sid, fun _sid o -> listener sessionId (fromNeutralOutcome o))
                 { new IDisposable with
                     member _.Dispose() = rawUnsub?dispose()
                 }
 
             member _.SubscribeFutureTerminal(sessionId, listener) =
                 let sid = SessionId.value sessionId
-                let rawUnsub = reg?SubscribeFutureTerminal(sid, fun o -> listener sessionId (fromNeutralOutcome o))
+                let rawUnsub = reg?SubscribeFutureTerminal(sid, fun _sid o -> listener sessionId (fromNeutralOutcome o))
                 { new IDisposable with
                     member _.Dispose() = rawUnsub?dispose()
                 }
@@ -75,7 +75,7 @@ module TerminalWiring =
                 }
 
             member _.SubscribeFutureTerminalListener(listener) =
-                let rawUnsub = reg?SubscribeProcessTerminal(fun sid o -> listener (SessionId.create sid) (fromNeutralOutcome o))
+                let rawUnsub = reg?SubscribeProcessFutureTerminal(fun sid o -> listener (SessionId.create sid) (fromNeutralOutcome o))
                 { new IDisposable with
                     member _.Dispose() = rawUnsub?dispose()
                 }
