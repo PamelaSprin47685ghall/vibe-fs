@@ -66,7 +66,7 @@ module CasebookLifecycle =
     let private refreshIndexThenSettle (store: IEventStore) (delegateSessionId: string) : Task<CaseFinalizeSettlement> =
         task {
             try
-                let! _ = CasebookIndexSurface.refresh (box {| Store = store |}) 256
+                let! _ = CasebookIndexSurface.refresh (box (EventStoreHandle.Create store)) 256
                 return CaseFinalizeSettlement.finalized delegateSessionId
             with ex ->
                 return CaseFinalizeSettlement.unknown delegateSessionId ex.Message
@@ -276,7 +276,7 @@ module CasebookLifecycle =
             match touched with
             | Ok() ->
                 CasebookIndexSurface.invalidate ()
-                let! _ = CasebookIndexSurface.refresh (box {| Store = store |}) 256
+                let! _ = CasebookIndexSurface.refresh (box (EventStoreHandle.Create store)) 256
                 return Ok()
             | Error error -> return Error error
         }

@@ -44,7 +44,7 @@ module CasebookBookkeeper =
             do! CasebookWorkflow.refreshCase store case.Identity q' a' targetState paths case.Observations
 
             CasebookIndexSurface.invalidate ()
-            let! _ = CasebookIndexSurface.refresh (box {| Store = store |}) 256 |> TaskResultCE.ofTask
+            let! _ = CasebookIndexSurface.refresh (box (EventStoreHandle.Create store)) 256 |> TaskResultCE.ofTask
             return true
         }
 
