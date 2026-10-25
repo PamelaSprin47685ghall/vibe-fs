@@ -157,4 +157,6 @@ module ContextProjectionBridge =
                     (ToolCallId.value payload.CallId)
                     payload.QuestionsDigest)
                 projection
-            |> Result.mapError (fun reason -> { Fact = "ScopeQuestionAsked"; Reason = reason })
+            |> Result.mapError (fun reason ->
+                { Fact = "ScopeQuestionAsked"
+                  Reason = reason })

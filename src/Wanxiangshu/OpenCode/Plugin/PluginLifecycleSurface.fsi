@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 
 module PluginLifecycleSurface =
+    val acquireHostTerminal: workspace: string -> Task<obj>
     val create: input: obj -> Task<obj>
     val hooks: runtime: obj -> obj
     val invokeEngineer: runtime: obj -> ownerSessionId: string -> charge: string -> Task<obj>

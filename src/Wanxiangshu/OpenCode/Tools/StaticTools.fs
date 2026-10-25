@@ -91,7 +91,8 @@ module StaticTools =
         |> List.map (fun name ->
             name,
             (name = "negotiate"
-             || (name = "askPreviousScope" && (role = Role.Advisor || Set.contains ToolPermission.ResetScope allowed))
+             || (name = "askPreviousScope"
+                 && (role = Role.Advisor || Set.contains ToolPermission.ResetScope allowed))
              || (name = "resetScope" && role = Role.Advisor)
              || OfficeCapability.admitsUtility role name
              || (permissionOfToolName role name
@@ -129,8 +130,8 @@ module StaticTools =
         | true, "fork", Role.Orchestrator -> "deny"
         | true, "negotiate", _ -> "allow"
         | true, "askPreviousScope", Role.Advisor -> "allow"
-        | true, "askPreviousScope", role ->
-            if OfficeCapability.isAllowed role ToolPermission.ResetScope then "allow" else "deny"
+        | true, "askPreviousScope", role when OfficeCapability.isAllowed role ToolPermission.ResetScope -> "allow"
+        | true, "askPreviousScope", _ -> "deny"
         | true, "resetScope", Role.Advisor -> "allow"
         | true, "commission", Role.Orchestrator -> "allow"
         | true, name, role when List.contains name OfficeCapability.utilityToolNames -> utilityPermission role name

@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { outboundViewStore, OutboundViewStore } from 'wanxiangli/pair-hint'
+import { clearSessionState } from '../../../dist/Context/Scope/Surface.js'
+import { withExecutablePlugin, acceptAuthorityRoot } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
-test('WHAT[CONTEXT-COMPRESSION-043] OutboundViewStore: progressive checkAndSeal seals only on full non-empty triad (toolsCaptured=false)', () => {
+test('WHAT[context-compression-043] OutboundViewStore: progressive checkAndSeal seals only on full non-empty triad (toolsCaptured=false)', () => {
   const store = new OutboundViewStore()
   const sid = 'sess-triad-043'
 
@@ -21,7 +23,7 @@ test('WHAT[CONTEXT-COMPRESSION-043] OutboundViewStore: progressive checkAndSeal 
   assert.equal(sealed.nativePayload, null, 'progressive checkAndSeal has null nativePayload')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-043] OutboundViewStore: recordNativeRequest seals atomically with toolsCaptured=true and deep clones payload', () => {
+test('WHAT[context-compression-043] OutboundViewStore: recordNativeRequest seals atomically with toolsCaptured=true and deep clones payload', () => {
   const store = new OutboundViewStore()
   const sid = 'sess-native-043'
 
@@ -50,7 +52,7 @@ test('WHAT[CONTEXT-COMPRESSION-043] OutboundViewStore: recordNativeRequest seals
   assert.equal(sealed.messages[0].content, 'run tool command', 'sealed messages must be immutable copy')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-043] OutboundViewStore: serializeSnapshot strictly adheres to wire JSON specification', () => {
+test('WHAT[context-compression-043] OutboundViewStore: serializeSnapshot strictly adheres to wire JSON specification', () => {
   const store = new OutboundViewStore()
   const sid = 'sess-spec-json-043'
 
@@ -74,7 +76,7 @@ test('WHAT[CONTEXT-COMPRESSION-043] OutboundViewStore: serializeSnapshot strictl
   assert.equal(parsed.nativePayload, null)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-043] OutboundViewStore: discardSealed empties sealed snapshot (single-drain semantics)', () => {
+test('WHAT[context-compression-043] OutboundViewStore: discardSealed empties sealed snapshot (single-drain semantics)', () => {
   const store = new OutboundViewStore()
   const sid = 'sess-discard-043'
 
@@ -87,7 +89,7 @@ test('WHAT[CONTEXT-COMPRESSION-043] OutboundViewStore: discardSealed empties sea
   assert.equal(store.tryGetSealed(sid), undefined, 'discardSealed must empty the sealed snapshot')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-043] OutboundViewStore: clearSession purges all session state idempotently', () => {
+test('WHAT[context-compression-043] OutboundViewStore: clearSession purges all session state idempotently', () => {
   const store = new OutboundViewStore()
   const sid = 'sess-purge-043'
 
@@ -100,7 +102,7 @@ test('WHAT[CONTEXT-COMPRESSION-043] OutboundViewStore: clearSession purges all s
   assert.equal(store.tryGetSealed(sid), undefined, 'prior pending system must have been purged')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-043] OutboundViewStore: global singleton outboundViewStore is operational', () => {
+test('WHAT[context-compression-043] OutboundViewStore: global singleton outboundViewStore is operational', () => {
   assert.ok(outboundViewStore instanceof OutboundViewStore)
   const sid = 'sess-singleton-043'
   outboundViewStore.recordSystem(sid, ['s'])
@@ -108,87 +110,40 @@ test('WHAT[CONTEXT-COMPRESSION-043] OutboundViewStore: global singleton outbound
 })
 
 
-const dummyFactory = {
-  fields: [
-    {
-      schema: {
-        string: () => ({ optional: () => ({ describe: () => ({}) }), describe: () => ({}) }),
-        number: () => ({ int: () => ({ nonnegative: () => ({ describe: () => ({ optional: () => ({}) }), optional: () => ({ describe: () => ({}) }) }) }) }),
-        enum: () => ({ describe: () => ({}) })
-      }
-    }
-  ]
-};
-
-test('WHAT[CONTEXT-COMPRESSION-043] ResetScopeTool 宿主真实表面接线反例：无封存快照时拒绝重置并返回明确错误文本', async () => {
-    const { spec } = await import('../../../dist/OpenCode/Tools/ResetScopeTool.js');
-    const { ToolHostCodec_argumentsOfRaw } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js');
-    const { ToolCallIdModule_create } = await import('../../../dist/Foundation/Identity.js');
-    const { HostToolContext } = await import('../../../dist/Host/ToolContext.js');
-    const tool = spec(dummyFactory, undefined);
-    const noSnapSid = 'no-snap-session-' + Math.random().toString(36).slice(2);
-    const rawArgs = ToolHostCodec_argumentsOfRaw({ newScopeObjective: 'test-objective', newScopeTurnBudget: 5, kpiCompletion: 'met' });
-    const ctx = new HostToolContext(
-      noSnapSid,
-      undefined,
-      ToolCallIdModule_create('tc-no-snap'),
-      undefined,
-      undefined,
-      () => {}
+test('WHAT[context-compression-043] ResetScopeTool 宿主真实表面接线反例：无封存快照时拒绝重置并返回明确错误文本', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
+    const noSnapSid = 'no-snap-session-043-' + Math.random().toString(36).slice(2);
+    await acceptAuthorityRoot(runtime, noSnapSid, 'engineer');
+    clearSessionState(noSnapSid);
+    const res = await hooks.tool.resetScope.execute(
+      { newScopeObjective: 'test-objective', newScopeTurnBudget: 5, kpiCompletion: 'met' },
+      { sessionID: noSnapSid, agent: 'engineer', callID: 'tc-no-snap-043' },
     );
-    const res = await tool.Execute(rawArgs, ctx);
     assert.equal(typeof res, 'string');
-    assert.ok(res.includes('resetScope failed: no sealed outbound view snapshot captured for this session.'));
+    assert.ok(String(res).includes('resetScope failed: no sealed outbound view snapshot captured for this session.'));
   });
+});
 
-  test('WHAT[CONTEXT-COMPRESSION-043] ResetScopeTool 宿主真实表面接线正例：单例建立封存快照后可正常归档并排空', async () => {
-    const { spec } = await import('../../../dist/OpenCode/Tools/ResetScopeTool.js');
-    const { ToolHostCodec_argumentsOfRaw } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js');
-    const { ToolCallIdModule_create, ProviderRunIdentityModule_create } = await import('../../../dist/Foundation/Identity.js');
-    const { HostToolContext } = await import('../../../dist/Host/ToolContext.js');
-    const snapSid = 'snap-session-' + Math.random().toString(36).slice(2);
+test('WHAT[context-compression-043] ResetScopeTool 宿主真实表面接线正例：单例建立封存快照后可正常归档并排空', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
+    const snapSid = 'snap-session-043-' + Math.random().toString(36).slice(2);
+    await acceptAuthorityRoot(runtime, snapSid, 'engineer');
+    clearSessionState(snapSid);
     const nativePayload = {
       messages: [{ role: 'user', content: 'hello world' }],
       tools: [{ type: 'function', function: { name: 'bash' } }],
       system: ['System instructions.']
     };
     const model = { providerID: 'openai', modelID: 'gpt-4o', variant: null };
-    const ok = outboundViewStore.recordNativeRequest(snapSid, nativePayload, model);
-    assert.equal(ok, true);
+    assert.equal(outboundViewStore.recordNativeRequest(snapSid, nativePayload, model), true);
     assert.ok(outboundViewStore.tryGetSealed(snapSid), '快照必须处于已封存状态');
-
-    const os = await import('node:os');
-    const path = await import('node:path');
-    const fs = await import('node:fs');
-    const workspaceHost = await import('../../../dist/OpenCode/Host/WorkspaceSharedJournal.js');
-    const { JournalHandle__get_Journal, JournalSurface_dispose } = await import('../../../dist/Persistence/Journal/Surface.js');
-    const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxs-reset-positive-'));
-    const acquired = await workspaceHost.acquireSharedForWorkspace(tmpdir, process.pid, new Date().toISOString());
-    if (!acquired?.ok) {
-      throw new Error('journal acquire rejected: ' + (acquired?.error ?? 'unknown'));
-    }
-    const journal = JournalHandle__get_Journal(acquired.journal);
-
-    const tool = spec(dummyFactory, journal);
-    const rawArgs = ToolHostCodec_argumentsOfRaw({
-      newScopeObjective: 'verified-objective',
-      newScopeTurnBudget: 10,
-      kpiCompletion: 'met'
-    });
-    const ctx = new HostToolContext(
-      snapSid,
-      undefined,
-      ToolCallIdModule_create('tc-snap'),
-      ProviderRunIdentityModule_create('provider-run-1'),
-      undefined,
-      () => {}
+    const res = await hooks.tool.resetScope.execute(
+      { newScopeObjective: 'verified-objective', newScopeTurnBudget: 10, kpiCompletion: 'met' },
+      { sessionID: snapSid, agent: 'engineer', callID: 'tc-snap-043', messageID: 'run-snap-043' },
     );
-    const res = await tool.Execute(rawArgs, ctx);
     assert.equal(typeof res, 'string');
-    assert.ok(res.includes('Scope reset. Objective: verified-objective'));
+    assert.ok(String(res).includes('Scope reset. Objective: verified-objective'));
     assert.equal(outboundViewStore.tryGetSealed(snapSid), undefined, '归档提交后必须单次排空该会话快照');
-
-    JournalSurface_dispose(acquired.journal);
-    fs.rmSync(tmpdir, { recursive: true, force: true });
   });
+});
 

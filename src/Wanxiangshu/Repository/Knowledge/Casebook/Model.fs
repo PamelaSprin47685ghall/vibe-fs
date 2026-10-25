@@ -224,8 +224,10 @@ module CasebookProjection =
     let resolve (store: IEventStore) (capacity: int) (shelfmark: string) : Result<Case option, string> =
         let cases = projectCases store capacity
         let ordered = cases |> Map.toArray |> Array.map snd
+
         let indexCases =
             ordered
             |> Array.map (fun case -> createObj [ "sessionId" ==> case.Identity; "question" ==> case.Q ])
+
         let position = unbox<int> (casebookIndex?locate (indexCases, shelfmark))
         Ok(if position < 0 then None else Some ordered.[position])

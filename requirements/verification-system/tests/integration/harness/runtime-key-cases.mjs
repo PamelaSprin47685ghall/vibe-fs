@@ -76,6 +76,15 @@ const withTools = (body, names) => ({
 });
 
 export const runtimeKeyCases = [
+  {
+    name: 'verification-system-003 初始化 steer 前的宿主相邻 user 占位不是模型步骤',
+    fn: () => {
+      const reminder = user('[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]');
+      assertEq(stepOf(request([user('first'), assistant('.'), reminder])), 0);
+      assertEq(stepOf(request([user('first'), assistant('real reply'), reminder])), 1);
+      assertEq(stepOf(request([user('first'), assistant('.'), user('real next')])), 0);
+    },
+  },
   // ── kind: the fourth component, and why turn alone cannot carry it ────────
 
   {
@@ -422,6 +431,15 @@ export const runtimeKeyCases = [
       // A conversation carries many user messages; the one being answered is the
       // last. Matching on the first would pin every step of a session to turn one.
       assertEq(turnOf(request([user('first'), assistant('r1'), user('second')])), 'second');
+    },
+  },
+
+  {
+    name: 'verification-system-003 初始化提醒不替代真实用户轮次或重置步骤',
+    fn: () => {
+      const body = request([user('first'), assistant('r1'), user('[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]')]);
+      assertEq(turnOf(body), 'first');
+      assertEq(stepOf(body), 1);
     },
   },
 

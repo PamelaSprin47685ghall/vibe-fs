@@ -12,7 +12,7 @@ module Events =
     /// A fresh terminal source. The product owns the terminal facts; this is
     /// the only adapter-side place that names the product's implementation, and
     /// it names it only to obtain an instance — never to hold one.
-    let newTerminalSource () : ISessionTerminalSource = TerminalWiring.createSource()
+    let newTerminalSource () : ISessionTerminalSource = TerminalWiring.createSource ()
 
     let private notifyOne (listener: HostSignal -> Task) (signal: HostSignal) : Task =
         task {

@@ -324,9 +324,9 @@ test('WHAT[capability-enforcement-026] D09_relayed_tenure_refuses_new_devops_dis
   })
 })
 
-// 收口窗二：已评 Promoted。新派工不因为已有评审被放行；同时评审接纳前已有的
-// 只读 Engineer fork/resume 不被本门误伤。
-test('WHAT[capability-enforcement-026] D10_promoted_review_refuses_new_devops_dispatch_and_spares_readonly_engineer', async () => {
+// 收口窗二：已评 Promoted。末任具备终局交付资格后，仍允许向固定 DevOps 派工完成实际收尾；
+// 同时评审接纳前已有的只读 Engineer fork/resume 不被本门误伤。
+test('WHAT[capability-enforcement-026] D10_promoted_review_admits_devops_dispatch_and_spares_readonly_engineer', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     const sessionID = 'ses-d10-promoted'
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
@@ -355,17 +355,17 @@ test('WHAT[capability-enforcement-026] D10_promoted_review_refuses_new_devops_di
 
     await injectAcceptedAssessment(runtime, sessionID, `inc-${sessionID}`, 'Promoted')
     const promptsBefore = runtime.prompts.length
-    const refused = await runManagerProgram(
+    const admitted = await runManagerProgram(
       hooks,
       sessionID,
       resumeCall({ name: 'devops', charge: 'NEW-TASK-PROMOTED' }),
     )
-    assert.equal(refusalCode(refused), DISPATCH_CLOSED,
-      'a Promoted review must not admit a new DevOps task')
-    assert.equal(envelopeOk(refused), false,
-      'a Promoted review must not report a DevOps handover')
-    assert.equal(createdIds.length, 1)
-    assert.equal(runtime.prompts.length, promptsBefore)
+    assert.equal(refusalCode(admitted), null,
+      'a Promoted review retains DevOps dispatch capability for substantive closure')
+    assert.equal(envelopeOk(admitted), true, admitted)
+    assert.equal(outcomeOf(admitted), 'created', admitted)
+    assert.equal(createdIds.length, 2)
+    assert.equal(runtime.prompts.length, promptsBefore + 1)
   })
 })
 

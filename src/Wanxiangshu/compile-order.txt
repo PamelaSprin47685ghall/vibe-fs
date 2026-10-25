@@ -737,8 +737,6 @@ Execution/Routing/ModelCapacity/Surface.fsi
 Execution/Routing/ModelCapacity/Surface.fs
 Execution/Routing/ModelRouting.fsi
 Execution/Routing/ModelRouting.fs
-OpenCode/Host/ExternalToolNamespace.fsi
-OpenCode/Host/ExternalToolNamespace.fs
 OpenCode/Host/ManagedAgentConfig.fsi
 OpenCode/Host/ManagedAgentConfig.fs
 OpenCode/Host/ManagedAgentConfigSurface.fsi
@@ -847,8 +845,8 @@ OpenCode/Host/ModelRoutingSurface.fsi
 OpenCode/Host/ModelRoutingSurface.fs
 Foundation/HostSessionPort.fsi
 Foundation/HostSessionPort.fs
-Host/Ports/FissionPort.fsi
-Host/Ports/FissionPort.fs
+Execution/Fission/FissionEnvironment.fsi
+Execution/Fission/FissionEnvironment.fs
 Execution/Session/Attachment/CompanionLeaseRuntime.fsi
 Execution/Session/Attachment/CompanionLeaseRuntime.fs
 Execution/Session/Attachment/AttachmentSurface.fsi

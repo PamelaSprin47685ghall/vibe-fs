@@ -7,7 +7,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.TerminalSignal
-open Wanxiangshu.Host.Ports
 open Wanxiangshu.Persistence.Journal
 
 /// Host-side terminal bridge for same-participant Fission lanes. A physical lane

@@ -251,7 +251,7 @@ module PluginHostWiring =
                 match workOpt with
                 | Some work when work.Sequence = [ "S1"; "S2"; "S3" ] && (work.Delivered || work.PendingDelivery) ->
                     true
-                | Some work when work.Sequence = [ "S4" ] -> false
+                | Some work when work.Sequence = [ "S4" ] -> work.Delivered
                 | Some work -> work.Delivered && activeRoot.IsNone
                 | None -> false
 

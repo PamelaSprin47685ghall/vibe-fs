@@ -125,6 +125,14 @@ const insertedReplayPairLength = (messages, index) => {
   return hasAck ? 3 : 2;
 };
 
+const scopeReminderTexts = new Set([
+  '[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]',
+  '[System: Before any resetScope initialization, call negotiate(questions: string) NOW. Ask the delegator all questions needed to clarify this assignment. Group related questions into the single plural questions argument. The call acknowledges sending immediately; continue your work without waiting. Until the delegator’s answer arrives as a user steer, do not call resetScope. After that answer, call resetScope promptly. You may negotiate again at any time; later calls never delay resetScope.]',
+  '[System: You have received the handoff from the previous scope. You must now call askPreviousScope(questions) first to clarify specific questions with the previous scope based on the handoff and current objective. The call acknowledges sending immediately; continue your work without waiting. Answers will arrive later as a user steer.]',
+]);
+
+export const isScopeReminderText = (text) => scopeReminderTexts.has(text);
+
 // ── lane ────────────────────────────────────────────────────────────────────
 
 /**
@@ -282,7 +290,9 @@ const isAssistant = (message) => {
 
 const lastUserIndex = (messages) => {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (isUser(messages[index])) return index;
+    if (!isUser(messages[index])) continue;
+    if (isScopeReminderText(messages[index].content)) continue;
+    return index;
   }
   return -1;
 };
@@ -328,7 +338,13 @@ export function stepOf(body) {
       cursor += replayRows - 1;
       continue;
     }
-    if (isAssistant(messages[cursor])) step += 1;
+    const message = messages[cursor];
+    const next = messages[cursor + 1];
+    const initialReminderAck = isUser(messages[cursor - 1])
+      && message?.role === 'assistant' && message.content === hostDotAckText
+      && !Array.isArray(message.tool_calls)
+      && isUser(next) && isScopeReminderText(next.content);
+    if (isAssistant(message) && !initialReminderAck) step += 1;
   }
   return step;
 }

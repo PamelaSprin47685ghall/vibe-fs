@@ -14,9 +14,7 @@ module UserQuestionJournal =
             Wanxiangshu.Interaction.Authority.PromptAuthority.UserQuestion option
 
     val hasAskedExact:
-        journal: AgentJournal ->
-        sessionId: Wanxiangshu.Foundation.Identity.SessionId ->
-        questionText: string -> bool
+        journal: AgentJournal -> sessionId: Wanxiangshu.Foundation.Identity.SessionId -> questionText: string -> bool
 
     val pending:
         journal: AgentJournal ->

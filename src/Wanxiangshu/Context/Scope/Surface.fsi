@@ -3,6 +3,7 @@ namespace Wanxiangshu.Context.Scope
 module Surface =
     [<Literal>]
     val ResetScopeTool: string = "resetScope"
+
     [<Literal>]
     val SuffixSeparator: string = "\u0000\uFEFF"
 

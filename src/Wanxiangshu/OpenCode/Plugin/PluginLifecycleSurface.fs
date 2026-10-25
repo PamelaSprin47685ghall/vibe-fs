@@ -11,6 +11,15 @@ module PluginLifecycleSurface =
     [<Import("sessionDraftStore", "wanxiangli/casebook")>]
     let private sessionDraftStore: obj = jsNative
 
+    let acquireHostTerminal (workspace: string) : Task<obj> =
+        task {
+            let! result = PluginHost.createHost (Some workspace) (createObj []) None None None None
+
+            match result with
+            | Error reason -> return invalidOp reason
+            | Ok(_, _, _, _, source) -> return source |> Option.map box |> Option.toObj
+        }
+
     let create (input: obj) : Task<obj> =
         task {
             let! runtime = SpikePlugin.createRuntime input
@@ -58,11 +67,13 @@ module PluginLifecycleSurface =
             |> Option.map SessionId.value
             |> Option.defaultWith (fun () -> invalidOp "owner has no attached Engineer")
 
-        let draftOpt: obj option = sessionDraftStore?tryTake(delegateSessionId)
+        let draftOpt: obj option = sessionDraftStore?tryTake (delegateSessionId)
+
         match draftOpt with
         | None -> null
         | Some draft ->
             let turns: obj array = draft?turns
+
             box
                 {| sessionId = delegateSessionId
                    turns =

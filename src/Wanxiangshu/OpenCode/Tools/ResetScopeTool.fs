@@ -30,25 +30,18 @@ module ResetScopeTool =
             |> Option.map (fun num -> max 0 (int num))
             |> Option.defaultValue 0
 
-    let private executeCommitted (journalOpt: AgentJournal option) (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
+    let private commitArchivedScope
+        (journalOpt: AgentJournal option)
+        (ctx: HostToolContext)
+        (budget: int)
+        (objective: string)
+        (rawSnap: obj)
+        : Task<string> =
         task {
-            let objective = args.Text "newScopeObjective"
-            let budget = Surface.adjustBudgetForKpi (resolveBudget args) (args.Text "kpiCompletion")
-
-            let _oldExperience = args.OptionalText "oldScopeVerboseVerbatimExperience"
-
-            // 1. 获取本会话 sealed 快照，若取不到则明确报错，不提交、不更新内存
-            let rawSnap: obj = outboundViewStore?tryGetSealed(ctx.SessionId)
-            if isNullOrUndefined rawSnap then
-                return "resetScope failed: no sealed outbound view snapshot captured for this session."
-            else
-
-            // 2. 序列化为稳定 JSON，写入 journal blob
             let callId =
                 match ctx.ToolCallId with
                 | Some id -> id
-                | None ->
-                    failwith "resetScope requires an exact tool call id in host context (HOST-011)"
+                | None -> failwith "resetScope requires an exact tool call id in host context (HOST-011)"
 
             let journal =
                 match journalOpt with
@@ -56,62 +49,96 @@ module ResetScopeTool =
                 | None ->
                     failwith "resetScope requires a durable agent journal for ScopeReanchored prefix epoch advance"
 
-            let archiveJson = string (outboundViewStore?serializeSnapshot(rawSnap))
+            let archiveJson = string (outboundViewStore?serializeSnapshot (rawSnap))
             let! blobResult = journal.WriteBlob archiveJson
+
+            let finalize (receipt: BlobWriteReceipt) =
+                task {
+                    let sessionId = SessionId.create ctx.SessionId
+                    let journalSnapshot = AgentJournal.snapshot journal
+
+                    let epoch =
+                        AgentProjection.tryFind sessionId journalSnapshot.AgentProjections
+                        |> Option.bind (fun session -> session.PrefixEpoch)
+                        |> Option.defaultValue PrefixEpochProjection.empty
+
+                    let nextEpoch = PrefixEpochId.next epoch.EpochId
+
+                    let fact =
+                        ContextFact.ScopeReanchored
+                            {| SessionId = sessionId
+                               PreviousEpochId = epoch.EpochId
+                               NextEpochId = nextEpoch
+                               CallId = callId
+                               ArchiveRef = Some receipt.BlobRef
+                               ArchiveDigest = Some receipt.BlobDigest |}
+
+                    let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) ctx.ProviderRunId fact journal
+
+                    match appended with
+                    | Ok _ -> ()
+                    | Error failure -> raise (JournalAppendException failure)
+
+                    outboundViewStore?discardSealed (ctx.SessionId) |> ignore
+                    Surface.resetScopeState ctx.SessionId budget
+
+                    if not (Set.isEmpty epoch.ReanchoredScopes) then
+                        Surface.beginAskPreviousScope ctx.SessionId
+
+                    Surface.setHasPreviousScope ctx.SessionId true
+                    return $"Scope reset. Objective: %s{objective}"
+                }
+
             match blobResult with
-            | Error failure ->
-                return $"resetScope failed: failed to write archive blob: %s{failure}"
-            | Ok receipt ->
+            | Error failure -> return $"resetScope failed: failed to write archive blob: %s{failure}"
+            | Ok receipt -> return! finalize receipt
+        }
 
-            let sessionId = SessionId.create ctx.SessionId
-            let journalSnapshot = AgentJournal.snapshot journal
-            let epoch =
-                match AgentProjection.tryFind sessionId journalSnapshot.AgentProjections with
-                | None -> PrefixEpochProjection.empty
-                | Some session -> session.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
+    let private executeCommitted
+        (journalOpt: AgentJournal option)
+        (args: HostToolArguments)
+        (ctx: HostToolContext)
+        : Task<string> =
+        task {
+            let objective = args.Text "newScopeObjective"
 
-            let nextEpoch = PrefixEpochId.next epoch.EpochId
-            let fact =
-                ContextFact.ScopeReanchored
-                    {| SessionId = sessionId
-                       PreviousEpochId = epoch.EpochId
-                       NextEpochId = nextEpoch
-                       CallId = callId
-                       ArchiveRef = Some receipt.BlobRef
-                       ArchiveDigest = Some receipt.BlobDigest |}
+            let budget =
+                Surface.adjustBudgetForKpi (resolveBudget args) (args.Text "kpiCompletion")
 
-            let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) ctx.ProviderRunId fact journal
-            match appended with
-            | Ok _ -> ()
-            | Error failure -> raise (JournalAppendException failure)
+            let _oldExperience = args.OptionalText "oldScopeVerboseVerbatimExperience"
+            let rawSnap: obj = outboundViewStore?tryGetSealed (ctx.SessionId)
 
-            // 3. append 成功后才更新内存：resetScopeState，并进入 askPreviousScope pending，且标记 hasPreviousScope
-            outboundViewStore?discardSealed(ctx.SessionId) |> ignore
-            Surface.resetScopeState ctx.SessionId budget
-            if not (Set.isEmpty epoch.ReanchoredScopes) then
-                Surface.beginAskPreviousScope ctx.SessionId
-            Surface.setHasPreviousScope ctx.SessionId true
-
-            // Tool results stay raw; the provider-request view receives its budget suffix.
-            return $"Scope reset. Objective: %s{objective}"
+            if isNullOrUndefined rawSnap then
+                return "resetScope failed: no sealed outbound view snapshot captured for this session."
+            else
+                return! commitArchivedScope journalOpt ctx budget objective rawSnap
         }
 
     let private resetAlreadyCommitted (journalOpt: AgentJournal option) (ctx: HostToolContext) =
         match journalOpt, ctx.ToolCallId with
         | Some journal, Some callId ->
             let state = AgentJournal.snapshot journal
+
             AgentProjection.tryFind (SessionId.create ctx.SessionId) state.AgentProjections
             |> Option.bind (fun session -> session.PrefixEpoch)
             |> Option.exists (PrefixEpochProjection.isScopeReanchored (ToolCallId.value callId))
         | _ -> false
 
-    let private execute (journalOpt: AgentJournal option) (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
+    let private execute
+        (journalOpt: AgentJournal option)
+        (args: HostToolArguments)
+        (ctx: HostToolContext)
+        : Task<string> =
         if resetAlreadyCommitted journalOpt ctx then
             Task.FromResult("Scope reset. Objective: " + args.Text "newScopeObjective")
         elif Surface.negotiationRequired ctx.SessionId then
-            Task.FromResult("resetScope is unavailable until the first negotiate(questions) reply has arrived as a user steer. Ask the delegator clarifying questions now, and continue while the reply is pending.")
+            Task.FromResult(
+                "resetScope is unavailable until the first negotiate(questions) reply has arrived as a user steer. Ask the delegator clarifying questions now, and continue while the reply is pending."
+            )
         elif Surface.isPreviousScopePending ctx.SessionId then
-            Task.FromResult("resetScope is unavailable until askPreviousScope(questions) has been called to clarify questions with the previous scope. Call askPreviousScope now; ordinary tools remain available.")
+            Task.FromResult(
+                "resetScope is unavailable until askPreviousScope(questions) has been called to clarify questions with the previous scope. Call askPreviousScope now; ordinary tools remain available."
+            )
         else
             executeCommitted journalOpt args ctx
 
@@ -134,7 +161,12 @@ module ResetScopeTool =
                   factory
               "kpiCompletion",
               ToolHostCodec.enumSchemaDescribed
-                  [ "not_started"; "far_below"; "partially_met"; "met"; "exceeded"; "not_applicable" ]
+                  [ "not_started"
+                    "far_below"
+                    "partially_met"
+                    "met"
+                    "exceeded"
+                    "not_applicable" ]
                   "Report the previous scope KPI achievement: not_started (0.50x), far_below (0.75x), partially_met (0.90x), met (1.00x), exceeded (1.25x), or not_applicable for first scope (1.00x). The host applies the factor to newScopeTurnBudget and rounds upward."
                   factory ]
           Execute = execute journal }

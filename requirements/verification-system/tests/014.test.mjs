@@ -142,8 +142,8 @@ test('WHAT[verification-system-014] 继任任期的权威检查识别真实锚�
   const sessionID = 'ses_anchor_authority'
   const original = { role: 'user', content: '[ANCHOR: 1]\u0000\uFEFF原始用户委托' }
   assertManagerLoopAuthorityPreserved({ provider: { requests: [
-    { sessionID, messages: [original] },
-    { sessionID, messages: [original, { role: 'user', content: '[ANCHOR: 2]\u0000\uFEFF# You are the 2 Manager taking over this mission.' }] },
+    { sessionID, messages: [original, { role: 'user', content: '[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]' }] },
+    { sessionID, messages: [original, { role: 'user', content: '[ANCHOR: 2]\u0000\uFEFF# You are the 2 Manager taking over this mission.' }, { role: 'user', content: '[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]' }] },
   ] } }, sessionID)
 })
 

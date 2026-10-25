@@ -58,12 +58,10 @@ module CasebookIndexSurface =
         |> Array.map (fun case -> createObj [ "sessionId" ==> case.Identity; "question" ==> case.Q ])
 
     /// Current frozen provider-visible snapshot, or `null` before first refresh.
-    let tryGet () : obj =
-        index?tryGet ()
+    let tryGet () : obj = index?tryGet ()
 
     /// Mark the provider-visible index dirty for its next refresh.
-    let invalidate () : unit =
-        index?invalidate ()
+    let invalidate () : unit = index?invalidate ()
 
     /// Stable provider-visible shelfmark for a durable Case identity.
     let shelfmarkFor (sessionId: string) (canonicalQuestion: string) : string =

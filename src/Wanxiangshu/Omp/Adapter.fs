@@ -287,8 +287,11 @@ module Adapter =
           mutable Replaced: int
           mutable Cancelled: bool }
 
-    let private frozenProviderLeases = System.Collections.Generic.Dictionary<string, FrozenProviderLease>()
-    let private pendingPreviousSteers = System.Collections.Generic.Dictionary<string, string * PrefixEpochId>()
+    let private frozenProviderLeases =
+        System.Collections.Generic.Dictionary<string, FrozenProviderLease>()
+
+    let private pendingPreviousSteers =
+        System.Collections.Generic.Dictionary<string, string * PrefixEpochId>()
 
 
     let private childOf (id: string) : Result<Child, HostError> =
@@ -354,8 +357,10 @@ module Adapter =
                 { Session = session
                   Parent = parent
                   Title = title }
-            parent |> Option.filter (fun p -> not (String.IsNullOrEmpty p))
-                   |> Option.iter (fun p -> Surface.bindDelegation persisted p |> ignore)
+
+            parent
+            |> Option.filter (fun p -> not (String.IsNullOrEmpty p))
+            |> Option.iter (fun p -> Surface.bindDelegation persisted p |> ignore)
 
             Ok persisted
 
@@ -1056,7 +1061,13 @@ module Adapter =
     let private openOmpJournal store (runtimeId: RuntimeId) (pid: int) (startedAt: DateTimeOffset) =
         taskResult {
             let! (writer, _, projection) =
-                Wanxiangshu.Persistence.Journal.EventStoreJournalWriter.resumeOrCreate (runtimeId, pid, startedAt, store)
+                Wanxiangshu.Persistence.Journal.EventStoreJournalWriter.resumeOrCreate (
+                    runtimeId,
+                    pid,
+                    startedAt,
+                    store
+                )
+
             return! AgentJournal.createFromProjection writer projection
         }
 
@@ -1065,12 +1076,18 @@ module Adapter =
             try
                 let runtimeDir = RuntimePath.forStateRoot stateRoot
                 let writerId = Guid.NewGuid().ToString("N")
+
                 let integrator =
                     Wanxiangshu.Persistence.EventStore.CanonicalIntegrator.createWithRules
                         Wanxiangshu.Persistence.EventStore.CanonicalIntegrator.baseRules
                         Wanxiangshu.Persistence.EventStore.AuthoritativeEventTypes.isKnown
-                let store = Wanxiangshu.Persistence.EventStore.EventStore.createLocal stateRoot writerId integrator
-                let! acquired = SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow (openOmpJournal store)
+
+                let store =
+                    Wanxiangshu.Persistence.EventStore.EventStore.createLocal stateRoot writerId integrator
+
+                let! acquired =
+                    SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow (openOmpJournal store)
+
                 return Result.toOption acquired
             with _ ->
                 return None
@@ -1107,25 +1124,31 @@ module Adapter =
                        CallId = toolCallId
                        ArchiveRef = Some archived.BlobRef
                        ArchiveDigest = Some archived.BlobDigest |}
+
             let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal
+
             match appended with
             | Ok _ -> ()
             | Error failure -> raise (JournalAppendException failure)
 
-            outboundViewStore?discardSealed(sid) |> ignore
+            outboundViewStore?discardSealed (sid) |> ignore
             Surface.resetScopeState sid budget
+
             if not (Set.isEmpty epoch.ReanchoredScopes) then
                 Surface.beginAskPreviousScope sid
+
             Surface.setHasPreviousScope sid true
 
             let content =
                 box [| createObj [ "type", box "text"; "text", box $"Scope reset. Objective: %s{objective}" ] |]
+
             let details =
                 createObj
                     [ "objective", box objective
                       "turnBudget", box budget
                       "archived", box true
                       "experience", box experience.IsSome ]
+
             return createObj [ "content", content; "details", details ]
         }
 
@@ -1141,8 +1164,9 @@ module Adapter =
         (previous: obj)
         : Task<obj> =
         task {
-            let archiveJson = string (outboundViewStore?serializeSnapshot(previous))
+            let archiveJson = string (outboundViewStore?serializeSnapshot (previous))
             let! written = journal.WriteBlob archiveJson
+
             match written with
             | Error reason ->
                 return ompScopeRefused ("resetScope refused: durable scope archive write failed: " + reason)
@@ -1160,7 +1184,8 @@ module Adapter =
 
     let private ompScopeSuccess (objective: string) =
         createObj
-            [ "content", box [| createObj [ "type", box "text"; "text", box ("Scope reset. Objective: " + objective) ] |]
+            [ "content",
+              box [| createObj [ "type", box "text"; "text", box ("Scope reset. Objective: " + objective) ] |]
               "details", createObj [ "replayed", box true; "archived", box true ] ]
 
     let private ompPriorAnswer (accepted: bool) (message: string) : obj =
@@ -1173,6 +1198,7 @@ module Adapter =
         let epoch =
             AgentProjection.tryFind (SessionId.create sid) (AgentJournal.snapshot journal).AgentProjections
             |> Option.bind (fun session -> session.PrefixEpoch)
+
         match epoch |> Option.bind (fun current -> current.LastScopeArchive) with
         | Some archive when epoch |> Option.exists (fun current -> current.EpochId = archive.TargetEpochId) ->
             Ok(epoch.Value, archive)
@@ -1181,11 +1207,13 @@ module Adapter =
     let private ompPriorVerify (journal: AgentJournal) (archive: ArchivedScope) : Task<Result<obj option, string>> =
         task {
             let! content = journal.Writer.BlobWriter.Read archive.ArchiveRef
+
             let readNative (text: string) =
                 try
                     let source: obj = emitJsExpr text "JSON.parse($0)"
                     let model = fieldValue source "model"
                     let native = fieldValue source "nativePayload"
+
                     let complete =
                         isTrue (fieldValue source "toolsCaptured")
                         && isArray (fieldValue native "messages")
@@ -1193,22 +1221,31 @@ module Adapter =
                         && not (isNull (fieldValue native "model"))
                         && not (isNull (fieldValue model "providerID"))
                         && not (isNull (fieldValue model "modelID"))
+
                     Ok(if complete then Some source else None)
-                with ex -> Error("previous Scope archived payload is invalid JSON: " + ex.Message)
+                with ex ->
+                    Error("previous Scope archived payload is invalid JSON: " + ex.Message)
+
             return
                 content
                 |> Result.mapError (fun reason -> "previous Scope blob read failed: " + reason)
                 |> Result.bind (fun text ->
                     if Wanxiangshu.Host.HostDigest.sha256Hex text = BlobDigest.value archive.ArchiveDigest then
                         readNative text
-                    else Error "previous Scope digest mismatch")
+                    else
+                        Error "previous Scope digest mismatch")
         }
 
     let private ompPriorWriteReceipt
-        (journal: AgentJournal) (sid: string) (archive: ArchivedScope)
-        (epoch: ActivePrefixEpoch) (toolId: string) (questions: string)
+        (journal: AgentJournal)
+        (sid: string)
+        (archive: ArchivedScope)
+        (epoch: ActivePrefixEpoch)
+        (toolId: string)
+        (questions: string)
         : Task<Result<bool, string>> =
         let digest = Wanxiangshu.Host.HostDigest.sha256Hex questions
+
         match PrefixEpochProjection.scopeQuestionReceipt toolId epoch with
         | Some existing when existing = digest -> Task.FromResult(Ok true)
         | Some _ -> Task.FromResult(Error "ScopeQuestionAsked identity conflict")
@@ -1220,18 +1257,36 @@ module Adapter =
                            TargetEpochId = archive.TargetEpochId
                            CallId = ToolCallId.create toolId
                            QuestionsDigest = digest |}
+
                 let! outcome = AgentJournal.appendAgent (StreamId.Session(SessionId.create sid)) None fact journal
-                return outcome |> Result.map (fun _ -> false) |> Result.mapError (sprintf "durable question record failed: %A")
+
+                return
+                    outcome
+                    |> Result.map (fun _ -> false)
+                    |> Result.mapError (sprintf "durable question record failed: %A")
             }
 
     let private ompPriorSettle
-        (journal: AgentJournal) (sid: string) (archive: ArchivedScope)
-        (epoch: ActivePrefixEpoch) (toolId: string) (questions: string)
-        (frozen: obj option) (ctx: obj)
-        (start: obj -> string -> string -> ArchivedScope -> obj -> bool) =
+        (journal: AgentJournal)
+        (sid: string)
+        (archive: ArchivedScope)
+        (epoch: ActivePrefixEpoch)
+        (toolId: string)
+        (questions: string)
+        (frozen: obj option)
+        (ctx: obj)
+        (start: obj -> string -> string -> ArchivedScope -> obj -> bool)
+        =
         task {
             let! saved = ompPriorWriteReceipt journal sid archive epoch toolId questions
-            let receipt = sid + ":scope:" + string (PrefixEpochId.value archive.TargetEpochId) + ":call:" + toolId
+
+            let receipt =
+                sid
+                + ":scope:"
+                + string (PrefixEpochId.value archive.TargetEpochId)
+                + ":call:"
+                + toolId
+
             let acknowledge (replayed: bool) =
                 Surface.setHasPreviousScope sid true
                 let observed = Surface.askPreviousScope sid questions (Some receipt)
@@ -1239,17 +1294,28 @@ module Adapter =
                 let localReplay = not (isNull observed?replayed) && unbox<bool> observed?replayed
                 let already = replayed || localReplay
                 let runnable = not already && frozen.IsSome
+
                 let started =
-                    if runnable && admitted then start ctx questions receipt archive frozen.Value
-                    else false
+                    if runnable && admitted then
+                        start ctx questions receipt archive frozen.Value
+                    else
+                        false
+
                 let status =
-                    if already then "already accepted; an earlier external model effect must not be repeated"
-                    elif started then "accepted; a readonly old-model turn was scheduled; the actual Provider request and answer are not yet observed"
-                    elif frozen.IsNone then "accepted; archived native provider payload or tool catalog is missing, so no old-model request was dispatched"
-                    else "accepted; native side-turn transport unavailable, no old-model request was dispatched"
+                    if already then
+                        "already accepted; an earlier external model effect must not be repeated"
+                    elif started then
+                        "accepted; a readonly old-model turn was scheduled; the actual Provider request and answer are not yet observed"
+                    elif frozen.IsNone then
+                        "accepted; archived native provider payload or tool catalog is missing, so no old-model request was dispatched"
+                    else
+                        "accepted; native side-turn transport unavailable, no old-model request was dispatched"
+
                 if not admitted then
                     ompPriorAnswer false ("receipt is durable but the scope actor refused: " + string observed?reason)
-                else ompPriorAnswer true ("askPreviousScope " + status + "; receipt=" + receipt)
+                else
+                    ompPriorAnswer true ("askPreviousScope " + status + "; receipt=" + receipt)
+
             return
                 match saved with
                 | Error reason -> ompPriorAnswer false ("askPreviousScope rejected: " + reason)
@@ -1257,22 +1323,32 @@ module Adapter =
         }
 
     let private ompPriorExecute
-        (journalOpt: AgentJournal option) (toolId: string) (args: obj) (ctx: obj)
-        (start: obj -> string -> string -> ArchivedScope -> obj -> bool) =
+        (journalOpt: AgentJournal option)
+        (toolId: string)
+        (args: obj)
+        (ctx: obj)
+        (start: obj -> string -> string -> ArchivedScope -> obj -> bool)
+        =
         task {
             let sid = ctxSessionId ctx
             let raw = fieldValue args "questions"
             let questions = if isNull raw then "" else stringOf raw
+
             let requested =
                 match journalOpt with
-                | Some journal when not (String.IsNullOrWhiteSpace toolId)
-                                    && not (String.IsNullOrWhiteSpace questions) ->
-                    ompPriorArchive journal sid |> Result.map (fun (epoch, archive) -> journal, epoch, archive)
+                | Some journal when
+                    not (String.IsNullOrWhiteSpace toolId)
+                    && not (String.IsNullOrWhiteSpace questions)
+                    ->
+                    ompPriorArchive journal sid
+                    |> Result.map (fun (epoch, archive) -> journal, epoch, archive)
                 | _ -> Error "askPreviousScope requires actual callId, nonblank questions, and a durable journal"
+
             let! proof =
                 match requested with
                 | Error reason -> Task.FromResult(Error reason)
                 | Ok(journal, _, archive) -> ompPriorVerify journal archive
+
             return!
                 match requested, proof with
                 | Error reason, _ -> Task.FromResult(ompPriorAnswer false ("askPreviousScope refused: " + reason))
@@ -1284,16 +1360,25 @@ module Adapter =
         }
 
     let private registerAskPreviousScopeTool
-        (pi: obj) (journalOpt: AgentJournal option)
-        (start: obj -> string -> string -> ArchivedScope -> obj -> bool) =
+        (pi: obj)
+        (journalOpt: AgentJournal option)
+        (start: obj -> string -> string -> ArchivedScope -> obj -> bool)
+        =
         let schema =
             createObj
                 [ "type", box "object"
-                  "properties", box (createObj
-                      [ "questions", box (createObj
-                          [ "type", box "string"
-                            "description", box "Clarifying questions to the previous Scope." ]) ])
+                  "properties",
+                  box (
+                      createObj
+                          [ "questions",
+                            box (
+                                createObj
+                                    [ "type", box "string"
+                                      "description", box "Clarifying questions to the previous Scope." ]
+                            ) ]
+                  )
                   "required", box [| "questions" |] ]
+
         let definition =
             createObj
                 [ "name", box "askPreviousScope"
@@ -1301,13 +1386,58 @@ module Adapter =
                   "concurrency", box "exclusive"
                   "loadMode", box "essential"
                   "approval", box "read"
-                  "description", box "Ask concrete clarifying questions of the immediately preceding Scope. Valid old-context readonly model turns run asynchronously with an agent-attributed steer. The receipt separately reports if no old-model call was possible, and acceptance does not prove answer delivery."
+                  "description",
+                  box
+                      "Ask concrete clarifying questions of the immediately preceding Scope. Valid old-context readonly model turns run asynchronously with an agent-attributed steer. The receipt separately reports if no old-model call was possible, and acceptance does not prove answer delivery."
                   "parameters", box schema
                   "execute",
-                    box (Func<obj, obj, obj, obj, obj, obj>(
-                        fun callId arguments _signal _onUpdate ctx ->
-                            ompPriorExecute journalOpt (stringOf callId) arguments ctx start |> unbox<obj>)) ]
+                  box (
+                      Func<obj, obj, obj, obj, obj, obj>(fun callId arguments _signal _onUpdate ctx ->
+                          ompPriorExecute journalOpt (stringOf callId) arguments ctx start |> unbox<obj>)
+                  ) ]
+
         registerTool pi definition
+
+    let private ompCommitResetScope
+        (journalOpt: AgentJournal option)
+        (sid: string)
+        (callId: obj)
+        (estimate: int)
+        (completion: string)
+        (objective: string)
+        (experience: string option)
+        : obj =
+        let budget = Surface.adjustBudgetForKpi estimate completion
+        let toolCallIdStr = stringOf callId
+
+        if String.IsNullOrWhiteSpace toolCallIdStr then
+            failwith "resetScope requires an exact tool call id (HOST-011)"
+
+        let journal =
+            match journalOpt with
+            | Some j -> j
+            | None -> failwith "resetScope requires a durable agent journal for ScopeReanchored prefix epoch advance"
+
+        let sessionId = SessionId.create sid
+        let toolCallId = ToolCallId.create toolCallIdStr
+        let snapshot = AgentJournal.snapshot journal
+
+        let epoch =
+            AgentProjection.tryFind sessionId snapshot.AgentProjections
+            |> Option.bind (fun session -> session.PrefixEpoch)
+            |> Option.defaultValue PrefixEpochProjection.empty
+
+        task {
+            let rawSnap: obj = outboundViewStore?tryGetSealed (sid)
+
+            if isNullOrUndefined rawSnap then
+                return
+                    ompScopeRefused
+                        "resetScope refused: the preceding real provider request has no complete archived system/messages/model observation"
+            else
+                return! ompWriteArchivedScope journal sid sessionId epoch toolCallId budget objective experience rawSnap
+        }
+        |> unbox<obj>
 
     let private registerResetScopeTool (pi: obj) (journalOpt: AgentJournal option) : unit =
         let resetScopeDef =
@@ -1318,7 +1448,8 @@ module Adapter =
                   "loadMode", box "essential"
                   "approval", box "read"
                   "description",
-                  box "Execution barrier and context garbage collector. Preserves operator messages and the complete historical call/result pairs for resetScope, assume, negotiate, askPreviousScope, and advisor across later resets. Other old-scope working context is removed from subsequent model requests. Requires a KPI completion level; the Host scales the proposed new scope turnBudget using that tier."
+                  box
+                      "Execution barrier and context garbage collector. Preserves operator messages and the complete historical call/result pairs for resetScope, assume, negotiate, askPreviousScope, and advisor across later resets. Other old-scope working context is removed from subsequent model requests. Requires a KPI completion level; the Host scales the proposed new scope turnBudget using that tier."
                   "parameters",
                   box (
                       createObj
@@ -1331,26 +1462,42 @@ module Adapter =
                                           createObj
                                               [ "type", box [| "string"; "null" |]
                                                 "description",
-                                                box "Write out your experience and findings from the closing scope, verbosely: everything between the previous resetScope call (or session start) and this call. Any exact text needed in the next scope (such as function signatures, error stack traces, or exact line numbers) MUST be copied VERBATIM here. Null or omitted if there is no prior work." ]
+                                                box
+                                                    "Write out your experience and findings from the closing scope, verbosely: everything between the previous resetScope call (or session start) and this call. Any exact text needed in the next scope (such as function signatures, error stack traces, or exact line numbers) MUST be copied VERBATIM here. Null or omitted if there is no prior work." ]
                                       )
                                       "newScopeObjective",
                                       box (
                                           createObj
                                               [ "type", box "string"
-                                                "description", box "The objective for the new scope. The scope must form a self-contained state closed-loop (状态闭环)." ]
+                                                "description",
+                                                box
+                                                    "The objective for the new scope. The scope must form a self-contained state closed-loop (状态闭环)." ]
                                       )
                                       "newScopeTurnBudget",
                                       box (
                                           createObj
                                               [ "type", box "integer"
                                                 "minimum", box 0
-                                                "description", box "Estimated number of LLM turns needed for the new scope (1 LLM request = 1 turn)." ]
+                                                "description",
+                                                box
+                                                    "Estimated number of LLM turns needed for the new scope (1 LLM request = 1 turn)." ]
                                       )
                                       "kpiCompletion",
-                                      box (createObj
-                                               [ "type", box "string"
-                                                 "enum", box [| "not_started"; "far_below"; "partially_met"; "met"; "exceeded"; "not_applicable" |]
-                                                 "description", box "Previous KPI achievement: not_started (0.50x), far_below (0.75x), partially_met (0.90x), met (1.00x), exceeded (1.25x), or not_applicable for first scope (1.00x). Host multiplies the proposed new budget, rounding upward." ]) ]
+                                      box (
+                                          createObj
+                                              [ "type", box "string"
+                                                "enum",
+                                                box
+                                                    [| "not_started"
+                                                       "far_below"
+                                                       "partially_met"
+                                                       "met"
+                                                       "exceeded"
+                                                       "not_applicable" |]
+                                                "description",
+                                                box
+                                                    "Previous KPI achievement: not_started (0.50x), far_below (0.75x), partially_met (0.90x), met (1.00x), exceeded (1.25x), or not_applicable for first scope (1.00x). Host multiplies the proposed new budget, rounding upward." ]
+                                      ) ]
                             )
                             "required", box [| "newScopeObjective"; "newScopeTurnBudget"; "kpiCompletion" |] ]
                   )
@@ -1359,79 +1506,62 @@ module Adapter =
                       Func<obj, obj, obj, obj, obj, obj>(fun callId arguments signal onUpdate toolCtx ->
                           let ctx = orNull toolCtx
                           let sid = ctxSessionId ctx
+
                           let estimate =
                               if not (isNull arguments) && not (isNull arguments?newScopeTurnBudget) then
                                   unbox<int> arguments?newScopeTurnBudget
-                              else -1
+                              else
+                                  -1
+
                           let completion =
-                              if isNull arguments || isNull arguments?kpiCompletion then ""
-                              else stringOf arguments?kpiCompletion
+                              if isNull arguments || isNull arguments?kpiCompletion then
+                                  ""
+                              else
+                                  stringOf arguments?kpiCompletion
+
                           let objective =
                               if not (isNull arguments) && not (isNull arguments?newScopeObjective) then
                                   stringOf arguments?newScopeObjective
-                              else ""
-                          let experience =
-                              if not (isNull arguments) && not (isNull arguments?oldScopeVerboseVerbatimExperience) then
-                                  Some(stringOf arguments?oldScopeVerboseVerbatimExperience)
-                              else None
+                              else
+                                  ""
 
-                          // The budget changes only after the durable reanchor commits.
+                          let experience =
+                              if
+                                  not (isNull arguments)
+                                  && not (isNull arguments?oldScopeVerboseVerbatimExperience)
+                              then
+                                  Some(stringOf arguments?oldScopeVerboseVerbatimExperience)
+                              else
+                                  None
+
                           let negotiationPending = Surface.negotiationRequired sid
                           let previousPending = Surface.isPreviousScopePending sid
+
                           let pendingMessage =
                               if negotiationPending then
                                   "resetScope is unavailable until the first negotiate(questions) reply has arrived as a user steer. Ask the delegator clarifying questions now, and continue while the reply is pending."
                               else
                                   "resetScope is unavailable until askPreviousScope(questions) has been called by the new scope; ordinary tools remain available."
+
                           if ompScopeResetReplayed journalOpt sid (stringOf callId) then
                               task { return ompScopeSuccess objective } |> unbox<obj>
                           elif negotiationPending || previousPending then
                               let msg = pendingMessage
-                              let content =
-                                  box [| createObj [ "type", box "text"; "text", box msg ] |]
+                              let content = box [| createObj [ "type", box "text"; "text", box msg ] |]
+
                               let details =
                                   createObj
                                       [ "objective", box ""
                                         "turnBudget", box 0
                                         "archived", box false
                                         "refused", box true ]
-                              task {
-                                  return createObj [ "content", content; "details", details ]
-                              }
+
+                              task { return createObj [ "content", content; "details", details ] }
                               |> unbox<obj>
                           else
-
-                          let budget = Surface.adjustBudgetForKpi estimate completion
-                          // 2. Append durable ScopeReanchored fact using real journal and toolCallId
-                          let toolCallIdStr = stringOf callId
-                          if String.IsNullOrWhiteSpace toolCallIdStr then
-                              failwith "resetScope requires an exact tool call id (HOST-011)"
-
-                          let journal =
-                              match journalOpt with
-                              | Some j -> j
-                              | None ->
-                                  failwith "resetScope requires a durable agent journal for ScopeReanchored prefix epoch advance"
-
-                          let sessionId = SessionId.create sid
-                          let toolCallId = ToolCallId.create toolCallIdStr
-                          let snapshot = AgentJournal.snapshot journal
-                          let epoch =
-                              match AgentProjection.tryFind sessionId snapshot.AgentProjections with
-                              | None -> PrefixEpochProjection.empty
-                              | Some session -> session.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
-
-                          task {
-                              let rawSnap: obj = outboundViewStore?tryGetSealed(sid)
-                              if isNullOrUndefined rawSnap then
-                                  return
-                                      ompScopeRefused
-                                          "resetScope refused: the preceding real provider request has no complete archived system/messages/model observation"
-                              else
-                                  return! ompWriteArchivedScope journal sid sessionId epoch toolCallId budget objective experience rawSnap
-                          }
-                          |> unbox<obj>)
+                              ompCommitResetScope journalOpt sid callId estimate completion objective experience)
                   ) ]
+
         registerTool pi resetScopeDef
 
     // ------------------------------------------------------------------
@@ -1549,13 +1679,19 @@ module Adapter =
                 member _.Emit(operation, fields) =
                     call2 (fieldValue (fieldValue pi "logger") "debug") (box operation) (box (entriesOf fields))
                     |> ignore }
+
         let effectiveAgents =
             agents
             |> List.map (fun agent ->
                 let policy =
                     match agent.ToolPolicy with
                     | None -> Map [ ("resetScope", true); ("negotiate", true); ("askPreviousScope", true) ]
-                    | Some m -> m |> Map.add "resetScope" true |> Map.add "negotiate" true |> Map.add "askPreviousScope" true
+                    | Some m ->
+                        m
+                        |> Map.add "resetScope" true
+                        |> Map.add "negotiate" true
+                        |> Map.add "askPreviousScope" true
+
                 { agent with ToolPolicy = Some policy })
 
         let catalog: IAgentCatalog =
@@ -1814,16 +1950,22 @@ module Adapter =
 
     let private replaceArrayContent (raw: obj) (newText: string) (arr: obj array) : obj =
         let hasNonText =
-            arr |> Array.exists (fun block ->
+            arr
+            |> Array.exists (fun block ->
                 let t = fieldValue block "type"
                 isNull t || stringOf t <> "text")
+
         let oldText =
             arr
             |> Array.choose (fun block ->
                 let t = fieldValue block "type"
-                if not (isNull t) && stringOf t = "text" then Some(stringOf (fieldValue block "text"))
-                else None)
+
+                if not (isNull t) && stringOf t = "text" then
+                    Some(stringOf (fieldValue block "text"))
+                else
+                    None)
             |> String.concat "\n"
+
         if hasNonText || oldText = newText then
             raw
         else
@@ -1833,6 +1975,7 @@ module Adapter =
 
     let private replaceRawContent (raw: obj) (newText: string) : obj =
         let rawContent = fieldValue raw "content"
+
         if isString rawContent then
             replaceStringContent raw newText rawContent
         elif isArray rawContent then
@@ -1842,26 +1985,32 @@ module Adapter =
 
     let private mergeOneContextItem (raw: obj, rep: ContextMessage) : Result<obj, unit> =
         if isNull raw || not (List.forall isTextOnlyPart rep.Parts) then
-            Error ()
+            Error()
         else
             let newText = textOfParts rep.Parts
             Ok(replaceRawContent raw newText)
 
     let private selectChangedMerged (rawArray: obj array) (mergedList: obj list) : obj array option =
         let merged = List.toArray mergedList
-        let anyChanged = Array.exists2 (fun orig m -> not (obj.ReferenceEquals(orig, m))) rawArray merged
+
+        let anyChanged =
+            Array.exists2 (fun orig m -> not (obj.ReferenceEquals(orig, m))) rawArray merged
+
         if anyChanged then Some merged else None
 
     let private mergeContextPairs (rawArray: obj array) (replacements: ContextMessage list) : obj array option =
         let pairs = Array.zip rawArray (List.toArray replacements) |> Array.toList
+
         pairs
         |> List.traverseResultM mergeOneContextItem
         |> Result.toOption
         |> Option.bind (selectChangedMerged rawArray)
 
     let private mergeContextReplacements (rawArray: obj array) (replacements: ContextMessage list) : obj array option =
-        if rawArray.Length <> replacements.Length then None
-        else mergeContextPairs rawArray replacements
+        if rawArray.Length <> replacements.Length then
+            None
+        else
+            mergeContextPairs rawArray replacements
 
     let private isScopeSection (text: string) : bool =
         text.Contains("## Scope & Context Management") || text.Contains("## Scope 与上下文")
@@ -1871,15 +2020,21 @@ module Adapter =
 
     let private updateSystemPromptScope (system: string list) (scopeProtocol: string) : string list =
         let hasScope = system |> List.exists isScopeSection
-        if hasScope then system |> List.map (replaceLegacyScopeHeader scopeProtocol)
-        else system @ [ scopeProtocol ]
+
+        if hasScope then
+            system |> List.map (replaceLegacyScopeHeader scopeProtocol)
+        else
+            system @ [ scopeProtocol ]
 
     // HNI projection for scope planning: the library sees no omp field names.
     let private ompScopeKind (message: obj) =
         match optionalString (fieldValue message "role") with
         | Some "user" -> "user"
         | Some "assistant" -> "assistant"
-        | Some "toolResult" | Some "tool" | Some "tool-result" | Some "tool_result" -> "result"
+        | Some "toolResult"
+        | Some "tool"
+        | Some "tool-result"
+        | Some "tool_result" -> "result"
         | Some "custom" -> "custom"
         | _ -> "other"
 
@@ -1889,7 +2044,9 @@ module Adapter =
 
     let private ompScopeText (message: obj) =
         let content = fieldValue message "content"
-        if isString content then stringOf content
+
+        if isString content then
+            stringOf content
         else
             ompScopeParts message
             |> Array.filter (fun part -> stringOf (fieldValue part "type") = "text")
@@ -1898,22 +2055,32 @@ module Adapter =
 
     let private ompNeutralPart (part: obj) : obj =
         match optionalString (fieldValue part "type") with
-        | Some "toolCall" | Some "tool-call" | Some "tool_call" ->
-            createObj [ "id", fieldValue part "id"; "tool", fieldValue part "name" ]
-        | Some "toolResult" | Some "tool-result" | Some "tool_result" ->
-            createObj [ "resultFor", fieldValue part "id" ]
+        | Some "toolCall"
+        | Some "tool-call"
+        | Some "tool_call" -> createObj [ "id", fieldValue part "id"; "tool", fieldValue part "name" ]
+        | Some "toolResult"
+        | Some "tool-result"
+        | Some "tool_result" -> createObj [ "resultFor", fieldValue part "id" ]
         | _ -> createObj []
 
     let private ompNeutralMessage (message: obj) : obj =
         let kind = ompScopeKind message
         let attribution = stringOf (fieldValue message "attribution")
-        let operator = (kind = "user" && attribution <> "agent") || (kind = "custom" && attribution = "user")
-        let side = kind = "user" && not operator && not (isTrue (fieldValue message "steering"))
+
+        let operator =
+            (kind = "user" && attribution <> "agent")
+            || (kind = "custom" && attribution = "user")
+
+        let side =
+            kind = "user" && not operator && not (isTrue (fieldValue message "steering"))
+
         let ts = fieldValue message "timestamp"
         let key = (if isNull ts then "" else stringOf ts) + ":" + ompScopeText message
+
         let resultFor =
             let id = fieldValue message "toolCallId"
             if isNull id then "" else stringOf id
+
         createObj
             [ "kind", box kind
               "operator", box operator
@@ -1924,12 +2091,15 @@ module Adapter =
               "resultFor", box resultFor
               "resultField", box (if kind = "result" then "content" else "") ]
 
-    let private copyScopeObject (value: obj) = emitJsExpr value "Object.assign({}, $0)"
+    let private copyScopeObject (value: obj) =
+        emitJsExpr value "Object.assign({}, $0)"
 
     let private ompWritePlannedTail (message: obj) (suffix: string) : obj =
         let content = fieldValue message "content"
         let updated = Surface.appendTailOnce content suffix
-        if obj.ReferenceEquals(content, updated) then message
+
+        if obj.ReferenceEquals(content, updated) then
+            message
         else
             let replacement = copyScopeObject message
             replacement?content <- updated
@@ -1938,18 +2108,22 @@ module Adapter =
     let private ompApplyHint (messages: obj array) (hint: obj) =
         let index = unbox<int> hint?index
         let current = messages.[index]
+
         let updated =
             if stringOf hint?kind = "user" then
                 Surface.writeUserHint current [| stringOf hint?tail |]
             else
                 ompWritePlannedTail current (stringOf hint?tail)
+
         messages.[index] <- updated
 
     let private ompApplySlot (messages: obj array) (slot: obj) : obj =
         let index = unbox<int> slot?index
         let item = messages.[index]
         let kept = fieldValue slot "parts"
-        if isNull kept then item
+
+        if isNull kept then
+            item
         else
             let parts = ompScopeParts item
             let selected = unbox<int array> kept |> Array.map (fun i -> parts.[i])
@@ -1964,13 +2138,20 @@ module Adapter =
             |> Array.tryLast
             |> Option.map (fun message -> fieldValue message "timestamp")
             |> Option.defaultValue null
+
         let fields =
             [ "role", box "user"
               "content", box [| createObj [ "type", box "text"; "text", box prose ] |]
               "steering", box true
               "attribution", box "agent"
               "strong", box strong ]
-        let withTime = if isNull lastStamp then fields else fields @ [ "timestamp", lastStamp ]
+
+        let withTime =
+            if isNull lastStamp then
+                fields
+            else
+                fields @ [ "timestamp", lastStamp ]
+
         Array.append messages [| createObj withTime |]
 
     let private ompScopeRequest (sessionId: string) (rawMessages: obj) : obj array =
@@ -1980,9 +2161,13 @@ module Adapter =
         let staged = Array.copy original
         unbox<obj array> plan?hints |> Array.iter (ompApplyHint staged)
         let scoped = unbox<obj array> plan?slots |> Array.map (ompApplySlot staged)
-        if not (isNull plan?strong) then ompScopeSteer scoped (stringOf plan?strong) true
-        elif not (isNull plan?weak) then ompScopeSteer scoped (stringOf plan?weak) false
-        else scoped
+
+        if not (isNull plan?strong) then
+            ompScopeSteer scoped (stringOf plan?strong) true
+        elif not (isNull plan?weak) then
+            ompScopeSteer scoped (stringOf plan?weak) false
+        else
+            scoped
 
     let private contextMessagesReply (rawList: obj) (withSteer: obj array) : obj =
         if Surface.isUnchanged withSteer (Surface.toObjArray rawList) then
@@ -1990,7 +2175,11 @@ module Adapter =
         else
             createObj [ "messages", box withSteer ]
 
-    let private applyContextReplacements (rawList: obj) (withSteer: obj array) (replacements: ContextMessage list) : obj =
+    let private applyContextReplacements
+        (rawList: obj)
+        (withSteer: obj array)
+        (replacements: ContextMessage list)
+        : obj =
         match mergeContextReplacements withSteer replacements with
         | Some merged -> createObj [ "messages", box merged ]
         | None -> contextMessagesReply rawList withSteer
@@ -2008,58 +2197,77 @@ module Adapter =
                 [ "content", box [| createObj [ "type", box "text"; "text", box result.Text ] |]
                   "isError", box result.IsError ]
 
+    let private extractTextPart (p: obj) =
+        if stringOf (fieldValue p "type") = "text" then
+            Some(stringOf (fieldValue p "text"))
+        else
+            None
+
+    let private joinTextParts (parts: obj array) : string option =
+        let texts = parts |> Array.choose extractTextPart
+
+        if texts.Length > 0 then
+            Some(String.concat "\n" texts)
+        else
+            None
+
+    let private extractAssistantContent (content: obj) : string option =
+        if isString content then
+            Some(stringOf content)
+        elif isArray content then
+            joinTextParts (unbox<obj array> content)
+        else
+            None
+
     let private latestAssistantText (entries: obj array) : string =
         entries
         |> Array.filter (fun e -> stringOf (fieldValue e "type") = "message")
         |> Array.choose (fun e ->
             let msg = fieldValue e "message"
             let role = stringOf (fieldValue msg "role")
+
             if role = "assistant" then
-                let content = fieldValue msg "content"
-                if isString content then Some(stringOf content)
-                elif isArray content then
-                    let extractTextPart (p: obj) =
-                        if stringOf (fieldValue p "type") = "text" then Some(stringOf (fieldValue p "text")) else None
-                    let texts = unbox<obj array> content |> Array.choose extractTextPart
-                    if texts.Length > 0 then Some(String.concat "\n" texts) else None
-                else None
-            else None)
+                extractAssistantContent (fieldValue msg "content")
+            else
+                None)
         |> Array.tryLast
         |> Option.defaultValue ""
 
     let private appendHistoryEntry (histOpt: obj option) (userText: string) (assistantMsg: obj) =
         let userMsg =
-            createObj [
-                "role", box "user"
-                "content", box [| createObj [ "type", box "text"; "text", box userText ] |]
-            ]
+            createObj
+                [ "role", box "user"
+                  "content", box [| createObj [ "type", box "text"; "text", box userText ] |] ]
+
         match histOpt with
-        | Some h when isArray h ->
-            Array.append (unbox<obj array> h) [| userMsg; assistantMsg |]
+        | Some h when isArray h -> Array.append (unbox<obj array> h) [| userMsg; assistantMsg |]
         | _ -> [| userMsg; assistantMsg |]
 
     let private extractMessageContent (message: obj) : string =
-        let content = if isNull message then null else fieldValue message "content"
-        let isArr = isArray content
-        let isStr = isString content
-        if isNull content then ""
-        elif isStr then stringOf content
-        elif isArr then
-            unbox<obj array> content
-            |> Array.choose (fun p ->
-                let isText = stringOf (fieldValue p "type") = "text"
-                if isText then Some (stringOf (fieldValue p "text")) else None)
-            |> String.concat "\n"
-        else ""
+        let content =
+            if isNull message then
+                null
+            else
+                fieldValue message "content"
+
+        if isNull content then
+            ""
+        elif isString content then
+            stringOf content
+        elif isArray content then
+            unbox<obj array> content |> Array.choose extractTextPart |> String.concat "\n"
+        else
+            ""
 
     let private recordPromptOutcome
         (outcome: Result<bool, HostError>)
         (tcs: System.Threading.Tasks.TaskCompletionSource<Result<unit, string>>)
-        (resolve: Result<unit, string> -> unit) =
+        (resolve: Result<unit, string> -> unit)
+        =
         match outcome with
-        | Error err -> resolve (Error ("prompt failed: " + reasonOf err))
+        | Error err -> resolve (Error("prompt failed: " + reasonOf err))
         | Ok false -> resolve (Error "omp dropped prompt before dispatch")
-        | Ok true -> resolve (Ok ())
+        | Ok true -> resolve (Ok())
 
     let private observeIdlePrompt
         (child: Child)
@@ -2108,28 +2316,38 @@ module Adapter =
         : Task<Result<unit, string>> =
         task {
             let tcs = System.Threading.Tasks.TaskCompletionSource<Result<unit, string>>()
+            // DSL-MUTABLE: single-flight
             let settled = ref false
             let unsubscribeRef: (unit -> unit) option ref = ref None
+
             let resolve (res: Result<unit, string>) =
                 if not settled.Value then
                     settled.Value <- true
                     unsubscribeRef.Value |> Option.iter (fun u -> u ())
                     tcs.SetResult res
+
             let listener =
                 Func<obj, unit>(fun event ->
                     let eventType = stringOf (fieldValue event "type")
                     let message = fieldValue event "message"
-                    let role = if isNull message then "" else stringOf (fieldValue message "role")
+
+                    let role =
+                        if isNull message then
+                            ""
+                        else
+                            stringOf (fieldValue message "role")
+
                     let contentText = extractMessageContent message
+
                     if eventType = "message_end" && role = "user" && contentText.Contains(receipt) then
-                        resolve (Ok ())
+                        resolve (Ok())
                     elif eventType = "message_start" && role = "user" && contentText.Contains(receipt) then
-                        resolve (Ok ())
+                        resolve (Ok())
                     elif eventType = "agent_end" || eventType = "session_shutdown" then
-                        resolve (Error "child session terminated before steer landed")
-                )
+                        resolve (Error "child session terminated before steer landed"))
+
             let unsubObj = callMethod session "subscribe" (box listener)
-            unsubscribeRef := Some (fun () -> callMethod unsubObj "call" null |> ignore)
+            unsubscribeRef := Some(fun () -> callMethod unsubObj "call" null |> ignore)
             dispatchDeliveryAttempt session child payload isStreaming resolve
             let! res = tcs.Task
             unsubscribeRef.Value |> Option.iter (fun u -> u ())
@@ -2146,9 +2364,11 @@ module Adapter =
 
     let private messageHasToolCall (msg: obj) =
         let content = if isNull msg then null else fieldValue msg "content"
+
         if isArray content then
             unbox<obj array> content |> Array.exists isToolCallBlock
-        else false
+        else
+            false
 
     let private invokeEphemeralTurn (target: obj) (options: obj) : Task<Result<obj, string>> =
         task {
@@ -2159,28 +2379,39 @@ module Adapter =
                 return Error ex.Message
         }
 
-    let private executeEphemeralTurn (delegatorCtx: obj) (promptText: string) (conversationKey: string) (historyOpt: obj option) =
+    let private executeEphemeralTurn
+        (delegatorCtx: obj)
+        (promptText: string)
+        (conversationKey: string)
+        (historyOpt: obj option)
+        =
         task {
             let histEntries = historyEntries historyOpt
+
             let options =
-                createObj ([
-                    "promptText", box promptText
-                    "conversationKey", box conversationKey
-                ] @ histEntries)
+                createObj (
+                    [ "promptText", box promptText; "conversationKey", box conversationKey ]
+                    @ histEntries
+                )
+
             let targetOpt =
-                [
-                    fun () -> if hasMethod delegatorCtx "runEphemeralTurn" then Some delegatorCtx else None
-                    fun () ->
-                        let sess = fieldValue delegatorCtx "session"
-                        if hasMethod sess "runEphemeralTurn" then Some sess else None
-                ]
+                [ fun () ->
+                      if hasMethod delegatorCtx "runEphemeralTurn" then
+                          Some delegatorCtx
+                      else
+                          None
+                  fun () ->
+                      let sess = fieldValue delegatorCtx "session"
+
+                      if hasMethod sess "runEphemeralTurn" then
+                          Some sess
+                      else
+                          None ]
                 |> List.tryPick (fun f -> f ())
 
             match targetOpt with
-            | None ->
-                return Error "Neither delegatorCtx nor delegatorCtx.session exposes runEphemeralTurn"
-            | Some t ->
-                return! invokeEphemeralTurn t options
+            | None -> return Error "Neither delegatorCtx nor delegatorCtx.session exposes runEphemeralTurn"
+            | Some t -> return! invokeEphemeralTurn t options
         }
 
     let private processTurnResult
@@ -2191,10 +2422,13 @@ module Adapter =
         : Task<Result<string, string>> =
         let replyText = stringOf (fieldValue result "replyText")
         let assistantMsg = fieldValue result "assistantMessage"
-        let isBlankOrTool = String.IsNullOrWhiteSpace replyText || messageHasToolCall assistantMsg
+
+        let isBlankOrTool =
+            String.IsNullOrWhiteSpace replyText || messageHasToolCall assistantMsg
+
         if isBlankOrTool then
             let historyArr = appendHistoryEntry historyOpt promptText assistantMsg
-            retry (Some (box historyArr))
+            retry (Some(box historyArr))
         else
             Task.FromResult(Ok replyText)
 
@@ -2220,18 +2454,26 @@ module Adapter =
                     return Error "ephemeral negotiation retry budget exhausted"
                 else
                     let! turnRes = executeEphemeralTurn delegatorCtx currentPrompt conversationKey historyOpt
-                    return! handleTurnOutcome turnRes currentPrompt historyOpt (fun hist -> step retryPromptText hist (remaining - 1))
+
+                    return!
+                        handleTurnOutcome turnRes currentPrompt historyOpt (fun hist ->
+                            step retryPromptText hist (remaining - 1))
             }
+
         step promptText None 3
 
     let private runEphemeralDelegatorQuestion
-        (delegatorCtx: obj) (promptText: string) (retryPromptText: string) (receipt: string) =
+        (delegatorCtx: obj)
+        (promptText: string)
+        (retryPromptText: string)
+        (receipt: string)
+        =
         runEphemeralConsultation delegatorCtx promptText retryPromptText ("negotiate:" + receipt)
 
-    let private deliverArchivedSteer
-        (pi: obj) (receipt: string) (sid: string) (target: PrefixEpochId) (text: string) =
+    let private deliverArchivedSteer (pi: obj) (receipt: string) (sid: string) (target: PrefixEpochId) (text: string) =
         task {
             pendingPreviousSteers[receipt] <- sid, target
+
             try
                 let opts = createObj [ "deliverAs", box "steer"; "attribution", box "agent" ]
                 let! _ = awaitObj (call2 (fieldValue pi "sendUserMessage") (box text) opts)
@@ -2241,80 +2483,139 @@ module Adapter =
         }
 
     let private sendArchivedScopeSteer
-        (pi: obj) (journal: AgentJournal)
-        (sid: string) (archive: ArchivedScope)
-        (receipt: string) (answer: string) =
+        (pi: obj)
+        (journal: AgentJournal)
+        (sid: string)
+        (archive: ArchivedScope)
+        (receipt: string)
+        (answer: string)
+        =
         let stillCurrent =
             ompPriorArchive journal sid
             |> Result.map (fun (epoch, _) -> epoch.EpochId = archive.TargetEpochId)
             |> Result.defaultValue false
+
         let prepared =
-            if stillCurrent then Surface.preparePreviousScopeReply receipt sid answer
-            else null
-        let admitted = not (isNull prepared) && not (isNull prepared?ok) && unbox<bool> prepared?ok
+            if stillCurrent then
+                Surface.preparePreviousScopeReply receipt sid answer
+            else
+                null
+
+        let admitted =
+            not (isNull prepared) && not (isNull prepared?ok) && unbox<bool> prepared?ok
+
         if admitted then
             let text = stringOf prepared?steer + "\n[receipt:" + receipt + "]"
             deliverArchivedSteer pi receipt sid archive.TargetEpochId text
-        else Task.FromResult(())
+        else
+            Task.FromResult(())
 
     let private settleArchivedTurn
-        (pi: obj) (journal: AgentJournal) (sid: string)
-        (archive: ArchivedScope) (receipt: string)
-        (lease: FrozenProviderLease) (result: Result<string, string>) =
+        (pi: obj)
+        (journal: AgentJournal)
+        (sid: string)
+        (archive: ArchivedScope)
+        (receipt: string)
+        (lease: FrozenProviderLease)
+        (result: Result<string, string>)
+        =
         match result with
-        | Ok text when not lease.Cancelled && lease.Replaced > 0 && not (String.IsNullOrWhiteSpace text) ->
+        | Ok text when
+            not lease.Cancelled
+            && lease.Replaced > 0
+            && not (String.IsNullOrWhiteSpace text)
+            ->
             sendArchivedScopeSteer pi journal sid archive receipt text
         | _ -> Task.FromResult(())
 
+    let private executeArchivedTurn
+        (pi: obj)
+        (journal: AgentJournal)
+        (ctx: obj)
+        (sid: string)
+        (questions: string)
+        (receipt: string)
+        (archive: ArchivedScope)
+        (native: obj)
+        (providerId: string)
+        (modelId: string)
+        : unit =
+        let marker = "[wanxiangshu-prior:" + Guid.NewGuid().ToString("N") + "]"
+
+        let lease =
+            { SessionId = sid
+              Marker = marker
+              NativePayload = native
+              ProviderId = providerId
+              ModelId = modelId
+              Replaced = 0
+              Cancelled = false }
+
+        frozenProviderLeases[marker] <- lease
+
+        let prompt =
+            "Consult the strictly frozen preceding Scope request only. No tools and no follow-up. "
+            + "If the evidence is absent, explicitly say so. Questions:\n"
+            + questions
+            + "\n"
+            + marker
+
+        let retry =
+            "The previous reply was blank or tried a tool. Answer in plain text only, "
+            + "without tools, from the archived context.\n"
+            + questions
+            + "\n"
+            + marker
+
+        let guarded =
+            task {
+                try
+                    return! runEphemeralConsultation ctx prompt retry ("previous-scope:" + receipt)
+                with ex ->
+                    return Error ex.Message
+            }
+
+        let run =
+            task {
+                try
+                    let! result = guarded
+                    do! settleArchivedTurn pi journal sid archive receipt lease result
+                finally
+                    frozenProviderLeases.Remove marker |> ignore
+            }
+
+        run |> ignore
+
     let private launchArchivedScopeTurn
-        (pi: obj) (journal: AgentJournal) (ctx: obj)
-        (sid: string) (questions: string) (receipt: string)
-        (archive: ArchivedScope) (source: obj) : bool =
+        (pi: obj)
+        (journal: AgentJournal)
+        (ctx: obj)
+        (sid: string)
+        (questions: string)
+        (receipt: string)
+        (archive: ArchivedScope)
+        (source: obj)
+        : bool =
         let native = fieldValue source "nativePayload"
         let priorModel = fieldValue source "model"
         let providerId = stringOf (fieldValue priorModel "providerID")
         let modelId = stringOf (fieldValue priorModel "modelID")
+
         let available =
             hasMethod ctx "runEphemeralTurn"
             || hasMethod (fieldValue ctx "session") "runEphemeralTurn"
+
         let valid =
             available
             && isArray (fieldValue native "messages")
             && isArray (fieldValue native "tools")
-            && providerId <> "" && modelId <> ""
-        if not valid then false
+            && providerId <> ""
+            && modelId <> ""
+
+        if not valid then
+            false
         else
-            let marker = "[wanxiangshu-prior:" + Guid.NewGuid().ToString("N") + "]"
-            let lease =
-                { SessionId = sid
-                  Marker = marker
-                  NativePayload = native
-                  ProviderId = providerId
-                  ModelId = modelId
-                  Replaced = 0
-                  Cancelled = false }
-            frozenProviderLeases[marker] <- lease
-            let prompt =
-                "Consult the strictly frozen preceding Scope request only. No tools and no follow-up. "
-                + "If the evidence is absent, explicitly say so. Questions:\n"
-                + questions + "\n" + marker
-            let retry =
-                "The previous reply was blank or tried a tool. Answer in plain text only, "
-                + "without tools, from the archived context.\n" + questions + "\n" + marker
-            let guarded =
-                task {
-                    try return! runEphemeralConsultation ctx prompt retry ("previous-scope:" + receipt)
-                    with ex -> return Error ex.Message
-                }
-            let run =
-                task {
-                    try
-                        let! result = guarded
-                        do! settleArchivedTurn pi journal sid archive receipt lease result
-                    finally
-                        frozenProviderLeases.Remove marker |> ignore
-                }
-            run |> ignore
+            executeArchivedTurn pi journal ctx sid questions receipt archive native providerId modelId
             true
 
     let private deliverNegotiationSteerToChild
@@ -2327,10 +2628,10 @@ module Adapter =
         : Task<Result<unit, string>> =
         task {
             let! appended = tryAppendCorrelationEntry pi recipient correlationKey
+
             match appended with
-            | Error err ->
-                return Error ("failed to write prompt correlation entry: " + reasonOf err)
-            | Ok () ->
+            | Error err -> return Error("failed to write prompt correlation entry: " + reasonOf err)
+            | Ok() ->
                 let payload = steerText + "\n[receipt:" + receipt + "]"
                 let session = child.Session
                 let isStreaming = isTrue (fieldValue (fieldValue session "agent") "isStreaming")
@@ -2348,38 +2649,57 @@ module Adapter =
             member _.AskEphemeral(request: EphemeralTurnRequest) =
                 task {
                     match sessionContexts.TryGetValue request.DelegatorSessionId with
-                    | false, _ ->
-                        return Error ("Delegator context not found for " + request.DelegatorSessionId)
+                    | false, _ -> return Error("Delegator context not found for " + request.DelegatorSessionId)
                     | true, ctx ->
-                        return! runEphemeralDelegatorQuestion ctx request.PromptText request.RetryPromptText request.Receipt
+                        return!
+                            runEphemeralDelegatorQuestion ctx request.PromptText request.RetryPromptText request.Receipt
                 }
 
             member _.DeliverAndObserve(request: SteerDeliveryRequest) =
                 task {
                     match liveChildren.TryGetValue request.RecipientSessionId with
-                    | false, _ ->
-                        return Error ("Recipient child not found: " + request.RecipientSessionId)
+                    | false, _ -> return Error("Recipient child not found: " + request.RecipientSessionId)
                     | true, child ->
-                        return! deliverNegotiationSteerToChild pi request.RecipientSessionId child request.SteerText request.Receipt request.CorrelationKey
+                        return!
+                            deliverNegotiationSteerToChild
+                                pi
+                                request.RecipientSessionId
+                                child
+                                request.SteerText
+                                request.Receipt
+                                request.CorrelationKey
                 } }
 
     let private toolNameOf (t: obj) : string =
-        if isNull t then ""
-        elif not (isNull (fieldValue t "name")) then stringOf (fieldValue t "name")
+        if isNull t then
+            ""
+        elif not (isNull (fieldValue t "name")) then
+            stringOf (fieldValue t "name")
         elif not (isNull (fieldValue (fieldValue t "function") "name")) then
             stringOf (fieldValue (fieldValue t "function") "name")
-        else ""
+        else
+            ""
 
     let private filterOutNegotiate (tools: obj) =
-        unbox<obj array> tools
-        |> Array.filter (fun t -> toolNameOf t <> "negotiate")
+        unbox<obj array> tools |> Array.filter (fun t -> toolNameOf t <> "negotiate")
 
     let private priorProviderModel (source: obj) =
         let provider = fieldValue source "provider"
+
         let providerId =
-            if isNull provider then fieldValue source "providerID" else provider
+            if isNull provider then
+                fieldValue source "providerID"
+            else
+                provider
+
         let modelId = fieldValue source "id"
-        let modelId = if isNull modelId then fieldValue source "modelID" else modelId
+
+        let modelId =
+            if isNull modelId then
+                fieldValue source "modelID"
+            else
+                modelId
+
         stringOf providerId, stringOf modelId
 
     let private projectFrozenProvider (active: FrozenProviderLease) (latest: obj) (payload: obj) (ctx: obj) : obj =
@@ -2388,32 +2708,46 @@ module Adapter =
         let provider, modelId = priorProviderModel (fieldValue ctx "model")
         let actualNativeModel = stringOf (fieldValue payload "model")
         let frozenNativeModel = stringOf (fieldValue native "model")
+
         let matches =
-            provider = active.ProviderId && modelId = active.ModelId
+            provider = active.ProviderId
+            && modelId = active.ModelId
             && actualNativeModel = frozenNativeModel
             && isArray (fieldValue native "messages")
             && isArray originalTools
+
         if not matches then
             invalidOp "Archived Scope side turn cannot replay: provider/model/catalog does not match actual request"
         else
             let projected: obj =
-                emitJsExpr (native, latest)
+                emitJsExpr
+                    (native, latest)
                     "Object.assign({}, structuredClone($0), { messages: [...structuredClone($0.messages), structuredClone($1)] })"
+
             active.Replaced <- active.Replaced + 1
             projected
 
 
     let private replayFrozenProvider (sid: string) (payload: obj) (ctx: obj) : obj option =
         let messages = fieldValue payload "messages"
+
         let latest =
             if isArray messages then
                 let arr = unbox<obj array> messages
                 if arr.Length = 0 then null else arr[arr.Length - 1]
-            else null
-        let latestText: string = if isNull latest then "" else emitJsExpr latest "JSON.stringify($0)"
+            else
+                null
+
+        let latestText: string =
+            if isNull latest then
+                ""
+            else
+                emitJsExpr latest "JSON.stringify($0)"
+
         let lease =
             frozenProviderLeases.Values
             |> Seq.tryFind (fun active -> active.SessionId = sid && latestText.Contains(active.Marker))
+
         match lease with
         | None -> None
         | Some active -> Some(projectFrozenProvider active latest payload ctx)
@@ -2429,11 +2763,27 @@ module Adapter =
         : (HostSignal -> Task<unit>) =
 
         registerResetScopeTool pi journalOpt
-        registerAskPreviousScopeTool pi journalOpt
-            (fun ctx questions receipt archive source ->
-                match journalOpt with
-                | Some journal -> launchArchivedScopeTurn pi journal ctx (ctxSessionId ctx) questions receipt archive source
-                | None -> false)
+
+        registerAskPreviousScopeTool pi journalOpt (fun ctx questions receipt archive source ->
+            match journalOpt with
+            | Some journal ->
+                launchArchivedScopeTurn pi journal ctx (ctxSessionId ctx) questions receipt archive source
+            | None -> false)
+
+        let bindHeaderParent (sid: string) (ctx: obj) =
+            let sm = sessionManagerOf ctx
+            let header = if isNull sm then null else callMethod sm "getHeader" null
+
+            let parentSession =
+                if isNull header then
+                    null
+                else
+                    fieldValue header "parentSession"
+
+            let parentStr = if isNull parentSession then "" else stringOf parentSession
+
+            if not (String.IsNullOrEmpty parentStr) then
+                Surface.bindDelegation sid parentStr |> ignore
 
         let refreshSessionState (ctx: obj) =
             let sid = ctxSessionId ctx
@@ -2441,24 +2791,27 @@ module Adapter =
             sessionContexts.[sid] <- ctx
             Surface.forgetSession sid
             let hasChild, child = liveChildren.TryGetValue sid
+
             if hasChild then
                 child.Parent |> Option.iter (fun p -> Surface.bindDelegation sid p |> ignore)
             else
-                let sm = sessionManagerOf ctx
-                let header = if isNull sm then null else callMethod sm "getHeader" null
-                let parentSession = if isNull header then null else fieldValue header "parentSession"
-                let parentStr = if isNull parentSession then "" else stringOf parentSession
-                if not (String.IsNullOrEmpty parentStr) then Surface.bindDelegation sid parentStr |> ignore
+                bindHeaderParent sid ctx
+
             Task.FromResult(jsUndefined) |> unbox<obj>
 
-        registerEvent pi "session_start" (fun (_event: obj) (ctx: obj) ->
-            refreshSessionState ctx)
-        registerEvent pi "session_switch" (fun (_event: obj) (ctx: obj) ->
-            refreshSessionState ctx)
-        registerEvent pi "session_branch" (fun (_event: obj) (ctx: obj) ->
-            refreshSessionState ctx)
+        registerEvent pi "session_start" (fun (_event: obj) (ctx: obj) -> refreshSessionState ctx)
+        registerEvent pi "session_switch" (fun (_event: obj) (ctx: obj) -> refreshSessionState ctx)
+        registerEvent pi "session_branch" (fun (_event: obj) (ctx: obj) -> refreshSessionState ctx)
 
-    // -- provider request: mask negotiate on root / unmanaged sessions ----------------
+        let recordNormalRequest (sid: string) (submitted: obj) (model: obj) (shouldFilter: bool) : obj =
+            if not (isNull model) then
+                outboundViewStore?recordModel (sid, model) |> ignore
+
+            outboundViewStore?recordNativeRequest (sid, submitted, model) |> ignore
+
+            if shouldFilter then submitted else jsUndefined
+
+        // -- provider request: mask negotiate on root / unmanaged sessions ----------------
         registerEvent pi "before_provider_request" (fun (event: obj) (ctx: obj) ->
             task {
                 let sid = ctxSessionId ctx
@@ -2469,52 +2822,75 @@ module Adapter =
                 let model = if isNull observedModel then rawModel else observedModel
                 let tools = if isNull payload then null else fieldValue payload "tools"
                 let shouldFilter = not isManaged && not (isNull payload) && isArray tools
+
                 let submitted =
                     if shouldFilter then
                         let filtered = filterOutNegotiate tools
                         emitJsExpr (payload, filtered) "Object.assign({}, $0, { tools: $1 })"
-                    else payload
+                    else
+                        payload
+
                 match replayFrozenProvider sid submitted ctx with
                 | Some frozen -> return frozen
-                | None ->
-                    if not (isNull model) then outboundViewStore?recordModel(sid, model) |> ignore
-                    outboundViewStore?recordNativeRequest(sid, submitted, model) |> ignore
-                    if shouldFilter then return submitted else return jsUndefined
-            } |> unbox<obj>)
+                | None -> return recordNormalRequest sid submitted model shouldFilter
+            }
+            |> unbox<obj>)
+
+        let settlePendingPreviousSteer
+            (sid: string)
+            (journal: AgentJournal)
+            (pair: System.Collections.Generic.KeyValuePair<string, string * PrefixEpochId>)
+            =
+            let _, epoch = pair.Value
+
+            let current =
+                ompPriorArchive journal sid
+                |> Result.map (fun (head, _) -> head.EpochId = epoch)
+                |> Result.defaultValue false
+
+            if current then
+                Surface.confirmPreviousScopeSteer pair.Key sid |> ignore
+
+            pendingPreviousSteers.Remove pair.Key |> ignore
 
         registerEvent pi "message_start" (fun (event: obj) (ctx: obj) ->
             let sid = ctxSessionId ctx
             let message = fieldValue event "message"
+
             let agentSource =
                 stringOf (fieldValue message "role") = "user"
                 && stringOf (fieldValue message "attribution") = "agent"
+
             let text = if agentSource then extractMessageContent message else ""
+
             let candidate =
                 pendingPreviousSteers
                 |> Seq.tryFind (fun pair ->
                     let owner, _ = pair.Value
                     owner = sid && text.Contains("[receipt:" + pair.Key + "]"))
+
             match candidate, journalOpt with
-            | Some pair, Some journal ->
-                let _, epoch = pair.Value
-                let current =
-                    ompPriorArchive journal sid
-                    |> Result.map (fun (head, _) -> head.EpochId = epoch)
-                    |> Result.defaultValue false
-                if current then Surface.confirmPreviousScopeSteer pair.Key sid |> ignore
-                pendingPreviousSteers.Remove pair.Key |> ignore
+            | Some pair, Some journal -> settlePendingPreviousSteer sid journal pair
             | _ -> ()
+
             jsUndefined)
 
-        let signal (value: HostSignal) : Task<unit> =
-            task { return () }
+        let signal (value: HostSignal) : Task<unit> = task { return () }
 
         let dispatchToolGate (ctx: obj) (event: obj) =
             task {
                 match hooks.ToolGate with
                 | None -> return jsUndefined
                 | Some gate ->
-                    let! verdict = gate.BeforeTool(toolCallView ctx (fieldValue event "toolCallId") (fieldValue event "toolName") (fieldValue event "input"))
+                    let! verdict =
+                        gate.BeforeTool(
+                            toolCallView
+                                ctx
+                                (fieldValue event "toolCallId")
+                                (fieldValue event "toolName")
+                                (fieldValue event "input")
+                        )
+
                     return verdictReply verdict
             }
 
@@ -2544,15 +2920,17 @@ module Adapter =
                 let scopeProtocol = ProviderProse.render lang "host/scope-protocol" Map.empty
                 let system = stringList (fieldValue event "systemPrompt")
                 let updated = updateSystemPromptScope system scopeProtocol
+
                 match hooks.Turn with
                 | None ->
-                    outboundViewStore?recordSystem(sid, box (List.toArray updated)) |> ignore
+                    outboundViewStore?recordSystem (sid, box (List.toArray updated)) |> ignore
                     return createObj [ "systemPrompt", box (List.toArray updated) ]
                 | Some turn ->
                     let! prompt = turn.SystemPrompt(turnContext ctx, updated)
-                    outboundViewStore?recordSystem(sid, box (List.toArray prompt)) |> ignore
+                    outboundViewStore?recordSystem (sid, box (List.toArray prompt)) |> ignore
                     return createObj [ "systemPrompt", box (List.toArray prompt) ]
-            } |> unbox<obj>)
+            }
+            |> unbox<obj>)
 
         // -- context messages -------------------------------------------------------------
         registerEvent pi "context" (fun (event: obj) (ctx: obj) ->
@@ -2561,6 +2939,7 @@ module Adapter =
                 sessionContexts.[sid] <- ctx
                 let rawList = fieldValue event "messages"
                 let scoped = ompScopeRequest sid rawList
+
                 let! finalResult =
                     match hooks.Turn with
                     | None -> Task.FromResult(contextMessagesReply rawList scoped)
@@ -2570,8 +2949,16 @@ module Adapter =
                             let! edit = turn.ContextMessages(turnContext ctx, messages)
                             return applyContextEdit rawList scoped edit
                         }
-                let physical = if isNull finalResult then rawList else fieldValue finalResult "messages"
-                if not (isNull physical) then outboundViewStore?recordMessagesFor(sid, physical) |> ignore
+
+                let physical =
+                    if isNull finalResult then
+                        rawList
+                    else
+                        fieldValue finalResult "messages"
+
+                if not (isNull physical) then
+                    outboundViewStore?recordMessagesFor (sid, physical) |> ignore
+
                 return finalResult
             }
             |> unbox<obj>)
@@ -2582,8 +2969,12 @@ module Adapter =
                 let sid = ctxSessionId ctx
                 sessionContexts.[sid] <- ctx
                 let toolName = stringOf (fieldValue event "toolName")
+
                 if toolName = "negotiate" && not (liveChildren.ContainsKey sid) then
-                    return createObj [ "block", box true; "reason", box "negotiate is not permitted on root or unmanaged sessions." ]
+                    return
+                        createObj
+                            [ "block", box true
+                              "reason", box "negotiate is not permitted on root or unmanaged sessions." ]
                 else
                     return! dispatchToolGate ctx event
             }
@@ -2596,17 +2987,23 @@ module Adapter =
                 | Some gate ->
                     let text = resultText event
                     let isError = isTrue (fieldValue event "isError")
+
                     let callView =
                         toolCallView
                             ctx
                             (fieldValue event "toolCallId")
                             (fieldValue event "toolName")
                             (fieldValue event "input")
+
                     let! edit =
                         gate.AfterTool(
                             callView,
-                            { Text = text; Truncated = false; IsError = isError; Details = None }
+                            { Text = text
+                              Truncated = false
+                              IsError = isError
+                              Details = None }
                         )
+
                     return applyToolResultEdit edit
             }
             |> unbox<obj>)
@@ -2649,6 +3046,7 @@ module Adapter =
             task {
                 let sid = ctxSessionId ctx
                 Surface.onTurnStart sid
+
                 do!
                     signal (
                         HostSignal.AttemptStarted
@@ -2754,7 +3152,13 @@ module Adapter =
     /// snapshots the listener list when it starts emitting `session_start`, so
     /// a listener registered during that emission is never called for this
     /// session.
-    let private mountHooks (pi: obj) (emit: HostSignal -> Task<unit>) (hooks: ProductHooks) (ctx: obj) (stateRoot: string) : Task<unit> =
+    let private mountHooks
+        (pi: obj)
+        (emit: HostSignal -> Task<unit>)
+        (hooks: ProductHooks)
+        (ctx: obj)
+        (stateRoot: string)
+        : Task<unit> =
         task {
             let! journalOpt = acquireOmpJournal stateRoot
             let signal = registerProductHooks pi hooks emit journalOpt
@@ -2791,7 +3195,10 @@ module Adapter =
 
                 let ports, emit = createOmpHostPorts pi agents workspace stateRoot
                 let negotiationTransport = createNegotiationTransport pi liveChildren
-                emitJsExpr (plugin, negotiationTransport) "if (typeof $0.AttachTransport === 'function') { $0.AttachTransport($1); }"
+
+                emitJsExpr
+                    (plugin, negotiationTransport)
+                    "if (typeof $0.AttachTransport === 'function') { $0.AttachTransport($1); }"
 
                 let! outcome = guardTask (fun () -> plugin.Activate ports)
 
@@ -2826,11 +3233,17 @@ module Adapter =
 
         registerEvent pi "session_shutdown" (fun (_event: obj) (_ctx: obj) ->
             task {
-                for kv in frozenProviderLeases do kv.Value.Cancelled <- true
+                for kv in frozenProviderLeases do
+                    kv.Value.Cancelled <- true
+
                 frozenProviderLeases.Clear()
                 pendingPreviousSteers.Clear()
-                for sid in sessionContexts.Keys do outboundViewStore?clearSession(sid) |> ignore
+
+                for sid in sessionContexts.Keys do
+                    outboundViewStore?clearSession (sid) |> ignore
+
                 sessionContexts.Clear()
+
                 match !liveHooks with
                 | None -> return jsUndefined
                 | Some hooks ->
@@ -2848,6 +3261,8 @@ module Adapter =
 
     let getLiveChildren () : System.Collections.Generic.Dictionary<string, obj> =
         let dict = System.Collections.Generic.Dictionary<string, obj>()
+
         for kv in liveChildren do
             dict.Add(kv.Key, box kv.Value)
+
         dict

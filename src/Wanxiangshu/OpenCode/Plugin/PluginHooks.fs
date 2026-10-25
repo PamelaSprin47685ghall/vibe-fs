@@ -105,19 +105,32 @@ module PluginHooks =
 
     let private negotiationSdk (session: obj) (methodName: string) (payload: obj) : Task<obj> =
         let action = emitJsExpr (session, methodName) "$0[$1]"
-        if isNull action then failwith ("session." + methodName + " unavailable")
-        else emitJsExpr (session, action, payload) "$1.call($0, $2)" |> unbox<Task<obj>>
+
+        if isNull action then
+            failwith ("session." + methodName + " unavailable")
+        else
+            emitJsExpr (session, action, payload) "$1.call($0, $2)" |> unbox<Task<obj>>
 
     let private negotiationResponse (reply: obj) =
-        if isNull reply then null elif isNull reply?data then reply else reply?data
+        if isNull reply then null
+        elif isNull reply?data then reply
+        else reply?data
 
     let private negotiationSessionPayload (sessionId: string) (body: (string * obj) list) =
-        let fields = [ "sessionID", box sessionId; "path", box (createObj [ "id", box sessionId ]) ]
+        let fields =
+            [ "sessionID", box sessionId; "path", box (createObj [ "id", box sessionId ]) ]
+
         createObj (fields @ [ "body", box (createObj body) ] @ body)
 
     let private negotiationResultText (response: obj) =
         let body = negotiationResponse response
-        let parts = if isNull body || isNull body?parts then [||] else unbox<obj array> body?parts
+
+        let parts =
+            if isNull body || isNull body?parts then
+                [||]
+            else
+                unbox<obj array> body?parts
+
         parts
         |> Array.filter (fun p -> not (isNull p) && emitJsExpr p "$0?.type === 'text'")
         |> Array.map (fun part -> if isNull part?text then "" else string part?text)
@@ -125,11 +138,13 @@ module PluginHooks =
 
     let private negotiationPromptText (questions: string) =
         "<btw>Ephemeral clarification on a delegate's current assignment. Answer the questions from this conversation context. Do not call ANY tools. Do not ask follow-up questions. Reply in plain text immediately.\nQuestions:\n"
-        + questions + "\n</btw>"
+        + questions
+        + "\n</btw>"
 
     let private previousScopePromptText (questions: string) =
         "<btw>Ephemeral consultation with the immediately preceding Scope, using its archived provider request. Answer only using what this archived context showed. Do not use ANY tools, do not ask follow-up questions. If unknown, say so. Reply in plain text immediately.\nQuestions:\n"
-        + questions + "\n</btw>"
+        + questions
+        + "\n</btw>"
 
     [<RequireQualifiedAccess>]
     type private TemporaryAnswer =
@@ -138,28 +153,41 @@ module PluginHooks =
         | Failed of string
 
     let private classifyTemporaryAnswer (text: string) (blocked: bool) =
-        if blocked || String.IsNullOrWhiteSpace text then TemporaryAnswer.Retry
-        else TemporaryAnswer.Replied text
+        if blocked || String.IsNullOrWhiteSpace text then
+            TemporaryAnswer.Retry
+        else
+            TemporaryAnswer.Replied text
 
     let private classifyTemporaryFailure (ex: exn) (blocked: bool) =
-        if blocked then TemporaryAnswer.Retry
-        else TemporaryAnswer.Failed ex.Message
+        if blocked then
+            TemporaryAnswer.Retry
+        else
+            TemporaryAnswer.Failed ex.Message
 
     let private temporaryPromptPayload (tempId: string) (agentName: string) (model: obj) (prose: string) =
         let parts = box [| createObj [ "type", box "text"; "text", box prose ] |]
         let body = [ "agent", box agentName; "parts", parts ]
+
         let physicalModel =
-            if isNull model then null
-            else createObj [ "providerID", model?providerID; "modelID", model?modelID ]
+            if isNull model then
+                null
+            else
+                createObj [ "providerID", model?providerID; "modelID", model?modelID ]
+
         let request =
-            if isNull model then body
-            elif isNull model?variant then body @ [ "model", physicalModel ]
-            else body @ [ "model", physicalModel; "variant", model?variant ]
+            if isNull model then
+                body
+            elif isNull model?variant then
+                body @ [ "model", physicalModel ]
+            else
+                body @ [ "model", physicalModel; "variant", model?variant ]
+
         negotiationSessionPayload tempId request
 
     let private tryTemporaryAnswer (session: obj) (tempId: string) (payload: obj) : Task<TemporaryAnswer> =
         task {
             let before = PluginTransforms.negotiationToolViolationCount tempId
+
             try
                 let! result = negotiationSdk session "prompt" payload
                 let text = negotiationResultText result
@@ -171,41 +199,58 @@ module PluginHooks =
         }
 
     let private runTemporaryQuestion
-        (session: obj) (tempId: string) (agentName: string) (model: obj) (firstPrompt: string)
+        (session: obj)
+        (tempId: string)
+        (agentName: string)
+        (model: obj)
+        (firstPrompt: string)
         : Task<Result<string, string>> =
         let retryText =
             "The preceding ephemeral response attempted a forbidden tool or lacked a plain-text answer. Do NOT use any tools; answer the questions from your existing context immediately."
+
         let rec run attempt prose =
             if not (PluginTransforms.negotiationIsTemporary tempId) then
                 Task.FromResult(Error "temporary read-only consultation was cancelled")
             elif attempt > 2 then
-                Task.FromResult(Error "read-only consultation exhausted two bounded retries after tool violations or empty answers")
+                Task.FromResult(
+                    Error "read-only consultation exhausted two bounded retries after tool violations or empty answers"
+                )
             else
                 runCandidate attempt prose
+
         and runCandidate attempt prose =
             task {
                 let payload = temporaryPromptPayload tempId agentName model prose
                 let! result = tryTemporaryAnswer session tempId payload
+
                 match result with
                 | TemporaryAnswer.Replied text -> return Ok text
                 | TemporaryAnswer.Retry -> return! run (attempt + 1) retryText
                 | TemporaryAnswer.Failed error -> return Error error
             }
+
         run 0 firstPrompt
 
     let private temporarySessionId (created: obj) : Result<string, string> =
         let data = negotiationResponse created
         let value = if isNull data || isNull data?id then "" else string data?id
-        if String.IsNullOrWhiteSpace value then Error "temporary session create yielded no identity"
-        else Ok value
+
+        if String.IsNullOrWhiteSpace value then
+            Error "temporary session create yielded no identity"
+        else
+            Ok value
 
     let private createTemporarySession (session: obj) (recipient: string) : Task<Result<string, string>> =
         task {
             let options = createObj [ "parentID", box recipient; "title", box "negotiation" ]
+
             try
-                let! created = negotiationSdk session "create" (createObj [ "body", options; "parentID", box recipient ])
+                let! created =
+                    negotiationSdk session "create" (createObj [ "body", options; "parentID", box recipient ])
+
                 return temporarySessionId created
-            with ex -> return Error ex.Message
+            with ex ->
+                return Error ex.Message
         }
 
     let private deleteTemporarySession (session: obj) (tempId: string) : Task<unit> =
@@ -213,7 +258,8 @@ module PluginHooks =
             try
                 let! _ = negotiationSdk session "delete" (negotiationSessionPayload tempId [])
                 return ()
-            with _ -> return ()
+            with _ ->
+                return ()
         }
 
     [<RequireQualifiedAccess>]
@@ -222,32 +268,44 @@ module PluginHooks =
         | Frozen of obj
 
     let private runLinkedTemporary
-        (session: obj) (origin: ConsultationOrigin) (tempId: string) (agentName: string) (promptText: string)
+        (session: obj)
+        (origin: ConsultationOrigin)
+        (tempId: string)
+        (agentName: string)
+        (promptText: string)
         : Task<Result<string, string>> =
         task {
             let linked, model =
                 match origin with
                 | ConsultationOrigin.Delegator delegator ->
-                    PluginTransforms.negotiationStartTemporary tempId delegator, PluginTransforms.negotiationModelFor delegator
+                    PluginTransforms.negotiationStartTemporary tempId delegator,
+                    PluginTransforms.negotiationModelFor delegator
                 | ConsultationOrigin.Frozen snapshot ->
                     PluginTransforms.consultationStartFrozen tempId snapshot,
                     (if isNull snapshot then null else snapshot?model)
+
             let questionRun =
                 match linked with
                 | Error reason -> Task.FromResult(Error reason)
-                | Ok () -> runTemporaryQuestion session tempId agentName model promptText
+                | Ok() -> runTemporaryQuestion session tempId agentName model promptText
+
             try
                 return! questionRun
             finally
                 PluginTransforms.negotiationFinishTemporary tempId
-                // Physical session cleanup is deliberately performed after the runner by createAndRunTemporary.
+        // Physical session cleanup is deliberately performed after the runner by createAndRunTemporary.
         }
 
     let private createAndRunTemporary
-        (session: obj) (origin: ConsultationOrigin) (recipient: string) (agentName: string) (promptText: string)
+        (session: obj)
+        (origin: ConsultationOrigin)
+        (recipient: string)
+        (agentName: string)
+        (promptText: string)
         : Task<Result<string, string>> =
         task {
             let! created = createTemporarySession session recipient
+
             match created with
             | Error reason -> return Error reason
             | Ok tempId ->
@@ -266,21 +324,37 @@ module PluginHooks =
         (questions: string)
         : Task<Result<string, string>> =
         let session = if isNull client then null else client?session
+
         match roleFor (SessionId.create delegator) with
         | None -> Task.FromResult(Error "delegator has no verified model agent identity")
         | Some _ when isNull session -> Task.FromResult(Error "OpenCode SDK session transport unavailable")
         | Some role ->
-            createAndRunTemporary session (ConsultationOrigin.Delegator delegator) recipient (ManagedAgent.nameOf role) (negotiationPromptText questions)
+            createAndRunTemporary
+                session
+                (ConsultationOrigin.Delegator delegator)
+                recipient
+                (ManagedAgent.nameOf role)
+                (negotiationPromptText questions)
 
     let private consultPreviousBtw
-        (client: obj) (roleFor: SessionId -> Role option) (recipient: string) (snapshot: obj) (questions: string)
+        (client: obj)
+        (roleFor: SessionId -> Role option)
+        (recipient: string)
+        (snapshot: obj)
+        (questions: string)
         : Task<Result<string, string>> =
         let session = if isNull client then null else client?session
+
         match roleFor (SessionId.create recipient) with
         | None -> Task.FromResult(Error "previous Scope consultation has no verified model agent identity")
         | Some _ when isNull session -> Task.FromResult(Error "OpenCode SDK session transport unavailable")
         | Some role ->
-            createAndRunTemporary session (ConsultationOrigin.Frozen snapshot) recipient (ManagedAgent.nameOf role) (previousScopePromptText questions)
+            createAndRunTemporary
+                session
+                (ConsultationOrigin.Frozen snapshot)
+                recipient
+                (ManagedAgent.nameOf role)
+                (previousScopePromptText questions)
 
     let create
         (boot: PluginBoot.Boot)
@@ -348,16 +422,25 @@ module PluginHooks =
                     | _ -> return None
                 }
 
-            let transformOrdinarySystem = ProviderSystemTransform.createWith roleFor planStageFor
+            let transformOrdinarySystem =
+                ProviderSystemTransform.createWith roleFor planStageFor
+
             let systemTransform (input: obj) (output: obj) : Task<unit> =
                 task {
                     let projected = PluginTransforms.negotiationProjectSystem input output
+
                     if not projected then
                         do! transformOrdinarySystem input output
                         PluginTransforms.negotiationRememberSystem input output
-                    let sid = if isNull input?sessionID then "" else string input?sessionID
+
+                    let sid =
+                        if isNull input?sessionID then
+                            ""
+                        else
+                            string input?sessionID
+
                     if not projected && not (String.IsNullOrEmpty sid) then
-                        outboundViewStore?recordSystem(sid, output?system) |> ignore
+                        outboundViewStore?recordSystem (sid, output?system) |> ignore
                 }
 
 
@@ -501,11 +584,13 @@ module PluginHooks =
                             userNotify
 
                     toolRegistration.Runtime.AttachQuestionNotifier(fun question -> showQuestionToast question)
+
                     toolRegistration.Runtime.AttachNegotiationTransport(
                         negotiateBtw client roleFor,
                         (fun recipient answer receipt ->
                             toolRegistration.Runtime.SendNegotiationSteer(recipient, answer, receipt))
                     )
+
                     toolRegistration.Runtime.AttachPreviousScopeTransport(consultPreviousBtw client roleFor)
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
@@ -654,6 +739,7 @@ module PluginHooks =
                             [ "session_id", sessionId; "result", "unbound" ]
                     | _ -> ()
                 }
+
             let firstFieldText = firstFieldText
 
             let checkManagerReviewPermissions toolName toolInput =
@@ -749,11 +835,20 @@ module PluginHooks =
                 task {
                     let sessionId = toolField toolInput "sessionID"
                     let toolName = toolField toolInput "tool"
+
                     if PluginTransforms.negotiationIsTemporary sessionId then
                         PluginTransforms.negotiationRecordToolViolation sessionId
-                        invalidOp "Ephemeral negotiation is read-only: do not use tools. Reply in plain text to the delegation questions immediately."
-                    if toolName = "negotiate" && (String.IsNullOrWhiteSpace sessionId || not (sessionPort.IsManagedChild(SessionId.create sessionId))) then
-                        invalidOp "negotiate is only available in delegated child or Advisor sessions, not user-facing sessions."
+
+                        invalidOp
+                            "Ephemeral negotiation is read-only: do not use tools. Reply in plain text to the delegation questions immediately."
+
+                    if
+                        toolName = "negotiate"
+                        && (String.IsNullOrWhiteSpace sessionId
+                            || not (sessionPort.IsManagedChild(SessionId.create sessionId)))
+                    then
+                        invalidOp
+                            "negotiate is only available in delegated child or Advisor sessions, not user-facing sessions."
 
                     // capability-enforcement-002/007: a Host-declared external
                     // (MCP) tool holds no office capability, so it is advertised
@@ -826,22 +921,27 @@ module PluginHooks =
 
             let requireUserMessageTools (message: obj) : obj =
                 let tools = message?tools
+
                 if isNull tools then
                     let created = createObj []
                     message?tools <- created
                     created
-                else tools
+                else
+                    tools
 
             let chatMessageWithNegotiationPolicy (input: obj) (output: obj) : Task<unit> =
                 task {
                     let pending: Task<unit> =
                         emitJsExpr (originalChatMessage, input, output) "$0($1, $2)"
+
                     do! pending
                     let rawSession = if isNull input then null else input?sessionID
+
                     let managedChild =
                         not (isNull rawSession)
                         && not (String.IsNullOrWhiteSpace(string rawSession))
                         && sessionPort.IsManagedChild(SessionId.create (string rawSession))
+
                     if not managedChild && not (isNull output) && not (isNull output?message) then
                         let tools = requireUserMessageTools output?message
                         tools?negotiate <- box false
@@ -854,8 +954,9 @@ module PluginHooks =
                 emitJsExpr (chatParams, input, output) "$0($1, $2)" |> ignore
                 PluginTransforms.negotiationRememberModel input
                 let modelSessionId = unbox<string> input?sessionID
+
                 if not (String.IsNullOrEmpty modelSessionId) then
-                    outboundViewStore?recordModel(modelSessionId, input?model) |> ignore
+                    outboundViewStore?recordModel (modelSessionId, input?model) |> ignore
 
             let chatParamsRegistration =
                 registeredHook HookKey.ChatParams (curriedHook (box rememberModelParams))
@@ -1000,17 +1101,18 @@ module PluginHooks =
 
                 observation
                 |> Option.iter (fun (sessionId, (cached, uncached)) ->
-                    calibration?recordUsage(SessionId.value sessionId, cached, uncached) |> ignore)
+                    calibration?recordUsage (SessionId.value sessionId, cached, uncached) |> ignore)
 
             let closeScopeOnSessionDeleted (rawInput: obj) =
                 let raw = HostEventEnvelope.unwrap rawInput
+
                 if HostEventEnvelope.eventTypeOf raw = "session.deleted" then
                     HostEventEnvelope.trySessionId raw
                     |> Option.iter (fun sessionId ->
                         Surface.clearSessionState (SessionId.value sessionId)
-                        calibration?clearSession(SessionId.value sessionId) |> ignore
+                        calibration?clearSession (SessionId.value sessionId) |> ignore
                         PluginTransforms.negotiationForgetSession (SessionId.value sessionId)
-                        outboundViewStore?clearSession(SessionId.value sessionId) |> ignore)
+                        outboundViewStore?clearSession (SessionId.value sessionId) |> ignore)
 
             let observeEvent raw =
                 task {

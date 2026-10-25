@@ -9,7 +9,6 @@ open Wanxiangshu.Execution.Fission.FissionLaunch
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.Host.Ports
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Context.Scope

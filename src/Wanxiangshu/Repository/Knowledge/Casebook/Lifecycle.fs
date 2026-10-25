@@ -30,13 +30,13 @@ module CasebookLifecycle =
         lock stateGate (fun () -> enabledWorkspace.IsSome)
 
     let notePrompt (delegateSessionId: string) (q: string) : unit =
-        sessionDraftStore?setQ(delegateSessionId, q)
+        sessionDraftStore?setQ (delegateSessionId, q)
 
     let noteAnswer (delegateSessionId: string) (a: string) : unit =
-        sessionDraftStore?setA(delegateSessionId, a)
+        sessionDraftStore?setA (delegateSessionId, a)
 
     let cleanupDraft (delegateSessionId: string) : unit =
-        sessionDraftStore?clear(delegateSessionId)
+        sessionDraftStore?clear (delegateSessionId)
         collector.Drain delegateSessionId |> ignore
 
     let private probeExistingScope
@@ -66,7 +66,7 @@ module CasebookLifecycle =
     let private refreshIndexThenSettle (store: IEventStore) (delegateSessionId: string) : Task<CaseFinalizeSettlement> =
         task {
             try
-                let! _ = CasebookIndexSurface.refresh (box {| Store = store |}) 256
+                let! _ = CasebookIndexSurface.refresh (box (EventStoreHandle.Create store)) 256
                 return CaseFinalizeSettlement.finalized delegateSessionId
             with ex ->
                 return CaseFinalizeSettlement.unknown delegateSessionId ex.Message
@@ -165,8 +165,8 @@ module CasebookLifecycle =
         task {
             let observations = collector.Drain delegateSessionId
 
-            let lastQ: string = sessionDraftStore?lastQuestion(draft)
-            let transcript: string = sessionDraftStore?transcript(draft)
+            let lastQ: string = sessionDraftStore?lastQuestion (draft)
+            let transcript: string = sessionDraftStore?transcript (draft)
 
             let! existing = probeExistingScope store delegateSessionId
 
@@ -221,13 +221,14 @@ module CasebookLifecycle =
         (delegateSessionId: string)
         : Task<CaseFinalizeSettlement> =
         task {
-            let draftOpt: obj option = sessionDraftStore?tryTake(delegateSessionId)
+            let draftOpt: obj option = sessionDraftStore?tryTake (delegateSessionId)
+
             match draftOpt with
             | None ->
                 collector.Drain delegateSessionId |> ignore
                 return CaseFinalizeSettlement.nothingToFinalize delegateSessionId
             | Some draft ->
-                let lastAnswer: string option = sessionDraftStore?lastAnswer(draft)
+                let lastAnswer: string option = sessionDraftStore?lastAnswer (draft)
                 return! finalizeWithDraft store workspaceRoot delegateSessionId draft lastAnswer
         }
 
@@ -276,7 +277,7 @@ module CasebookLifecycle =
             match touched with
             | Ok() ->
                 CasebookIndexSurface.invalidate ()
-                let! _ = CasebookIndexSurface.refresh (box {| Store = store |}) 256
+                let! _ = CasebookIndexSurface.refresh (box (EventStoreHandle.Create store)) 256
                 return Ok()
             | Error error -> return Error error
         }

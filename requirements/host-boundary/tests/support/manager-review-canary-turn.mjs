@@ -21,6 +21,7 @@ export function managerReviewStage(body) {
     // 标记在 7bf520242 简化为只含锚点编号；保留旧格式兼容，避免解析停在 null。
     const content = message.content.replace(/^\[ANCHOR: \d+(?:; prefixCount: \d+)?\]\u0000\ufeff/, '');
     const prompt = content.split('\u0000')[0];
+    if (prompt === '[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]') continue;
     const stages = prompts.get(prompt);
     if (!stages) return null;
     const [beforeCall, afterCall, callID] = stages;

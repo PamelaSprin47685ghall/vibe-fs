@@ -17,6 +17,7 @@
  *
  */
 import assert from 'node:assert/strict';
+import { isScopeReminderText } from './runtime-key.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -849,7 +850,8 @@ const stripGuidance = (text) => {
 const messageTextsByRole = (request, role) =>
   (request?.messages ?? [])
     .filter((message) => message?.role === role)
-    .map((message) => stripGuidance(contentText(message?.content)));
+    .map((message) => stripGuidance(contentText(message?.content)))
+    .filter((text) => role !== 'user' || !isScopeReminderText(text));
 
 const normalizeHostModelBanner = (text) => text.replace(
   /You are powered by the model named [^\n]*?\. The exact model ID is [^\n]+/g,

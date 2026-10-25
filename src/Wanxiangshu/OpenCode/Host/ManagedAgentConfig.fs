@@ -220,9 +220,11 @@ module ManagedAgentConfig =
         // (`declare` is monotone) so a live session's map can never outlive the
         // gate that closes its execution (capability-enforcement-002).
         let namespaces = hostNamespaceNames config
-        let patterns = declaredExternal?patterns(namespaces) |> unbox<string array> |> Array.toList
 
-        declaredExternal?declare(namespaces) |> ignore
+        let patterns =
+            declaredExternal?patterns (namespaces) |> unbox<string array> |> Array.toList
+
+        declaredExternal?declare (namespaces) |> ignore
 
         for name in ManagedAgent.requiredNames do
             applyNamedOwnedFields agents inventory patterns name

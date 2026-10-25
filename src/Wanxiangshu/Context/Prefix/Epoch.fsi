@@ -60,12 +60,22 @@ module PrefixEpochProjection =
             Result<ActivePrefixEpoch, PrefixFoldRejection>
 
     val applyArchivedScopeReanchor:
-        previousEpoch: PrefixEpochId -> nextEpoch: PrefixEpochId -> callId: string ->
-        blob: BlobRef option -> digest: BlobDigest option -> state: ActivePrefixEpoch ->
-        Result<ActivePrefixEpoch, PrefixFoldRejection>
+        previousEpoch: PrefixEpochId ->
+        nextEpoch: PrefixEpochId ->
+        callId: string ->
+        blob: BlobRef option ->
+        digest: BlobDigest option ->
+        state: ActivePrefixEpoch ->
+            Result<ActivePrefixEpoch, PrefixFoldRejection>
 
     val scopeQuestionReceipt: callId: string -> state: ActivePrefixEpoch -> string option
-    val recordScopeQuestion: targetEpoch: PrefixEpochId -> callId: string -> digest: string -> state: ActivePrefixEpoch -> Result<ActivePrefixEpoch, string>
+
+    val recordScopeQuestion:
+        targetEpoch: PrefixEpochId ->
+        callId: string ->
+        digest: string ->
+        state: ActivePrefixEpoch ->
+            Result<ActivePrefixEpoch, string>
 
     val isScopeReanchored: callId: string -> state: ActivePrefixEpoch -> bool
 

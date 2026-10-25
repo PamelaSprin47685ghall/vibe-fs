@@ -42,5 +42,7 @@
     <Compile Include="Repository/Knowledge/Casebook/Workflow.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/ToolPlan.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/ToolPlan.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/IndexSurface.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/IndexSurface.fs"/>
   </ItemGroup>
 </Project>

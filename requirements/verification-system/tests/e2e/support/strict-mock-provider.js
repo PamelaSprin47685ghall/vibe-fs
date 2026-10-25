@@ -384,8 +384,7 @@ export class StrictMockProvider {
         }
         if (!this._quiet) {
           console.error(`[SEAL-DIAG] session=${sessionId} reason=${selection.sealBroken.reason} prev=[${fmt(prev)}] next=[${fmt(next)}]`);
-          console.error(`[SEAL-DIFF] ${diffs.join(' || ') || '(no message diff — tools/model differ)'}`);
-        }
+          console.error(`[SEAL-DIFF] ${diffs.join(' || ') || '(no message diff — tools/model differ)'}`);        }
       } catch (diagErr) {
         console.error(`[SEAL-DIAG-ERR] ${diagErr?.message}`);
       }

@@ -100,6 +100,20 @@ const entry = (id) => ({ id, lane: 'coder' });
 
 export const coldBoundaryCases = [
   {
+    name: '首次预算提醒只退休精确的请求尾部提醒及相邻 user 占位',
+    fn: () => {
+      const reminder = user('[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]');
+      const previous = body('test-model', [SYSTEM, user('Round 1'), assistant('.'), reminder]);
+      const next = body('test-model', [SYSTEM, user('Round 1'), assistant('working'), reminder]);
+      assertEq(decide(previous, next).held, true);
+      assertEq(decide(previous, body('test-model', [SYSTEM, user('REWRITTEN'), assistant('working'), reminder])).broken, 'undeclared');
+      const ordinary = body('test-model', [SYSTEM, user('Round 1'), assistant('.'), user('ordinary steer')]);
+      assertEq(decide(ordinary, next).broken, 'undeclared');
+      const realReply = body('test-model', [SYSTEM, user('Round 1'), assistant('real reply'), reminder]);
+      assertEq(decide(realReply, next).broken, 'undeclared');
+    },
+  },
+  {
     name: 'MANAGER-LOOP keeps ordinary user prose that mentions archived records',
     fn: () => {
       const previous = body('test-model', [

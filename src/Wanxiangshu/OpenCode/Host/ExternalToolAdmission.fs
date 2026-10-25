@@ -43,7 +43,7 @@ module ExternalToolAdmission =
         task {
             if
                 not (String.IsNullOrWhiteSpace sessionId)
-                && (declaredExternal?matches(toolName) |> unbox<bool>)
+                && (declaredExternal?matches (toolName) |> unbox<bool>)
             then
                 match runtime.RoleFor(admissionContext sessionId) with
                 | Some _ ->

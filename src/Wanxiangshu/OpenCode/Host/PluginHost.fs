@@ -128,12 +128,5 @@ module PluginHost =
 
             let snapshotPort = SessionSnapshotPort.create workspaceDirectory input
 
-            return
-                Ok(
-                    eventPort,
-                    sessionPort :> ISessionHostPort,
-                    snapshotPort,
-                    terminalKey,
-                    Some finalSource
-                )
+            return Ok(eventPort, sessionPort :> ISessionHostPort, snapshotPort, terminalKey, Some finalSource)
         }

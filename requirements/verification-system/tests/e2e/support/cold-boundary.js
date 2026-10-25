@@ -31,7 +31,7 @@
 
 import { isDeepStrictEqual } from 'node:util';
 import { isAppendOnlyPrefix, wireOf } from './provider-wire.js';
-import { hostDotAckText } from './runtime-key.js';
+import { hostDotAckText, isScopeReminderText } from './runtime-key.js';
 
 export const BOUNDARY_KINDS = [
   'epoch-switch',
@@ -192,10 +192,22 @@ const withoutReadonlyReplayBlocks = (messages) => {
   return kept;
 };
 
+const withoutInitialBudgetReminder = (messages) => {
+  const last = messages.at(-1);
+  if (last?.role !== 'user' || last.parts?.length !== 1
+      || last.parts[0]?.kind !== 'text' || !isScopeReminderText(last.parts[0].text)) return messages;
+  const kept = messages.slice(0, -1);
+  const ack = kept.at(-1);
+  if (kept.at(-2)?.role === 'user' && ack?.role === 'assistant'
+      && ack.parts?.length === 1 && ack.parts[0]?.kind === 'text'
+      && hostDotAckText !== null && ack.parts[0].text === hostDotAckText) kept.pop();
+  return kept;
+};
+
 const withoutGuidanceOccurrences = (wire) => ({
   ...wire,
   messages: withoutReadonlyReplayBlocks(
-    (wire.messages ?? []).map(withoutGuidanceMessage),
+    withoutInitialBudgetReminder((wire.messages ?? []).map(withoutGuidanceMessage)),
   ),
 });
 
