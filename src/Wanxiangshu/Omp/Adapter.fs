@@ -272,6 +272,19 @@ module Adapter =
     let private liveChildren = System.Collections.Generic.Dictionary<string, Child>()
     let private sessionContexts = System.Collections.Generic.Dictionary<string, obj>()
 
+    type private FrozenProviderLease =
+        { SessionId: string
+          Marker: string
+          NativePayload: obj
+          ProviderId: string
+          ModelId: string
+          mutable Replaced: int
+          mutable Cancelled: bool }
+
+    let private frozenProviderLeases = System.Collections.Generic.Dictionary<string, FrozenProviderLease>()
+    let private pendingPreviousSteers = System.Collections.Generic.Dictionary<string, string * PrefixEpochId>()
+
+
     let private childOf (id: string) : Result<Child, HostError> =
         match liveChildren.TryGetValue id with
         | true, child -> Ok child
@@ -1093,6 +1106,7 @@ module Adapter =
             | Ok _ -> ()
             | Error failure -> raise (JournalAppendException failure)
 
+            OutboundViewCapture.discardSealed sid
             Surface.resetScopeState sid budget
             Surface.beginAskPreviousScope sid
             Surface.setHasPreviousScope sid true
@@ -1157,15 +1171,29 @@ module Adapter =
             Ok(epoch.Value, archive)
         | _ -> Error "NoPreviousScope"
 
-    let private ompPriorVerify (journal: AgentJournal) (archive: ArchivedScope) : Task<Result<unit, string>> =
+    let private ompPriorVerify (journal: AgentJournal) (archive: ArchivedScope) : Task<Result<obj option, string>> =
         task {
             let! content = journal.Writer.BlobWriter.Read archive.ArchiveRef
+            let readNative (text: string) =
+                try
+                    let source: obj = emitJsExpr text "JSON.parse($0)"
+                    let model = fieldValue source "model"
+                    let native = fieldValue source "nativePayload"
+                    let complete =
+                        isTrue (fieldValue source "toolsCaptured")
+                        && isArray (fieldValue native "messages")
+                        && isArray (fieldValue native "tools")
+                        && not (isNull (fieldValue native "model"))
+                        && not (isNull (fieldValue model "providerID"))
+                        && not (isNull (fieldValue model "modelID"))
+                    Ok(if complete then Some source else None)
+                with ex -> Error("previous Scope archived payload is invalid JSON: " + ex.Message)
             return
                 content
-                |> Result.mapError (fun error -> "previous Scope blob read failed: " + error)
+                |> Result.mapError (fun reason -> "previous Scope blob read failed: " + reason)
                 |> Result.bind (fun text ->
                     if Wanxiangshu.Host.HostDigest.sha256Hex text = BlobDigest.value archive.ArchiveDigest then
-                        Ok()
+                        readNative text
                     else Error "previous Scope digest mismatch")
         }
 
@@ -1191,29 +1219,39 @@ module Adapter =
 
     let private ompPriorSettle
         (journal: AgentJournal) (sid: string) (archive: ArchivedScope)
-        (epoch: ActivePrefixEpoch) (toolId: string) (questions: string) =
+        (epoch: ActivePrefixEpoch) (toolId: string) (questions: string)
+        (frozen: obj option) (ctx: obj)
+        (start: obj -> string -> string -> ArchivedScope -> obj -> bool) =
         task {
             let! saved = ompPriorWriteReceipt journal sid archive epoch toolId questions
             let receipt = sid + ":scope:" + string (PrefixEpochId.value archive.TargetEpochId) + ":call:" + toolId
-            let format (replayed: bool) =
+            let acknowledge (replayed: bool) =
                 Surface.setHasPreviousScope sid true
                 let observed = Surface.askPreviousScope sid questions (Some receipt)
                 let admitted = not (isNull observed?ok) && unbox<bool> observed?ok
+                let localReplay = not (isNull observed?replayed) && unbox<bool> observed?replayed
+                let already = replayed || localReplay
+                let runnable = not already && frozen.IsSome
+                let started =
+                    if runnable && admitted then start ctx questions receipt archive frozen.Value
+                    else false
+                let status =
+                    if already then "already accepted; an earlier external model effect must not be repeated"
+                    elif started then "accepted; a readonly old-model turn was scheduled; the actual Provider request and answer are not yet observed"
+                    elif frozen.IsNone then "accepted; archived native provider payload or tool catalog is missing, so no old-model request was dispatched"
+                    else "accepted; native side-turn transport unavailable, no old-model request was dispatched"
                 if not admitted then
-                    ompPriorAnswer false ("receipt is durable, but pending-state admission failed: " + string observed?reason)
-                else
-                    let label = if replayed then "already accepted" else "accepted"
-                    ompPriorAnswer true
-                        ("askPreviousScope " + label + ", receipt=" + receipt
-                         + ". OMP cannot reconstruct the exact previous provider request for a native side turn; no model answer or steer was sent.")
+                    ompPriorAnswer false ("receipt is durable but the scope actor refused: " + string observed?reason)
+                else ompPriorAnswer true ("askPreviousScope " + status + "; receipt=" + receipt)
             return
                 match saved with
                 | Error reason -> ompPriorAnswer false ("askPreviousScope rejected: " + reason)
-                | Ok replayed -> format replayed
+                | Ok replayed -> acknowledge replayed
         }
 
     let private ompPriorExecute
-        (journalOpt: AgentJournal option) (toolId: string) (args: obj) (ctx: obj) =
+        (journalOpt: AgentJournal option) (toolId: string) (args: obj) (ctx: obj)
+        (start: obj -> string -> string -> ArchivedScope -> obj -> bool) =
         task {
             let sid = ctxSessionId ctx
             let raw = fieldValue args "questions"
@@ -1234,11 +1272,13 @@ module Adapter =
                 | _, Error reason -> Task.FromResult(ompPriorAnswer false ("askPreviousScope refused: " + reason))
                 | Ok _, Ok _ when Surface.negotiationRequired sid ->
                     Task.FromResult(ompPriorAnswer false "askPreviousScope requires the first negotiate answer")
-                | Ok(journal, epoch, archive), Ok _ ->
-                    ompPriorSettle journal sid archive epoch toolId questions
+                | Ok(journal, epoch, archive), Ok frozen ->
+                    ompPriorSettle journal sid archive epoch toolId questions frozen ctx start
         }
 
-    let private registerAskPreviousScopeTool (pi: obj) (journalOpt: AgentJournal option) =
+    let private registerAskPreviousScopeTool
+        (pi: obj) (journalOpt: AgentJournal option)
+        (start: obj -> string -> string -> ArchivedScope -> obj -> bool) =
         let schema =
             createObj
                 [ "type", box "object"
@@ -1254,12 +1294,12 @@ module Adapter =
                   "concurrency", box "exclusive"
                   "loadMode", box "essential"
                   "approval", box "read"
-                  "description", box "Record questions for the immediate archived previous Scope. This OMP host cannot yet replay the exact frozen provider request for inference; receipt acceptance is not a promise of an answer."
+                  "description", box "Ask the immediately previous Scope clarifying questions after resetScope. When the complete prior native provider request (including exact tools) and matching model were physically captured, the old-context readonly model turn runs asynchronously and answers arrive via an agent-attributed steer. If the old request or side-turn transport is unavailable, the receipt explicitly reports no old-model call; acceptance is never proof of an answer."
                   "parameters", box schema
                   "execute",
                     box (Func<obj, obj, obj, obj, obj, obj>(
                         fun callId arguments _signal _onUpdate ctx ->
-                            ompPriorExecute journalOpt (stringOf callId) arguments ctx |> unbox<obj>)) ]
+                            ompPriorExecute journalOpt (stringOf callId) arguments ctx start |> unbox<obj>)) ]
         registerTool pi definition
 
     let private registerResetScopeTool (pi: obj) (journalOpt: AgentJournal option) : unit =
@@ -2158,13 +2198,12 @@ module Adapter =
         | Error err -> Task.FromResult(Error err)
         | Ok result -> processTurnResult result promptText historyOpt retry
 
-    let private runEphemeralDelegatorQuestion
+    let private runEphemeralConsultation
         (delegatorCtx: obj)
         (promptText: string)
         (retryPromptText: string)
-        (receipt: string)
+        (conversationKey: string)
         : Task<Result<string, string>> =
-        let conversationKey = "negotiate:" + receipt
         let rec step currentPrompt (historyOpt: obj option) remaining =
             task {
                 if remaining <= 0 then
@@ -2174,6 +2213,99 @@ module Adapter =
                     return! handleTurnOutcome turnRes currentPrompt historyOpt (fun hist -> step retryPromptText hist (remaining - 1))
             }
         step promptText None 3
+
+    let private runEphemeralDelegatorQuestion
+        (delegatorCtx: obj) (promptText: string) (retryPromptText: string) (receipt: string) =
+        runEphemeralConsultation delegatorCtx promptText retryPromptText ("negotiate:" + receipt)
+
+    let private deliverArchivedSteer
+        (pi: obj) (receipt: string) (sid: string) (target: PrefixEpochId) (text: string) =
+        task {
+            pendingPreviousSteers[receipt] <- sid, target
+            try
+                let opts = createObj [ "deliverAs", box "steer"; "attribution", box "agent" ]
+                let! _ = awaitObj (call2 (fieldValue pi "sendUserMessage") (box text) opts)
+                return ()
+            with _ ->
+                pendingPreviousSteers.Remove receipt |> ignore
+        }
+
+    let private sendArchivedScopeSteer
+        (pi: obj) (journal: AgentJournal)
+        (sid: string) (archive: ArchivedScope)
+        (receipt: string) (answer: string) =
+        let stillCurrent =
+            ompPriorArchive journal sid
+            |> Result.map (fun (epoch, _) -> epoch.EpochId = archive.TargetEpochId)
+            |> Result.defaultValue false
+        let prepared =
+            if stillCurrent then Surface.preparePreviousScopeReply receipt sid answer
+            else null
+        let admitted = not (isNull prepared) && not (isNull prepared?ok) && unbox<bool> prepared?ok
+        if admitted then
+            let text = stringOf prepared?steer + "\n[receipt:" + receipt + "]"
+            deliverArchivedSteer pi receipt sid archive.TargetEpochId text
+        else Task.FromResult(())
+
+    let private settleArchivedTurn
+        (pi: obj) (journal: AgentJournal) (sid: string)
+        (archive: ArchivedScope) (receipt: string)
+        (lease: FrozenProviderLease) (result: Result<string, string>) =
+        match result with
+        | Ok text when not lease.Cancelled && lease.Replaced > 0 && not (String.IsNullOrWhiteSpace text) ->
+            sendArchivedScopeSteer pi journal sid archive receipt text
+        | _ -> Task.FromResult(())
+
+    let private launchArchivedScopeTurn
+        (pi: obj) (journal: AgentJournal) (ctx: obj)
+        (sid: string) (questions: string) (receipt: string)
+        (archive: ArchivedScope) (source: obj) : bool =
+        let native = fieldValue source "nativePayload"
+        let priorModel = fieldValue source "model"
+        let providerId = stringOf (fieldValue priorModel "providerID")
+        let modelId = stringOf (fieldValue priorModel "modelID")
+        let available =
+            hasMethod ctx "runEphemeralTurn"
+            || hasMethod (fieldValue ctx "session") "runEphemeralTurn"
+        let valid =
+            available
+            && isArray (fieldValue native "messages")
+            && isArray (fieldValue native "tools")
+            && providerId <> "" && modelId <> ""
+        if not valid then false
+        else
+            let marker = "[wanxiangshu-prior:" + Guid.NewGuid().ToString("N") + "]"
+            let lease =
+                { SessionId = sid
+                  Marker = marker
+                  NativePayload = native
+                  ProviderId = providerId
+                  ModelId = modelId
+                  Replaced = 0
+                  Cancelled = false }
+            frozenProviderLeases[marker] <- lease
+            let prompt =
+                "Consult the strictly frozen preceding Scope request only. No tools and no follow-up. "
+                + "If the evidence is absent, explicitly say so. Questions:\n"
+                + questions + "\n" + marker
+            let retry =
+                "The previous reply was blank or tried a tool. Answer in plain text only, "
+                + "without tools, from the archived context.\n" + questions + "\n" + marker
+            let guarded =
+                task {
+                    try return! runEphemeralConsultation ctx prompt retry ("previous-scope:" + receipt)
+                    with ex -> return Error ex.Message
+                }
+            let run =
+                task {
+                    try
+                        let! result = guarded
+                        do! settleArchivedTurn pi journal sid archive receipt lease result
+                    finally
+                        frozenProviderLeases.Remove marker |> ignore
+                }
+            run |> ignore
+            true
 
     let private deliverNegotiationSteerToChild
         (pi: obj)
@@ -2232,6 +2364,50 @@ module Adapter =
         unbox<obj array> tools
         |> Array.filter (fun t -> toolNameOf t <> "negotiate")
 
+    let private priorProviderModel (source: obj) =
+        let provider = fieldValue source "provider"
+        let providerId =
+            if isNull provider then fieldValue source "providerID" else provider
+        let modelId = fieldValue source "id"
+        let modelId = if isNull modelId then fieldValue source "modelID" else modelId
+        stringOf providerId, stringOf modelId
+
+    let private projectFrozenProvider (active: FrozenProviderLease) (latest: obj) (payload: obj) (ctx: obj) : obj =
+        let native = active.NativePayload
+        let originalTools = fieldValue native "tools"
+        let provider, modelId = priorProviderModel (fieldValue ctx "model")
+        let actualNativeModel = stringOf (fieldValue payload "model")
+        let frozenNativeModel = stringOf (fieldValue native "model")
+        let matches =
+            provider = active.ProviderId && modelId = active.ModelId
+            && actualNativeModel = frozenNativeModel
+            && isArray (fieldValue native "messages")
+            && isArray originalTools
+        if not matches then
+            invalidOp "Archived Scope side turn cannot replay: provider/model/catalog does not match actual request"
+        else
+            let projected: obj =
+                emitJsExpr (native, latest)
+                    "Object.assign({}, structuredClone($0), { messages: [...structuredClone($0.messages), structuredClone($1)] })"
+            active.Replaced <- active.Replaced + 1
+            projected
+
+
+    let private replayFrozenProvider (sid: string) (payload: obj) (ctx: obj) : obj option =
+        let messages = fieldValue payload "messages"
+        let latest =
+            if isArray messages then
+                let arr = unbox<obj array> messages
+                if arr.Length = 0 then null else arr[arr.Length - 1]
+            else null
+        let latestText: string = if isNull latest then "" else emitJsExpr latest "JSON.stringify($0)"
+        let lease =
+            frozenProviderLeases.Values
+            |> Seq.tryFind (fun active -> active.SessionId = sid && latestText.Contains(active.Marker))
+        match lease with
+        | None -> None
+        | Some active -> Some(projectFrozenProvider active latest payload ctx)
+
     /// Register the product hooks on the omp event bus and return the
     /// combined signal emitter: every signal reaches the host subscribers
     /// and the product at the same time.
@@ -2244,6 +2420,10 @@ module Adapter =
 
         registerResetScopeTool pi journalOpt
         registerAskPreviousScopeTool pi journalOpt
+            (fun ctx questions receipt archive source ->
+                match journalOpt with
+                | Some journal -> launchArchivedScopeTurn pi journal ctx (ctxSessionId ctx) questions receipt archive source
+                | None -> false)
 
         let refreshSessionState (ctx: obj) =
             let sid = ctxSessionId ctx
@@ -2268,7 +2448,7 @@ module Adapter =
         registerEvent pi "session_branch" (fun (_event: obj) (ctx: obj) ->
             refreshSessionState ctx)
 
-        // -- provider request: mask negotiate on root / unmanaged sessions ----------------
+    // -- provider request: mask negotiate on root / unmanaged sessions ----------------
         registerEvent pi "before_provider_request" (fun (event: obj) (ctx: obj) ->
             task {
                 let sid = ctxSessionId ctx
@@ -2277,16 +2457,44 @@ module Adapter =
                 let observedModel = fieldValue ctx "model"
                 let rawModel = if isNull payload then null else fieldValue payload "model"
                 let model = if isNull observedModel then rawModel else observedModel
-                if not (isNull model) then OutboundViewCapture.recordModel sid model
                 let tools = if isNull payload then null else fieldValue payload "tools"
                 let shouldFilter = not isManaged && not (isNull payload) && isArray tools
-                if shouldFilter then
-                    let filtered = filterOutNegotiate tools
-                    let cloned = emitJsExpr (payload, filtered) "Object.assign({}, $0, { tools: $1 })"
-                    return cloned
-                else
-                    return jsUndefined
+                let submitted =
+                    if shouldFilter then
+                        let filtered = filterOutNegotiate tools
+                        emitJsExpr (payload, filtered) "Object.assign({}, $0, { tools: $1 })"
+                    else payload
+                match replayFrozenProvider sid submitted ctx with
+                | Some frozen -> return frozen
+                | None ->
+                    if not (isNull model) then OutboundViewCapture.recordModel sid model
+                    OutboundViewCapture.recordNativeRequest sid submitted model |> ignore
+                    if shouldFilter then return submitted else return jsUndefined
             } |> unbox<obj>)
+
+        registerEvent pi "message_start" (fun (event: obj) (ctx: obj) ->
+            let sid = ctxSessionId ctx
+            let message = fieldValue event "message"
+            let agentSource =
+                stringOf (fieldValue message "role") = "user"
+                && stringOf (fieldValue message "attribution") = "agent"
+            let text = if agentSource then extractMessageContent message else ""
+            let candidate =
+                pendingPreviousSteers
+                |> Seq.tryFind (fun pair ->
+                    let owner, _ = pair.Value
+                    owner = sid && text.Contains("[receipt:" + pair.Key + "]"))
+            match candidate, journalOpt with
+            | Some pair, Some journal ->
+                let _, epoch = pair.Value
+                let current =
+                    ompPriorArchive journal sid
+                    |> Result.map (fun (head, _) -> head.EpochId = epoch)
+                    |> Result.defaultValue false
+                if current then Surface.confirmPreviousScopeSteer pair.Key sid |> ignore
+                pendingPreviousSteers.Remove pair.Key |> ignore
+            | _ -> ()
+            jsUndefined)
 
         let signal (value: HostSignal) : Task<unit> =
             task { return () }
@@ -2608,6 +2816,11 @@ module Adapter =
 
         registerEvent pi "session_shutdown" (fun (_event: obj) (_ctx: obj) ->
             task {
+                for kv in frozenProviderLeases do kv.Value.Cancelled <- true
+                frozenProviderLeases.Clear()
+                pendingPreviousSteers.Clear()
+                for sid in sessionContexts.Keys do OutboundViewCapture.clearSession sid
+                sessionContexts.Clear()
                 match !liveHooks with
                 | None -> return jsUndefined
                 | Some hooks ->

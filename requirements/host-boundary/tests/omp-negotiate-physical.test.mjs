@@ -16,6 +16,7 @@
 
 import { test } from 'bun:test'
 import assert from 'node:assert/strict'
+import { empty } from '@fable-org/fable-library-js/List.js'
 import http from 'node:http'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -53,11 +54,10 @@ async function testBody() {
   const { HostPlugin_create, HostPlugin_nodeClockPort, HostPlugin_nodeTimerPort } = await import(
     path.join(REPO, 'dist/Host/SecondHost/HostPlugin.js')
   )
-  const { SessionIdModule_create, SessionIdModule_value } = await import(
+  const { SessionIdModule_create } = await import(
     path.join(REPO, 'dist/Foundation/Identity.js')
   )
-  const { negotiationRequired } = await import(path.join(REPO, 'dist/Context/Scope/Surface.js'))
-  const { empty } = await import(path.join(REPO, 'dist/fable_modules/fable-library-js.5.13.0/List.js'))
+  const { negotiationRequired, preparePreviousScopeReply, confirmPreviousScopeSteer } = await import(path.join(REPO, 'dist/Context/Scope/Surface.js'))
 
   // 1. Spin up local mock SSE server on 127.0.0.1
   const requestsSeen = []
@@ -89,7 +89,8 @@ async function testBody() {
       return text.includes('format error responses')
     })
 
-    const replyText = isEphemeral ? EXPECTED_ANSWER : 'MAIN_PROMPT_INITIALIZED'
+    const priorScope = msgs.some((m) => JSON.stringify(m.content).includes('wanxiangshu-prior:'))
+    const replyText = priorScope ? 'ROOT_OLD_SCOPE_ANSWER: errors must carry traceId.' : isEphemeral ? EXPECTED_ANSWER : 'MAIN_PROMPT_INITIALIZED'
 
     const chunk = {
       id: 'chunk-' + requestCounter,
@@ -167,6 +168,7 @@ async function testBody() {
 
     // Capture host ports when plugin activates
     let capturedPorts = null
+    let realProviderContext = null
     const origActivate = plugin.Activate.bind(plugin)
     plugin.Activate = (ports) => {
       capturedPorts = ports
@@ -184,6 +186,7 @@ async function testBody() {
           createAgentSession({
             agentId: opts.agentId || `child-worker-${++childCounter}`,
             ...opts,
+            extensions: [extension],
             authStorage,
             modelRegistry: mr,
             model,
@@ -191,6 +194,12 @@ async function testBody() {
             disableExtensionDiscovery: true,
           }),
       }
+
+      const originalOn = pi.on.bind(pi)
+      pi.on = (eventName, handler) => originalOn(eventName, (event, ctx) => {
+        if (eventName === 'before_provider_request') realProviderContext = ctx
+        return handler(event, ctx)
+      })
 
       const origRegisterTool = pi.registerTool.bind(pi)
       pi.registerTool = (toolDef) => {
@@ -231,21 +240,82 @@ async function testBody() {
     assert.ok(capturedPorts, 'HostPlugin.Activate must have captured host ports')
     assert.ok(capturedPorts.Sessions, 'hostPorts must provide Sessions capability')
 
+    // Same real OMP provider hook: archive this root session's actual request,
+    // run a native side turn with its frozen prefix, and observe the outgoing
+    // provider request on the local SSE server.
+    assert.ok(realProviderContext, 'OMP must expose its real provider request context')
+    assert.equal(typeof realProviderContext.runEphemeralTurn, 'function')
+    const historicalPayload = requestsSeen.at(-1)
+    const rootReset = registeredTools.get('resetScope')
+    const rootPrior = registeredTools.get('askPreviousScope')
+    assert.ok(rootReset && rootPrior)
+    const rootId = parentSession.sessionManager.getSessionId()
+    const archived = await rootReset.execute(
+      'actual-root-reset-previous',
+      {newScopeObjective:'Clarify old historical rules',newScopeTurnBudget:7,
+       kpiCompletion:'met',oldScopeVerboseVerbatimExperience:DELEGATOR_CONTEXT_RULE},
+      null,null,realProviderContext,
+    )
+    assert.equal(archived.details?.archived,true,JSON.stringify(archived))
+    const askedPrior = await rootPrior.execute('actual-root-prior-001',
+      {questions:'What was the old rule about traceId?'},null,null,realProviderContext)
+    assert.match(askedPrior.content?.[0]?.text??'',/readonly old-model turn was scheduled/)
+    const nativeLimit = Date.now()+8000
+    const hasPriorRequest=()=>requestsSeen.some(req=>req.messages?.some(msg=>{
+      const content=typeof msg.content==='string'?msg.content:JSON.stringify(msg.content)
+      return content.includes('wanxiangshu-prior:')
+    }))
+    while(!hasPriorRequest()&&Date.now()<nativeLimit)await new Promise(r=>setTimeout(r,20))
+    assert.ok(hasPriorRequest(),'the old Scope request physically reached the local SSE provider')
+    const priorWire=requestsSeen.find(req=>req.messages?.some(msg=>
+      (typeof msg.content==='string'?msg.content:JSON.stringify(msg.content)).includes('wanxiangshu-prior:')))
+    assert.deepEqual(priorWire.messages.slice(0,-1), historicalPayload.messages,
+      'the original physical user/system/assistant prefix is replayed exactly')
+    assert.deepEqual(priorWire.tools,historicalPayload.tools,
+      'the provider-side original tool definitions stay byte-equivalent')
+    assert.equal(priorWire.model,historicalPayload.model)
+    await parentSession.waitForIdle()
+    await parentSession.prompt('Consume the queued answer from the previous Scope.')
+    const physicalPrior = parentSession.sessionManager.getEntries()
+      .find(entry=>entry.type==='message' && entry.message?.role==='user'
+        && entry.message?.attribution==='agent'
+        && JSON.stringify(entry.message.content).includes('ROOT_OLD_SCOPE_ANSWER'))
+    assert.ok(physicalPrior,'the old answer arrives through an actual agent-attributed OMP message')
+    const priorReceipt = askedPrior.content[0].text.match(/receipt=([^\s]+)/)?.[1]
+    assert.ok(priorReceipt, 'model-side receipt must be observable in tool return')
+    assert.equal(preparePreviousScopeReply(priorReceipt,rootId,'another answer').ok,false,
+      'receipt is settled only after the actual physical OMP agent message start')
+    assert.equal(confirmPreviousScopeSteer(priorReceipt,rootId),false,
+      'physically accepted answer cannot be settled twice')
+    const priorReplay=await rootPrior.execute('actual-root-prior-001',
+      {questions:'What was the old rule about traceId?'},null,null,realProviderContext)
+    assert.match(priorReplay.content?.[0]?.text??'',/already accepted/)
+    assert.equal(requestsSeen.filter(req=>req.messages?.some(msg=>
+      (typeof msg.content==='string'?msg.content:JSON.stringify(msg.content)).includes('wanxiangshu-prior:'))).length,1,
+      'replayed toolCallId cannot send a second provider request')
+
     // 4. Create child session through actual ports.Sessions.Create path
     const createChildOutcome = await capturedPorts.Sessions.Create(
       SessionIdModule_create(parentId),
       { Title: 'child-worker', Workspace: undefined },
     )
-    assert.equal(createChildOutcome.tag, 0, 'ports.Sessions.Create must succeed')
-    const childSessionIdObj = createChildOutcome.fields[0]
-    const childId = SessionIdModule_value(childSessionIdObj)
+    // Check the physical child exists through the authoritative live session map,
+    // rather than inspecting Fable Result DU internals.
+    const liveMap = getLiveChildren()
+    assert.equal(liveMap.size,1,'ports.Sessions.Create must have created one actual child')
+    const childId = Array.from(liveMap.keys())[0]
 
     // Verify child is tracked in Adapter liveChildren
-    const liveMap = getLiveChildren()
     const childRecord = liveMap.get(childId)
     assert.ok(childRecord, 'child must be tracked in Adapter liveChildren')
     childSession = childRecord.Session
     assert.ok(childSession, 'child session instance must be present in liveChildren')
+    if (childSession.extensionRunner) {
+      await initializeExtensions(childSession, {
+        reportSendError: () => {}, reportRuntimeError: () => {},
+      })
+    }
+    await childSession.extensionRunner?.emit({type: 'session_start'})
 
     // Fact: Delegation is bound and gate is locked before negotiation
     assert.equal(negotiationRequired(childId), true, 'first-reset gate must be locked before negotiation')
@@ -378,6 +448,10 @@ async function testBody() {
     }
     assert.equal(negotiationRequired(childId), false, 'first-reset gate must unlock after physical steer landing')
 
+    // The child must itself make a real provider request before reset can seal its old Scope.
+    await childSession.waitForIdle()
+    await childSession.prompt('Proceed with the next task using the clarified invariants.')
+
     // 11. Fact: Testing resetScope tool directly - admitted now that gate is unlocked
     const admittedResetResult = await resetScopeDef.execute(
       'call-admitted-reset',
@@ -386,12 +460,13 @@ async function testBody() {
         oldScopeVerboseVerbatimExperience: 'Exploration completed successfully',
         newScopeObjective: 'Implement verified change',
         newScopeTurnBudget: 15,
+        kpiCompletion: 'met',
       },
       null,
       null,
       childCtx,
     )
-    assert.equal(admittedResetResult.details?.turnBudget, 15, 'resetScope sets newScopeTurnBudget')
+    assert.equal(admittedResetResult.details?.turnBudget, 15, JSON.stringify(admittedResetResult))
     assert.equal(admittedResetResult.details?.objective, 'Implement verified change', 'resetScope sets newScopeObjective')
     assert.equal(admittedResetResult.details?.archived, true, 'resetScope archives previous experience')
     assert.ok(admittedResetResult.content?.[0]?.text?.includes('Scope reset. Objective: Implement verified change'), 'content confirms scope reset')

@@ -903,3 +903,188 @@ test('WHAT[context-compression-048] OMP registers askPreviousScope and refuses t
     'never invent a provider reply without an archived old request')
   clearSessionState(sid)
 })
+
+test('WHAT[context-compression-049] OMP real native provider hook freezes old catalog then replays it for the readonly previous Scope side turn', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { execFileSync } = await import('node:child_process')
+  const workspace = mkdtempSync(join(tmpdir(), 'omp-prior-wire-'))
+  execFileSync('git', ['init', '-q', workspace])
+  try {
+    const env = createOmpTestEnvironment()
+    const sid = 'omp-prior-physical-049'
+    let liveCtx
+    const model = { provider: 'fixture', id: 'old-model' }
+    const steers = []
+    env.mockPi.sendUserMessage = async (text, opts) => {
+      steers.push({text, opts})
+      await env.eventHandlers.get('message_start')({
+        message: {role:'user',attribution:opts.attribution,
+          content:[{type:'text',text}]},
+      }, liveCtx)
+    }
+    const providerHook = () => env.eventHandlers.get('before_provider_request')
+    const rawOld = {
+      model:'old-model',
+      messages:[
+        {role:'system',content:'OLD_SYSTEM_KEEP_BYTES'},
+        {role:'user',content:'Old original observation: precise sentinel 314159'},
+      ],
+      tools:[{name:'read',description:'Old read'}, {name:'write',description:'Old write'}],
+      tool_choice:'auto',
+    }
+    let sideRuns = 0
+    liveCtx = {
+      cwd:workspace, model,
+      sessionManager:{
+        getSessionId:()=>sid,
+        getSessionDir:()=>workspace,
+        getHeader:()=>({parentSession:null}),
+      },
+      runEphemeralTurn: async opts => {
+        sideRuns++
+        const request = {
+          model:'old-model',
+          messages:[
+            {role:'system',content:'NEW_WRONG_SYSTEM'},
+            {role:'user',content:'NEW_WRONG_HISTORY'},
+            {role:'user',content:opts.promptText},
+          ],
+          tools:[],
+          tool_choice:'none',
+        }
+        const native = await providerHook()({payload:request},liveCtx)
+        assert.ok(native,'the real before_provider_request physically substitutes old provider payload')
+        assert.equal(native.messages[0].content,'OLD_SYSTEM_KEEP_BYTES')
+        assert.equal(native.messages[1].content,'Old original observation: precise sentinel 314159')
+        assert.deepEqual(native.tools,rawOld.tools,'the exact old tool catalog is retained')
+        assert.equal(native.tool_choice,'auto')
+        assert.match(native.messages.at(-1).content,/wanxiangshu-prior:/)
+        assert.equal(native.messages.some(x=>x.content==='NEW_WRONG_HISTORY'),false)
+        return {replyText:'Historical observation 314159 rejects the new parser.',
+          assistantMessage:{role:'assistant',content:[{type:'text',text:'Historical observation 314159 rejects the new parser.'}]}}
+      },
+    }
+    await activateOnOmp(env.mockPi,env.mockPlugin,env.agentsList)
+    await env.eventHandlers.get('session_start')({},liveCtx)
+    const captured = await providerHook()({payload:structuredClone(rawOld)},liveCtx)
+    assert.equal(captured.model,'old-model')
+    const reset = env.registeredTools.find(x=>x.name==='resetScope')
+    const ask = env.registeredTools.find(x=>x.name==='askPreviousScope')
+    assert.ok(reset && ask)
+    const first = await reset.execute('reset-old-049',
+      {newScopeObjective:'validate new parser',newScopeTurnBudget:10,
+       kpiCompletion:'met',oldScopeVerboseVerbatimExperience:'Old sentinel 314159'},null,null,liveCtx)
+    assert.equal(first.details?.archived,true,JSON.stringify(first))
+    const [accepted, parallelDuplicate] = await Promise.all([
+      ask.execute('prior-049',
+        {questions:'What precise evidence rejected the new parser?'},null,null,liveCtx),
+      ask.execute('prior-049',
+        {questions:'What precise evidence rejected the new parser?'},null,null,liveCtx),
+    ])
+    assert.equal([accepted,parallelDuplicate].filter(x =>
+      /readonly old-model turn was scheduled/.test(x.content?.[0]?.text??'')).length,1,
+      'simultaneous duplicated model toolcall may schedule only one paid Provider side turn')
+    for(let i=0;i<60 && steers.length===0;i++)await new Promise(r=>setTimeout(r,10))
+    assert.equal(sideRuns,1)
+    assert.equal(steers.length,1,'a single actual agent-attributed old-Scope steer is sent')
+    assert.equal(steers[0].opts.attribution,'agent','relay cannot masquerade as operator')
+    assert.match(steers[0].text,/314159 rejects/)
+    const replay=await ask.execute('prior-049',
+      {questions:'What precise evidence rejected the new parser?'},null,null,liveCtx)
+    assert.match(replay.content[0].text,/already accepted/)
+    assert.equal(sideRuns,1,'replayed durable receipt cannot cause a second model call')
+    const staleReset = await reset.execute('without-new-provider-evidence-049',
+      {newScopeObjective:'this must not use the old sealed request',newScopeTurnBudget:7,kpiCompletion:'met'},
+      null,null,liveCtx)
+    assert.equal(staleReset.details?.archived,false,
+      'a second reset cannot reuse a preceding epoch provider snapshot after it was consumed')
+    liveCtx.runEphemeralTurn = async opts => {
+      sideRuns++
+      const wrong = {...liveCtx,model:{provider:'some-other-provider',id:'old-model'}}
+      const invalid = {model:'old-model',messages:[{role:'user',content:opts.promptText}],tools:[]}
+      await assert.rejects(providerHook()({payload:invalid},wrong),/provider\/model\/catalog does not match/)
+      return {replyText:'UNTRUSTED_WRONG_MODEL_ANSWER',
+        assistantMessage:{role:'assistant',content:[{type:'text',text:'UNTRUSTED_WRONG_MODEL_ANSWER'}]}}
+    }
+    const mismatched = await ask.execute('prior-mismatched-model-049',
+      {questions:'What did the wrong provider see?'},null,null,liveCtx)
+    assert.match(mismatched.content[0].text,/readonly old-model turn was scheduled/)
+    for(let i=0;i<60 && sideRuns<2;i++)await new Promise(r=>setTimeout(r,10))
+    await new Promise(r=>setTimeout(r,10))
+    assert.equal(sideRuns,2)
+    assert.equal(steers.length,1,'a model mismatch must never generate a previous-Scope steer')
+
+    // A real old-model reply must not enter a later epoch after a second committed reset.
+    let releaseOldAnswer
+    liveCtx.runEphemeralTurn = async opts => {
+      sideRuns++
+      const native = await providerHook()({payload:{
+        model:'old-model',
+        messages:[{role:'system',content:'DURING_CURRENT_SCOPE'},
+          {role:'user',content:opts.promptText}],
+        tools:[{name:'edit'}],
+      }},liveCtx)
+      assert.deepEqual(native.tools,rawOld.tools)
+      return new Promise(resolve => {
+        releaseOldAnswer = () => resolve({
+          replyText:'LATE_PREVIOUS_SCOPE_ANSWER_MUST_NOT_LAND',
+          assistantMessage:{role:'assistant',content:[
+            {type:'text',text:'LATE_PREVIOUS_SCOPE_ANSWER_MUST_NOT_LAND'}]},
+        })
+      })
+    }
+    const late = await ask.execute('prior-late-049',
+      {questions:'Which past exception may be useful?'},null,null,liveCtx)
+    assert.match(late.content[0].text,/readonly old-model turn was scheduled/)
+    for(let i=0;i<60 && !releaseOldAnswer;i++)await new Promise(r=>setTimeout(r,10))
+    assert.equal(typeof releaseOldAnswer,'function','the physical old provider turn must actually begin')
+    const currentProvider={
+      model:'old-model',
+      messages:[{role:'system',content:'NEW_EPOCH_PROVIDER_SYSTEM'},
+        {role:'user',content:'NEW_EPOCH_OPERATOR_REQUEST'}],
+      tools:[{name:'read',description:'New read'}],
+    }
+    await providerHook()({payload:currentProvider},liveCtx)
+    const newReset=await reset.execute('new-epoch-reset-049',
+      {newScopeObjective:'start the next real epoch',newScopeTurnBudget:4,kpiCompletion:'met'},
+      null,null,liveCtx)
+    assert.equal(newReset.details?.archived,true,JSON.stringify(newReset))
+    releaseOldAnswer()
+    await new Promise(resolve=>setTimeout(resolve,25))
+    assert.equal(steers.length,1,'a late answer from a retired target epoch must not be delivered')
+
+    let releaseAfterShutdown
+    liveCtx.runEphemeralTurn = async opts => {
+      sideRuns++
+      const native = await providerHook()({payload:{
+        model:'old-model',
+        messages:[{role:'user',content:opts.promptText}],
+        tools:[],
+      }},liveCtx)
+      assert.equal(native.messages[0].content,'NEW_EPOCH_PROVIDER_SYSTEM')
+      return new Promise(resolve => {
+        releaseAfterShutdown = () => resolve({
+          replyText:'LATE_AFTER_SHUTDOWN_MUST_NOT_LAND',
+          assistantMessage:{role:'assistant',
+            content:[{type:'text',text:'LATE_AFTER_SHUTDOWN_MUST_NOT_LAND'}]},
+        })
+      })
+    }
+    const shutdownAsk=await ask.execute('prior-shutdown-049',
+      {questions:'Which criteria were still unfinished?'},null,null,liveCtx)
+    assert.match(shutdownAsk.content[0].text,/readonly old-model turn was scheduled/)
+    for(let i=0;i<60 && !releaseAfterShutdown;i++)await new Promise(r=>setTimeout(r,10))
+    assert.equal(typeof releaseAfterShutdown,'function')
+    await env.eventHandlers.get('session_shutdown')({},liveCtx)
+    releaseAfterShutdown()
+    await new Promise(resolve=>setTimeout(resolve,25))
+    assert.equal(steers.length,1,'a closed native session must not receive the old answer')
+
+
+
+  } finally {
+    rmSync(workspace,{recursive:true,force:true})
+  }
+})

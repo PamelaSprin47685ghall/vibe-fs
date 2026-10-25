@@ -14,12 +14,17 @@ type OutboundSnapshot =
     { SessionId: string
       Messages: obj
       System: string array
-      Model: OutboundModel }
+      Model: OutboundModel
+      NativePayload: obj option
+      ToolsCaptured: bool }
 
 [<RequireQualifiedAccess>]
 module OutboundViewCapture =
     [<Emit("structuredClone($0)")>]
     let private cloneDeep (x: obj) : obj = jsNative
+
+    [<Emit("Array.isArray($0)")>]
+    let private isArray (value: obj) : bool = jsNative
 
     [<Emit("Array.isArray($0) ? Array.from($0) : []")>]
     let private copyArray (x: obj) : obj array = jsNative
@@ -62,7 +67,9 @@ module OutboundViewCapture =
                 { SessionId = sessionId
                   Messages = msgs
                   System = sys
-                  Model = mdl }
+                  Model = mdl
+                  NativePayload = None
+                  ToolsCaptured = false }
             st.Sealed <- Some snapshot
             st.Pending <- emptyPending ()
         | _ -> ()
@@ -123,10 +130,60 @@ module OutboundViewCapture =
             st.Pending.Model <- Some mdl
             checkAndSeal sessionId st)
 
+    let private systemMessageText (item: obj) : string option =
+        let content = if isNull item then null else item?content
+        match not (isNull item) && string item?role = "system", content with
+        | false, _ | _, null -> None
+        | true, value when emitJsExpr value "typeof $0 === 'string'" -> Some(string value)
+        | true, value -> Some(stringify value)
+
+    let recordNativeRequest (sessionId: string) (payload: obj) (model: obj) : bool =
+        let messages: obj = if isNull payload then null else payload?messages
+        let tools: obj = if isNull payload then null else payload?tools
+        let nativeSystem: obj = if isNull payload then null else payload?system
+        let rawMessages = copyArray messages
+        let system =
+            if isNull nativeSystem then
+                rawMessages |> Array.choose systemMessageText
+            elif box nativeSystem :? string then [| unbox<string> nativeSystem |]
+            else copyArray nativeSystem |> Array.map stringify
+        let provider =
+            if isNull model then ""
+            elif not (isNull model?providerID) then string model?providerID
+            elif not (isNull model?provider) then string model?provider
+            else ""
+        let modelId =
+            if isNull model then ""
+            elif not (isNull model?modelID) then string model?modelID
+            elif not (isNull model?id) then string model?id
+            else ""
+        let complete =
+            not (String.IsNullOrWhiteSpace sessionId)
+            && isArray messages && rawMessages.Length > 0
+            && isArray tools && system.Length > 0
+            && provider <> "" && modelId <> ""
+        if complete then
+            let state = getOrCreateSession sessionId
+            let variant = if isNull model?variant then None else Some(string model?variant)
+            state.Sealed <- Some
+                { SessionId = sessionId
+                  Messages = cloneDeep messages
+                  System = system
+                  Model = { ProviderId = provider; ModelId = modelId; Variant = variant }
+                  NativePayload = Some(cloneDeep payload)
+                  ToolsCaptured = true }
+            state.Pending <- emptyPending ()
+        complete
+
     let tryGetSealed (sessionId: string) : OutboundSnapshot option =
         match sessions.TryGetValue sessionId with
         | true, s when not (String.IsNullOrWhiteSpace sessionId) -> s.Sealed
         | _ -> None
+
+    let discardSealed (sessionId: string) : unit =
+        match sessions.TryGetValue sessionId with
+        | true, state -> state.Sealed <- None
+        | _ -> ()
 
     let clearSession (sessionId: string) : unit =
         if not (String.IsNullOrWhiteSpace sessionId) then
@@ -146,6 +203,7 @@ module OutboundViewCapture =
         root?messages <- snapshot.Messages
         root?system <- snapshot.System
         root?model <- modelObj
-        root?toolsCaptured <- false
+        root?toolsCaptured <- snapshot.ToolsCaptured
+        root?nativePayload <- snapshot.NativePayload |> Option.defaultValue null
 
         stringify root
