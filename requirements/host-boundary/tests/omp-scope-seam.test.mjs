@@ -476,7 +476,7 @@ test('WHAT[context-compression-033] OMP context handler preserves raw messages, 
   const kept = result.messages
 
   // Messages before reset (call_read_1 and its result) must be purged;
-  // reset call/result, post-barrier edit call/result, and budget 0 weak steer survive
+  // reset call/result and post-barrier edit call/result survive; cold missing budget adds a separate strong steer
   assert.equal(kept.length, 6, 'pre-barrier tools must be purged, active scope and reset call kept')
 
   assert.equal(kept[0].role, 'user')
@@ -496,7 +496,11 @@ test('WHAT[context-compression-033] OMP context handler preserves raw messages, 
   assert.equal(kept[4].role, 'toolResult')
   assert.equal(kept[4].toolCallId, 'call_edit_1')
   assert.equal(kept[4].timestamp, 1060)
-  assert.equal(kept[4].content, 'edit success' + SEP + '[Remaining turnBudget: 0]')
+  assert.equal(kept[4].content, 'edit success', 'unknown cold budget may not forge a zero-budget suffix')
+  assert.equal(kept[5].role, 'user')
+  assert.equal(kept[5].attribution, 'agent')
+  assert.equal(kept[5].strong, true)
+  assert.match(contentText(kept[5].content),/resetScope/,'missing budget demands a strong reset steer')
   assert.equal(rawOmpMessages.at(-1).content, 'edit success', 'persisted result is not edited')
 
   clearSessionState(sid)
