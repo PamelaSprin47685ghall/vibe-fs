@@ -124,6 +124,39 @@ test('WHAT[delegation-026] RESUME_synchronous_admission_with_async_work_and_join
     }
   })
 })
+test('WHAT[delegation-026] reused child completes after busy guidance and a fresh assignment', async () => {
+  const owner = 'manager-resume-after-guidance'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime }) => {
+    const terminals = await observeTerminals(runtime)
+    try {
+      const first = await forkCall(hooks, owner, 'Ada', 'INITIAL-CHARGE')
+      const child = createdIds[0]
+      const agentId = agentIdOf(first)
+      await resumeCall(hooks, owner, 'Ada', 'GUIDANCE-WHILE-ACTIVE')
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'GUIDED ANSWER', null, terminals.awaitRun)
+      assert.match(await joinCall(hooks, owner), /GUIDED ANSWER/)
+
+      const send = runtime.client.session.promptAsync
+      let root
+      let overlap = true
+      runtime.client.session.promptAsync = async (args) => {
+        const result = await send(args)
+        if (overlap) {
+          overlap = false
+          root = physicalUserMessageOf(runtime, child).id
+          await resumeCall(hooks, owner, 'Ada', 'GUIDANCE-BEFORE-SEND-RETURNS')
+        }
+        return result
+      }
+      await resumeCall(hooks, owner, 'Ada', 'FRESH-CHARGE')
+      await childTurn(hooks, runtime, child, `run-${child}-2`, 'FRESH ANSWER', null, terminals.awaitRun)
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, root), 'CompletedAwaitingJoin')
+      assert.match(await joinCall(hooks, owner), /FRESH ANSWER/)
+    } finally {
+      terminals.dispose()
+    }
+  })
+})
 test('WHAT[delegation-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_placed', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-unknown-'))
   const owner = 'manager-unknown'
