@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { deliverOnce } from './support/contract.mjs'
+import { Work } from 'wanxiangli/work'
 import { withReview, scores } from './support/plugin.mjs'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as scopeMod from '../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js'
@@ -14,11 +14,30 @@ const verifyOwnership =
   scopeMod.verifyOwnershipRetirementContract ||
   (scopeMod.ToolRuntimeScopeSurface && scopeMod.ToolRuntimeScopeSurface.verifyOwnershipRetirementContract)
 
-test('WHAT[work-009] a live owned resource blocks deliver without retiring', () => {
-  const blocked = deliverOnce({ sequence: ['S1', 'S2', 'S3'], blockers: ['pty'], deliveryAuthorized: false, head: 1, projection: 'S1', incumbencyId: 'i' })
-  assert.equal(blocked.written[0].type, 'RetirementBlocked')
-  assert.equal(blocked.written.some((event) => event.type === 'IncumbencyRetired'), false)
-  assert.equal(blocked.finished, false)
+test('WHAT[work-009] a live owned resource blocks completion without retiring', () => {
+  const work = new Work('work-009', undefined)
+  const step = (id, updates, blockers) =>
+    work.execute(id, {
+      type: 'Review',
+      office: 'Manager',
+      providerRunId: 'run',
+      toolCallId: id,
+      updates,
+      ...(blockers ? { blockers } : {}),
+    })
+  step('r1', [{ key: 'job', value: 'do' }])
+  const relayed = step('r2', [{ key: 'job', value: null }])
+  assert.equal(relayed.result.kind, 'Relayed')
+  work.execute('confirm-relay', { type: 'Confirm', effectId: relayed.result.effect.id, outcome: 'Sent' })
+  const advanced = step('r3', [])
+  assert.equal(advanced.result.milestone, '收尾')
+  work.execute('confirm-advance', { type: 'Confirm', effectId: advanced.result.effect.id, outcome: 'Sent' })
+  const before = work.records().length
+  const blocked = step('r4', [], ['pty'])
+  assert.equal(blocked.status, 'Observed')
+  assert.equal(blocked.result.kind, 'Blocked')
+  assert.equal(work.records().length, before)
+  assert.equal(work.history().flatMap((frame) => frame.events).some((event) => event.type === 'IncumbencyRetired' && event.outcome === 'Completed'), false)
 })
 
 test('WHAT[work-009] deliver reports the live blocker instead of reporting an end', async () => {

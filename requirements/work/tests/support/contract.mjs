@@ -30,8 +30,6 @@ export const EVENTS = [
 ]
 export const END_TOOL = 'review'
 
-const LEGACY_STAGE_OUTCOMES = ['Promoted', 'Stayed']
-
 export function confirmationCount(sequence) {
   if (sequence.join(',') === 'S1,S2,S3') return 1
   if (sequence.join(',') === 'S4') return 1
@@ -61,24 +59,6 @@ export function openWork(input) {
   return { ok: true, written: [opened, incumbency], confirmationCount: count }
 }
 
-export function review(view, outcome) {
-  if (!view.active || view.reviewed) return { ok: false, written: [] }
-  if (!LEGACY_STAGE_OUTCOMES.includes(outcome)) return { ok: false, written: [] }
-  const sequence = view.sequence
-  const index = sequence.indexOf(view.projection)
-  const hasNext = index >= 0 && index < sequence.length - 1
-  let projection = view.projection
-  let deliveryAuthorized = false
-  if (outcome === 'Promoted' && hasNext) projection = sequence[index + 1]
-  if (outcome === 'Promoted' && !hasNext && sequence.join(',') === 'S1,S2,S3') deliveryAuthorized = true
-  return {
-    ok: true,
-    written: [{ type: 'Reviewed', incumbencyId: view.incumbencyId, stage: view.projection, outcome }],
-    projection,
-    deliveryAuthorized,
-  }
-}
-
 export function admitAction(view, action) {
   if (!view.active) return { admitted: false }
   if (view.reviewed) return { admitted: true }
@@ -88,29 +68,8 @@ export function admitAction(view, action) {
   return { admitted: true }
 }
 
-export function deliverOnce(view) {
-  if (confirmationCount(view.sequence) !== 1) return { ok: false, reason: 'wrong-sequence' }
-  if (view.blockers.length > 0) {
-    return { ok: true, finished: false, written: [{ type: 'RetirementBlocked', incumbencyId: view.incumbencyId }] }
-  }
-  if (view.deliveryAuthorized) {
-    if (!view.execSessionId || !view.digest || !view.path) return { ok: false, written: [] }
-    return {
-      ok: true,
-      finished: true,
-      outcome: 'Delivered',
-      written: [{ type: 'IncumbencyRetired', outcome: 'Delivered', retirementCursor: view.head }],
-    }
-  }
-  return {
-    ok: true,
-    finished: true,
-    outcome: 'Relayed',
-    written: [
-      { type: 'IncumbencyRetired', outcome: 'Relayed', retirementCursor: view.head },
-      { type: 'IncumbencyOpened', openingCursor: view.head, projection: view.projection },
-    ],
-  }
+export function deliverOnce() {
+  return { ok: false, reason: 'review is the only lifecycle entry', written: [] }
 }
 
 export function deliverTwice(view, call) {
@@ -156,6 +115,8 @@ export function reviewFromFindings(findings) {
 }
 
 export function relayHandover(relayed, owned) {
-  if (relayed.outcome !== 'Relayed') return { ok: false, orphaned: false, kept: [], written: [] }
-  return { ok: true, orphaned: false, kept: owned.received, written: relayed.written }
+  const outcome = relayed.outcome ?? relayed.kind
+  if (outcome !== 'Relayed') return { ok: false, orphaned: false, kept: [], written: [] }
+  const written = Array.isArray(relayed.written) ? relayed.written : []
+  return { ok: true, orphaned: false, kept: owned.received, written }
 }
