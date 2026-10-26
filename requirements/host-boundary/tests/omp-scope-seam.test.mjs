@@ -1353,3 +1353,132 @@ test('WHAT[context-compression-043] OMP resetScope refusal on missing snapshot, 
     rmSync(workspace, { recursive: true, force: true })
   }
 })
+
+
+test('WHAT[scope-progress-016] OMP native todowrite settles min and triggers four Advisor turns', async () => {
+  const {mkdtempSync,rmSync}=await import('node:fs')
+  const {tmpdir}=await import('node:os')
+  const {join}=await import('node:path')
+  const {execFileSync}=await import('node:child_process')
+  const {SqliteJournal}=await import('wanxiangli/eventstore')
+  const {DatabaseSync}=await import('node:sqlite')
+  const {stateRoot}=await import('../../../dist/Persistence/Journal/RuntimePath.js')
+  const {scopeProgress,advisorProcessQueue}=await import('wanxiangli/scope-progress')
+  const workspace=mkdtempSync(join(tmpdir(),'wxs-omp-advisor-'))
+  execFileSync('git',['init','-q',workspace])
+  const sid='ses_omp_scope_native_016'
+  try {
+    const env=createOmpTestEnvironment()
+    const asks=[],steers=[]
+    const ctx={...ompSession(()=>sid),cwd:workspace,
+      model:{provider:'fixture',id:'native'},
+      runEphemeralTurn:async args=>{
+        asks.push(args)
+        const reply='The work remaining is a verified backlog.'
+        return {replyText:reply,assistantMessage:{role:'assistant',content:[{type:'text',text:reply}]}}
+      },
+    }
+    env.mockPi.sendUserMessage=async (text,options)=>{
+      steers.push({text,options})
+      await env.eventHandlers.get('message_start')({type:'message_start',message:{
+        role:'user',attribution:'agent',content:[{type:'text',text}],
+      }},ctx)
+    }
+    await activateOnOmp(env.mockPi,env.mockPlugin,env.agentsList)
+    await env.eventHandlers.get('session_start')({},ctx)
+    const todo=env.registeredTools.find(x=>x.name==='todowrite')
+    assert.ok(todo)
+    assert.equal(todo.parameters.properties.remainingScopeTurnsEstimate.type,'integer')
+    const record=(id,n)=>todo.execute(id,{remainingScopeTurnsEstimate:n},null,null,ctx)
+    const begin=i=>env.eventHandlers.get('turn_start')({type:'turn_start',turnIndex:i},ctx)
+    const end=i=>env.eventHandlers.get('turn_end')({type:'turn_end',turnIndex:i,
+      message:{role:'assistant',stopReason:'stop',content:[]},toolResults:[]},ctx)
+    await begin(0)
+    assert.equal((await record('first',7)).details.estimate,7)
+    assert.equal((await record('second',3)).details.minimum,3)
+    await end(0)
+    assert.equal(scopeProgress.status(sid).estimate,3)
+    await begin(1)
+    assert.equal((await record('third',3)).details.estimate,3)
+    await end(1)
+    for(let n=0;n<90&&steers.length===0;n++)await new Promise(resolve=>setTimeout(resolve,15))
+    assert.equal(asks.length,4)
+    assert.deepEqual(asks.map(x=>x.tools),[undefined,false,undefined,false],
+      'the worker retains its provider tools while the dedicated Advisor has none')
+    assert.equal(steers.length,1)
+    assert.equal(steers[0].options.attribution,'agent')
+    const root=await stateRoot(workspace)
+    const journal=new SqliteJournal(new DatabaseSync(join(root,'wanxiangshu','advisor-process.sqlite')))
+    try {
+      const progress=journal.read('scope-progress:'+sid.length+':'+sid+':1:0').map(JSON.parse)
+      assert.deepEqual(progress.filter(x=>x.kind==='Settled').map(x=>x.estimate),[3,3])
+      assert.equal(progress.filter(x=>x.kind==='Recorded').length,3)
+      let facts=[]
+      for(let n=0;n<100;n++){
+        facts=journal.read('advisor-process:'+sid).map(JSON.parse)
+        if(facts.some(x=>x.kind==='Finished'))break
+        await new Promise(resolve=>setTimeout(resolve,10))
+      }
+      assert.deepEqual(facts.filter(x=>x.kind==='StageBegan').map(x=>x.phase),[1,2,3,4,5])
+      assert.equal(facts.filter(x=>x.kind==='StageAnswered').length,5)
+      assert.equal(facts.find(x=>x.kind==='Finished')?.outcome,'Completed')
+      await begin(2)
+      assert.equal((await record('zero',0)).details.estimate,0)
+      assert.equal((await record('zero',1)).details.refused,true,'same tool identity may not revise the original estimate')
+      assert.equal((await record('negative',-1)).details.refused,true,'negative estimates are never billed')
+      await end(2)
+      assert.equal(scopeProgress.status(sid).resetDue,true)
+      const finalProgress=journal.read('scope-progress:'+sid.length+':'+sid+':1:0').map(JSON.parse)
+      assert.deepEqual(finalProgress.filter(x=>x.kind==='Settled').map(x=>x.estimate),[3,3,0])
+    }finally{journal.close()}
+  }finally{
+    scopeProgress.clear(sid)
+    advisorProcessQueue.clear(sid)
+    clearSessionState(sid)
+    rmSync(workspace,{recursive:true,force:true})
+  }
+})
+
+
+test('WHAT[scope-progress-017] OMP cold restart settles an already accepted but unfinished native Provider turn', async()=>{
+  const {mkdtempSync,rmSync}=await import('node:fs')
+  const {tmpdir}=await import('node:os')
+  const {join}=await import('node:path')
+  const {execFileSync}=await import('node:child_process')
+  const {scopeProgress}=await import('wanxiangli/scope-progress')
+  const work=mkdtempSync(join(tmpdir(),'omp-scope-cold-'))
+  execFileSync('git',['init','-q',work])
+  const sid='ses_omp_cold_restart_017'
+  const start=async()=>{
+    const env=createOmpTestEnvironment()
+    await activateOnOmp(env.mockPi,env.mockPlugin,env.agentsList)
+    const ctx={...ompSession(()=>sid),cwd:work}
+    await env.eventHandlers.get('session_start')({},ctx)
+    return {env,ctx}
+  }
+  try{
+    let {env,ctx}=await start()
+    await env.eventHandlers.get('turn_start')({type:'turn_start',turnIndex:0},ctx)
+    const tool=env.registeredTools.find(x=>x.name==='todowrite')
+    assert.ok(tool)
+    assert.equal((await tool.execute('call-017',{remainingScopeTurnsEstimate:6},null,null,ctx)).details.estimate,6)
+    assert.equal(scopeProgress.status(sid).known,false,'no turn_end has settled the paid round yet')
+    await env.eventHandlers.get('session_shutdown')({},ctx)
+    assert.equal(scopeProgress.status(sid).known,false)
+    ;({env,ctx}=await start())
+    await env.eventHandlers.get('turn_start')({type:'turn_start',turnIndex:0},ctx)
+    assert.equal(scopeProgress.status(sid).estimate,6,
+      'the first provider boundary after cold restart settles the persisted tool call once')
+    assert.equal(scopeProgress.status(sid).resetDue,false)
+    const next=env.registeredTools.find(x=>x.name==='todowrite')
+    assert.equal((await next.execute('call-017b',{remainingScopeTurnsEstimate:3},null,null,ctx)).details.estimate,3)
+    await env.eventHandlers.get('turn_end')({type:'turn_end',turnIndex:0,
+      message:{role:'assistant',stopReason:'stop',content:[]},toolResults:[]},ctx)
+    assert.equal(scopeProgress.status(sid).estimate,3)
+    await env.eventHandlers.get('session_shutdown')({},ctx)
+  }finally{
+    scopeProgress.clear(sid)
+    clearSessionState(sid)
+    rmSync(work,{recursive:true,force:true})
+  }
+})

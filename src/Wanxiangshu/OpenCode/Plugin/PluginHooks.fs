@@ -477,15 +477,14 @@ module PluginHooks =
 
 
 
-            // work-031: resolve the stage-method semantic path for the
-            // session's active plan incumbency. Non-plan sessions, missing
-            // stores and delivered works resolve None and append nothing, so
-            // the non-plan system prompt path stays byte-identical.
+            // work-031: the live stage is the plan milestone. The planning/sN
+            // directories are resource paths. A tenure with no active id, and
+            // any other milestone, appends nothing.
             let stagePathFor (stage: string) (activeId: string option) : string option =
                 match stage, activeId with
-                | "S1", Some _ -> Some "planning/s1"
-                | "S2", Some _ -> Some "planning/s2"
-                | "S3", Some _ -> Some "planning/s3"
+                | "事实与取舍", Some _ -> Some "planning/s1"
+                | "理解与路径", Some _ -> Some "planning/s2"
+                | "流程与伪代码", Some _ -> Some "planning/s3"
                 | _ -> None
 
             let planStageFor (sessionId: SessionId) : Task<(string * string) option> =
