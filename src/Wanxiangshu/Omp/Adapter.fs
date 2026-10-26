@@ -2981,15 +2981,12 @@ module Adapter =
             if not (isNull receipt) && isTrue (fieldValue receipt "advisor") then
                 let runId = stringOf (fieldValue item "providerRunId")
                 let key = epoch + ":" + runId
-                let estimate = stringOf (fieldValue receipt "estimate")
-                let previous = fieldValue receipt "previous"
-                let question =
-                    if not (isNull previous) && stringOf previous = "0" then
-                        "There is still work after the previous zero estimate. What remains and why?"
-                    elif not (isNull previous) && stringOf previous = estimate then
-                        "What has kept this Scope's remaining work from decreasing?"
-                    else
-                        "What newly discovered work or obstacles explain the increased estimate?"
+                let questionPath =
+                    match stringOf (fieldValue receipt "trigger") with
+                    | "ResetDue" -> "host/advisor-question/reset-due"
+                    | "Equal" -> "host/advisor-question/equal"
+                    | _ -> "host/advisor-question/increase"
+                let question = ProviderProse.render (ProviderLanguageBinding.forSessionText sid) questionPath Map.empty
                 let launched: Task<obj> = unbox (advisorFlow?trigger(sid, epoch, key, question))
                 launched |> ignore
 
