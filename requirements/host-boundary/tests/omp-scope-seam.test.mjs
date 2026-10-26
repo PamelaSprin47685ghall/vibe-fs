@@ -281,6 +281,28 @@ test('WHAT[context-compression-034] before first reset OMP adds one fresh agent 
 
 })
 
+test('WHAT[scope-progress-016] OMP sends no estimate steer while durable Scope progress is unknown', async () => {
+  const env = createOmpTestEnvironment()
+  await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+  const { scopeProgress } = await import('wanxiangli/scope-progress')
+  const sid = 'ses_omp_scope_progress_unknown'
+  const sessionCtx = await activateSession(env, sid)
+  env.setTurnMode('keep')
+  scopeProgress.reset(sid, '1')
+  scopeProgress.bindSessionJournal(sid, () => { throw new Error('journal offline') })
+  try {
+    assert.equal(scopeProgress.status(sid).status, 'Unknown')
+    const messages = [{ role: 'user', content: [{ type: 'text', text: 'ship the scope port' }], timestamp: 1000 }]
+    const result = await env.eventHandlers.get('context')({ messages }, sessionCtx)
+    const sent = result?.messages ?? messages
+    assert.equal(sent.length, 1, 'unknown progress is not a missing estimate')
+    assert.ok(!sent.some(message => contentText(message.content) === USER_REMINDER))
+  } finally {
+    scopeProgress.unbindSessionJournal(sid)
+    scopeProgress.clear(sid)
+  }
+})
+
 test('WHAT[context-compression-034] OMP purge preserves a user-attributed custom message and refuses a batch without an operator message', async () => {
   const env = createOmpTestEnvironment()
   await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
