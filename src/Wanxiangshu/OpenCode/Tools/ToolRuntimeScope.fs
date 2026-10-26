@@ -1323,7 +1323,7 @@ type ToolRuntimeScope
             | _, Error reason, _ -> return "askPreviousScope unavailable: " + reason
             | _, _, None -> return "askPreviousScope unavailable: no real read-only consultation transport"
             | Ok a, Ok frozen, Some ask when Wanxiangshu.Context.Scope.Surface.negotiationRequired recipient ->
-                return "askPreviousScope unavailable: first negotiate must be answered"
+                return "askPreviousScope unavailable: the first negotiate call must be accepted"
             | Ok a, Ok frozen, Some ask -> return! acceptPreviousScopeQuestion ctx questions a frozen ask
         }
 
@@ -1345,9 +1345,9 @@ type ToolRuntimeScope
 
         let acceptedText =
             if chinese then
-                "问题已受理并发送给委托者。继续工作，答复将随后作为 steer 到达。"
+                "问题已受理并发送给委托者，本次协商已完成，时序继续，可立即调用 resetScope。不必等待答复，答复随后作为 steer 到达。"
             else
-                "Questions accepted for delivery to delegator. Continue working; their answer will arrive as a steer."
+                "Questions accepted for delivery to delegator. Negotiation is complete and the timeline continues; resetScope is available now. Do not wait for the answer; it arrives later as a steer."
 
         let unavailableText =
             if chinese then

@@ -530,7 +530,11 @@ module HostPlugin =
             failureOutcome "Negotiation refused: delegator context is not available for ephemeral turn."
         else
             launchNegotiationBackground transport sid questions delegator receipt
-            successOutcome ("Clarification requested (receipt " + receipt + "). Awaiting delegator steer.")
+            successOutcome (
+                "Clarification requested (receipt "
+                + receipt
+                + "). Negotiation is complete and the timeline continues; resetScope is available now. Do not wait for the answer; it arrives later as a steer."
+            )
 
     /// The plugin value. `Activate` performs the durable product wiring and
     /// returns the product hooks for the second host.

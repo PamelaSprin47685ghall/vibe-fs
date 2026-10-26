@@ -49,7 +49,7 @@ test('WHAT[cognitive-environment-018] registered Provider requests localize new 
   }
 })
 
-test('WHAT[cognitive-environment-018] Chinese delegated-first negotiation stays fenced until matching physical confirmation', async () => {
+test('WHAT[cognitive-environment-018] Chinese delegated-first negotiation unlocks on acceptance; only the matching recipient settles the reply', async () => {
   const session = 'scope-hni-zh-negotiation'
   try {
     await withPreference('zh-CN', async () => {
@@ -61,11 +61,11 @@ test('WHAT[cognitive-environment-018] Chinese delegated-first negotiation stays 
       assert.match(first.strong, /\p{Script=Han}/u)
       const asked = askNegotiation(session, '之前为什么决定放弃方案 B？')
       assert.equal(asked.ok, true)
+      assert.equal(planRequest(session, [user('delegated-task')]).negotiationRequired, false, '受理即完成，不等答复')
       const reply = prepareNegotiationReply(asked.receipt, '此前观察到反例。')
       assert.equal(reply.ok, true)
       assert.match(reply.steer, /\p{Script=Han}/u)
       assert.equal(confirmNegotiationSteer(asked.receipt, 'other-session'), false)
-      assert.equal(planRequest(session, [user('delegated-task')]).negotiationRequired, true)
       assert.equal(confirmNegotiationSteer(asked.receipt, session), true)
       assert.equal(planRequest(session, [user('delegated-task'), user('answer', 2)]).negotiationRequired, false)
     })
