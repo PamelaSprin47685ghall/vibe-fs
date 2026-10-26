@@ -264,6 +264,7 @@ module PluginTransforms =
 
     type NormalTransformCapabilities =
         { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
+          StopCompletedContinuation: string option -> PhysicalUserMessageId option -> obj -> Task<bool>
           BindSessionStartedAt: string option -> Task<DateTimeOffset option>
           ApplyRelayProjection: string option -> obj -> Task<RelayProjectionDisposition>
           ApplyTenureIsolation: string option -> obj -> Task<unit>
@@ -802,6 +803,58 @@ module PluginTransforms =
                 |> Option.isSome
             | _ -> false
 
+        let isContinuation = function
+            | PromptAuthority.PromptOrigin.Continuation _ -> true
+            | _ -> false
+
+        let completedContinuation (sidOpt: string option) (physical: PhysicalUserMessageId option) =
+            match journal, sidOpt, physical with
+            | Some durable, Some sid, Some messageId ->
+                let sessionId = SessionId.create sid
+                let projections = (AgentJournal.snapshot durable).AgentProjections
+
+                let key: ChatExecutionKey =
+                    { SessionId = sessionId
+                      PhysicalUserMessageId = messageId }
+
+                projections.ChatExecutions
+                |> ChatExecutionProjection.byKey key
+                |> Option.exists (fun execution ->
+                    let accepted = execution.acceptedEvidence
+                    let successor =
+                        PromptAuthorityProjectionQueries.activeProfile sessionId projections
+                        |> Option.exists (fun active -> active.LogicalRunId <> accepted.LogicalRunId)
+
+                    let completedWork =
+                        PromptIdentitySeed.owner accepted.IdentitySeed
+                        |> Option.bind (fun (owner, _, _) -> Map.tryFind owner projections.Sessions)
+                        |> Option.bind (fun owner -> owner.Handles)
+                        |> Option.bind (fun handles ->
+                            projections.HandleByChildSession
+                            |> Map.tryFind sessionId
+                            |> Option.bind (fun handle ->
+                                Wanxiangshu.Execution.Delegation.HandleProjection.tryWork
+                                    { Handle = handle.Handle
+                                      ChildSessionId = sessionId
+                                      AuthorityRoot = accepted.AuthorityRootUserMessageId }
+                                    handles))
+                        |> Option.exists (fun work ->
+                            work.LogicalRunId = accepted.LogicalRunId
+                            && (work.LastCompletion
+                                |> Option.exists (fun completion ->
+                                    completion.Kind = Wanxiangshu.Execution.Delegation.HandleCompletionKind.Terminal))
+                            && (match work.Lifecycle with
+                                | Wanxiangshu.Execution.Delegation.CompletedAwaitingJoin _
+                                | Wanxiangshu.Execution.Delegation.Retired -> true
+                                | _ -> false))
+
+                    let closedRun =
+                        PromptAuthorityProjectionQueries.projectionFor sessionId projections
+                        |> Option.exists (fun authority -> Map.containsKey accepted.LogicalRunId authority.ClosedRuns)
+
+                    isContinuation accepted.Origin && not successor && (completedWork || closedRun))
+            | _ -> false
+
         /// 条款 3：本次 attempt 是否存在一次已成立的交付。判据只认真实交付
         /// 事实——交付登记时的物理输入必须仍是当前请求的物理输入，物理输入
         /// 已变就不再命中（不得误停新输入或后任）。view 声明、助手正文与
@@ -1028,6 +1081,24 @@ module PluginTransforms =
           BindSessionStartedAt =
             let port = journal |> Option.map AgentJournalPortAdapter.forSessionStartedAt
             SessionStartedAtLedger.bindSessionStartedAt port clock terminateSession Diagnostic.emit
+          StopCompletedContinuation =
+            fun sidOpt physical outObj ->
+                task {
+                    if completedContinuation sidOpt physical then
+                        let sid = SessionId.create (Option.get sidOpt)
+                        ModelRouting.suppressProviderStep sid (Option.get physical)
+                        RelayNarrativeTransform.clearRequestMessages outObj
+                        let! outcome = requestRetiredAttemptInterrupt sid
+
+                        Diagnostic.emit
+                            "completed-continuation-interrupt-observed"
+                            [ "session_id", SessionId.value sid
+                              "result", deliveryInterruptResultName outcome ]
+
+                        return true
+                    else
+                        return false
+                }
           ApplyRelayProjection =
             fun sidOpt outObj ->
                 task {
@@ -1725,7 +1796,12 @@ module PluginTransforms =
                   SessionStartedAt = None
                   TracedXTrace = None }
 
-            do! runOrdinaryStages stages frame
+            let! stopped = caps.StopCompletedContinuation projectionSessionIdOpt physicalUserMessageId outObj
+
+            if not stopped then
+                do! runOrdinaryStages stages frame
+                let! _ = caps.StopCompletedContinuation projectionSessionIdOpt physicalUserMessageId outObj
+                ()
 
             projectionSessionIdOpt
             |> Option.iter (fun sid ->

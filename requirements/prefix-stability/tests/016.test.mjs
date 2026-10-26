@@ -7,6 +7,7 @@ async function outbound(sessionId, messages) {
   const yes = async () => {}
   const caps = {
     BeginPhysicalProviderAttempt: yes,
+    StopCompletedContinuation: async () => false,
     BindSessionStartedAt: async () => null,
     ApplyRelayProjection: async () => null,
     ApplyTenureIsolation: yes,

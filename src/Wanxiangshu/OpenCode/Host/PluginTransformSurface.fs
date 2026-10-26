@@ -16,6 +16,7 @@ module PluginTransformSurface =
 
             let caps: PluginTransforms.NormalTransformCapabilities =
                 { BeginPhysicalProviderAttempt = fun _ _ -> complete "begin"
+                  StopCompletedContinuation = fun _ _ _ -> Task.FromResult false
                   BindSessionStartedAt =
                     fun _ ->
                         record "session-time"

@@ -39,6 +39,8 @@ module PluginTransforms =
 
     type NormalTransformCapabilities =
         { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
+          StopCompletedContinuation:
+              string option -> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option -> obj -> Task<bool>
           BindSessionStartedAt: string option -> Task<DateTimeOffset option>
           ApplyRelayProjection: string option -> obj -> Task<RelayProjectionDisposition>
           ApplyTenureIsolation: string option -> obj -> Task<unit>

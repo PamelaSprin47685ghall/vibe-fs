@@ -13,6 +13,7 @@ function safeCaps() {
   const yes = async () => {}
   return {
     BeginPhysicalProviderAttempt: yes,
+    StopCompletedContinuation: async () => false,
     BindSessionStartedAt: async () => null,
     ApplyRelayProjection: async () => null,
     ApplyTenureIsolation: yes,
