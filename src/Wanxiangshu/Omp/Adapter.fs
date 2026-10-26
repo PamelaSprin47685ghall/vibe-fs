@@ -2188,8 +2188,25 @@ module Adapter =
 
         Array.append messages [| createObj withTime |]
 
+    /// Delivery receipts let message_start match a physical steer. The model never reads them.
+    let private ompWithoutReceipt (message: obj) : obj =
+        let carriesReceipt =
+            stringOf (fieldValue message "role") = "user"
+            && stringOf (fieldValue message "attribution") = "agent"
+        if not carriesReceipt then message
+        else
+            emitJsExpr message """(() => {
+                const strip = text => typeof text === 'string' ? text.replace(/\n\[receipt:[^\]\n]+\]$/, '') : text
+                const content = $0.content
+                const next = typeof content === 'string' ? strip(content)
+                    : Array.isArray(content) ? content.map(block => block && block.type === 'text' && typeof block.text === 'string' && strip(block.text) !== block.text ? { ...block, text: strip(block.text) } : block)
+                    : content
+                const changed = typeof content === 'string' ? next !== content : Array.isArray(content) && next.some((block, index) => block !== content[index])
+                return changed ? { ...$0, content: next } : $0
+            })()"""
+
     let private ompScopeRequest (sessionId: string) (rawMessages: obj) : obj array =
-        let original = Surface.toObjArray rawMessages
+        let original = Surface.toObjArray rawMessages |> Array.map ompWithoutReceipt
         let neutral = original |> Array.map ompNeutralMessage
         let plan = Surface.planRequest sessionId (box neutral)
         let staged = Array.copy original
