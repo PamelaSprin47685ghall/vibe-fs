@@ -2547,6 +2547,14 @@ module Adapter =
 
                     return!
                         handleTurnOutcome turnRes currentPrompt historyOpt (fun hist ->
+                            // Recording only: names why the bounded budget is being spent.
+                            Diagnostic.emit
+                                "ephemeral-consultation-retry"
+                                [ "receipt", conversationKey
+                                  "stage", "ephemeral-turn"
+                                  "reason",
+                                  "blank reply or tool call; attempts left " + string (remaining - 1) ]
+
                             step retryPromptText hist (remaining - 1))
             }
 
