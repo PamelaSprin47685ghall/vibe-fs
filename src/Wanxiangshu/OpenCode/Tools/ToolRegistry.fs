@@ -94,20 +94,16 @@ module ToolRegistry =
     let private reviewRefusal (code: string) (reason: string) : obj =
         createObj [ "ok" ==> false; "code" ==> code; "reason" ==> reason ]
 
-    /// The Manager draft a Plan review in 「待执行」 launches with. An explicit
-    /// `note` (same as the `review` tool's note) is the draft verbatim;
-    /// otherwise the canonical saved plan.md is read, and a missing or empty
-    /// draft refuses the launch before any session exists.
+    let private savedReviewDraft root sessionId office =
+        match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected root sessionId with
+        | Some work when office = "Plan" && work.Stage = "待执行" ->
+            Wanxiangshu.Mission.Planning.PlanTools.readAndValidatePlan (joinPath root "wanxiangshu") sessionId
+            |> Result.map (fun (content, _, _) -> content)
+            |> Result.defaultWith invalidOp
+        | _ -> ""
+
     let private reviewDraft root sessionId office (note: string) =
-        if not (String.IsNullOrEmpty note) then
-            note
-        else
-            match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected root sessionId with
-            | Some work when office = "Plan" && work.Stage = "待执行" ->
-                Wanxiangshu.Mission.Planning.PlanTools.readAndValidatePlan (joinPath root "wanxiangshu") sessionId
-                |> Result.map (fun (content, _, _) -> content)
-                |> Result.defaultWith invalidOp
-            | _ -> ""
+        if String.IsNullOrEmpty note then savedReviewDraft root sessionId office else note
 
     /// The optional `note` of `this.review(findings, note)`. Absent or empty
     /// leaves the draft to the canonical plan file.
