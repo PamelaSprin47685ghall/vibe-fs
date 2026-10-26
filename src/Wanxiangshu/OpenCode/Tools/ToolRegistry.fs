@@ -109,11 +109,11 @@ module ToolRegistry =
                 |> Result.defaultWith invalidOp
             | _ -> ""
 
-    /// The optional `note` of `this.review(findings, note)`. Absent or blank
+    /// The optional `note` of `this.review(findings, note)`. Absent or empty
     /// leaves the draft to the canonical plan file.
     let private reviewNote (note: obj) : Result<string, string> =
         if isNullish note then Ok ""
-        elif isStringValue note then Ok((unbox<string> note).Trim())
+        elif isStringValue note then Ok(unbox<string> note)
         else Error "review note must be a string"
 
     /// The `this.review(findings, note)` member. Plan and Manager send one Review command.

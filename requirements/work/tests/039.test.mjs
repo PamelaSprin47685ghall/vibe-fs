@@ -338,25 +338,25 @@ const withReadyPlanSurface = (body) => withExecutablePlugin(async (hooks, direct
   await body({ runPlan, createdIds, runtime, commonDir, sessionID })
 })
 
-test('WHAT[work-039] this.review(findings, note) launches the Manager titled and drafted with an explicit note', async () => {
+test('WHAT[work-039] an explicit review note preserves leading whitespace and trailing line endings in the durable launch and physical draft', async () => {
   await withReadyPlanSurface(async ({ runPlan, createdIds, runtime, commonDir, sessionID }) => {
-    const note = '# Ship the parser fix\n\nKeep the public API unchanged.'
+    const note = '\t # Ship the parser fix\r\n\r\nKeep the public API unchanged.\t\r\n'
     const output = await runPlan(`return await this.review([], ${JSON.stringify(note)});`)
     assert.match(output, /ok = true/, output)
     assert.match(output, /kind = "Launched"/, output)
     assert.equal(createdIds.length, 1, 'one Manager session is created')
     const child = createdIds[0]
     const created = (await runtime.client.session.get({ path: { id: child } })).data
-    assert.equal(created.title, note.trim(), 'the note is the Manager title')
+    assert.equal(created.title, note, 'the note is the Manager title')
     assert.equal(created.agent, 'manager')
     const drafts = runtime.prompts.filter((args) => (args?.path?.id ?? args?.sessionID) === child)
     assert.equal(drafts.length, 1, 'one draft is sent to the Manager')
     const text = (drafts[0]?.body?.parts ?? []).map((part) => part.text ?? '').join('')
-    assert.equal(text, note.trim(), 'the note is the Manager draft, verbatim')
+    assert.equal(text, note, 'the note is the Manager draft, verbatim')
     assert.equal(text.includes('待执行'), false)
     const launches = eventsOf(commonDir, sessionID).filter((event) => event.type === 'DeliveryRequested')
     assert.equal(launches.length, 1)
-    assert.equal(launches[0].digest, note.trim())
+    assert.equal(launches[0].digest, note)
   })
 })
 
