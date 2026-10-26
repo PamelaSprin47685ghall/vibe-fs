@@ -431,7 +431,8 @@ module DurableWorkHost =
                   "revision", box receipt.Revision
                   "milestone", box (resultText receipt "milestone")
                   "wait", box (resultText receipt "wait")
-                  "incumbencyId", box (resultText receipt "incumbencyId") ]
+                  "incumbencyId", box (resultText receipt "incumbencyId")
+                  "blockers", nested receipt.Result "blockers" ]
 
         let raw = executeWithEffects gitCommonDir workId requestId (command "Review" withDigest) ports
         if isThenable raw then continueWith raw present else present raw
