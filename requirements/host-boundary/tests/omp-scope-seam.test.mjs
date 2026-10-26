@@ -1411,6 +1411,10 @@ test('WHAT[scope-progress-016] OMP native todowrite settles min and triggers fou
     const todo=env.registeredTools.find(x=>x.name==='todowrite')
     assert.ok(todo)
     assert.equal(todo.parameters.properties.remainingScopeTurnsEstimate.type,'integer')
+    const estimateHelp=[readFileSync(new URL('../../../resources/provider/tool/js-program/arg-estimate/en.md',import.meta.url),'utf8').trim(),
+      readFileSync(new URL('../../../resources/provider/tool/js-program/arg-estimate/zh-CN.md',import.meta.url),'utf8').trim()]
+    assert.ok(estimateHelp.includes(todo.description),'OMP todowrite carries the contract text, not its own wording')
+    assert.equal(todo.parameters.properties.remainingScopeTurnsEstimate.description,todo.description)
     const record=(id,n)=>todo.execute(id,{remainingScopeTurnsEstimate:n},null,null,ctx)
     const begin=i=>env.eventHandlers.get('turn_start')({type:'turn_start',turnIndex:i},ctx)
     const end=i=>env.eventHandlers.get('turn_end')({type:'turn_end',turnIndex:i,
