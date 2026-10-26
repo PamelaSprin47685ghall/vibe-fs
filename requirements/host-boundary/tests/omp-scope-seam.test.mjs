@@ -1425,6 +1425,8 @@ test('WHAT[scope-progress-016] OMP native todowrite settles min and triggers fou
     await end(1)
     for(let n=0;n<90&&steers.length===0;n++)await new Promise(resolve=>setTimeout(resolve,15))
     assert.equal(asks.length,4)
+    assert.match(JSON.stringify(asks[0]),/工作进展受到了什么阻碍|What has held back the progress/,
+      'an unchanged estimate asks the stalled-progress question from the shared resource')
     assert.deepEqual(asks.map(x=>x.tools),[undefined,false,undefined,false],
       'the worker retains its provider tools while the dedicated Advisor has none')
     assert.equal(steers.length,1)

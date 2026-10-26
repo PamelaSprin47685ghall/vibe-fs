@@ -542,7 +542,7 @@ test('WHAT[scope-progress-018] true Bun/OMP SDK SSE Provider serves four Advisor
     if (text.includes('Additional background:')) return 4
     if (text.includes('You raised the following problem:')) return 3
     if (text.includes('What background do you need')) return 2
-    if (text.includes("What has kept this Scope's remaining work")) return 1
+    if (text.includes('What has held back the progress of the work?') || text.includes('工作进展受到了什么阻碍？')) return 1
     return 0
   }
   const requests = [], phases = []
