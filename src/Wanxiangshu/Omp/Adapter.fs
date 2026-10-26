@@ -18,7 +18,6 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Mission.Work.OpenCode
 
 /// Host-neutral adapter over the omp (oh-my-pi) extension API.
 ///
@@ -39,6 +38,11 @@ module Adapter =
 
     [<Import("scopeProgress", "wanxiangli/scope-progress")>]
     let private scopeProgress: obj = jsNative
+
+    [<Import("Projection", "wanxiangli/projection")>]
+    let private createTenureProjection: unit -> obj = jsNative
+
+    let private tenureProjection = createTenureProjection ()
 
     [<Import("AdvisorFlow", "wanxiangli/scope-progress")>]
     let private createAdvisorFlow: obj = jsNative
@@ -2125,6 +2129,34 @@ module Adapter =
               "resultFor", box resultFor
               "resultField", box (if kind = "result" then "content" else "") ]
 
+    let private ompTenureCall (expected: string) (part: obj) =
+        match optionalString (fieldValue part "type"), optionalString (fieldValue part "id") with
+        | Some ("toolCall" | "tool-call" | "tool_call"), Some id when id = expected -> Some id
+        | _ -> None
+
+    let private ompTenureMessage (expected: string) (message: obj) =
+        let call = ompScopeParts message |> Array.tryPick (ompTenureCall expected)
+        createObj
+            [ "id", (optionalString (fieldValue message "id") |> Option.toObj |> box)
+              "role", fieldValue message "role"
+              "synthetic", box (isTrue (fieldValue message "synthetic"))
+              "semantic", box true
+              "cursor", null
+              "toolCallId", (call |> Option.toObj |> box)
+              "resultFor", (optionalString (fieldValue message "toolCallId") |> Option.toObj |> box)
+              "tenureId", (optionalString (fieldValue message "tenureId") |> Option.toObj |> box) ]
+
+    let private ompTenureMessages stateRoot sessionId (messages: obj) =
+        match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected stateRoot sessionId with
+        | Some work when work.ActiveId.IsSome && work.ActiveId = work.SuccessorTenureId && work.BarrierToolCallId.IsSome ->
+            let original = Surface.toObjArray messages
+            let call = work.BarrierToolCallId.Value
+            let neutral = original |> Array.map (ompTenureMessage call)
+            let barrier = createObj [ "toolCallId", box call; "successorTenureId", box work.ActiveId.Value ]
+            let kept: obj array = tenureProjection?tenure(box neutral, barrier)
+            kept |> Array.map (fun index -> original[int (unbox<float> index)]) |> box
+        | _ -> messages
+
     let private copyScopeObject (value: obj) =
         emitJsExpr value "Object.assign({}, $0)"
 
@@ -3257,7 +3289,7 @@ module Adapter =
                 sessionContexts.[sid] <- ctx
                 let rawList = fieldValue event "messages"
 
-                let visible = RelayNarrativeTransform.visibleMessages stateRoot sid rawList
+                let visible = ompTenureMessages stateRoot sid rawList
                 let scoped = ompScopeRequest sid visible
 
                 let! finalResult =
