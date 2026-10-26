@@ -2997,12 +2997,14 @@ module Adapter =
             items |> Array.iter (reportAdvisor sid epoch)
 
         let registerScopeProgressTool () =
+            let estimateProse =
+                ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) "tool/js-program/arg-estimate" Map.empty
             let schema =
                 createObj [ "type" ==> "object"
                             "properties" ==> createObj [
                                 "remainingScopeTurnsEstimate" ==> createObj [
                                     "type" ==> "integer"; "minimum" ==> 0
-                                    "description" ==> "Your current estimate of remaining billable Provider rounds for this Scope." ]]
+                                    "description" ==> estimateProse ]]
                             "required" ==> [| "remainingScopeTurnsEstimate" |]
                             "additionalProperties" ==> false ]
             let definition = createObj [
@@ -3011,7 +3013,7 @@ module Adapter =
                 "loadMode" ==> "essential"
                 "concurrency" ==> "exclusive"
                 "approval" ==> "read"
-                "description" ==> "Report how many billable model rounds are still needed to finish the current Scope. Supply remainingScopeTurnsEstimate on each model turn. Each real Provider turn is charged once; nondecreasing estimates automatically request independent advice. After zero, call resetScope."
+                "description" ==> estimateProse
                 "parameters" ==> schema
                 "execute" ==> Func<obj, obj, obj, obj, obj, obj>(fun callId arguments _signal _onUpdate ctx ->
                     task {
