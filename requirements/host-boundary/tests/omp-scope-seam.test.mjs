@@ -303,6 +303,25 @@ test('WHAT[scope-progress-016] OMP sends no estimate steer while durable Scope p
   }
 })
 
+test('WHAT[scope-progress-016] OMP strips the physical delivery receipt before the Provider sees an agent steer', async () => {
+  const env = createOmpTestEnvironment()
+  await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+  const sid = 'ses_omp_scope_receipt_strip'
+  const sessionCtx = await activateSession(env, sid)
+  env.setTurnMode('keep')
+  const advice = 'Check the migration order before the next edit.'
+  const messages = [
+    { role: 'user', content: [{ type: 'text', text: 'ship the scope port' }], timestamp: 1000 },
+    { role: 'user', attribution: 'agent', steering: true, content: [{ type: 'text', text: advice + '\n[receipt:r-0123abcd]' }], timestamp: 1001 },
+    { role: 'user', content: 'operator text\n[receipt:r-keep]', timestamp: 1002 },
+  ]
+  const result = await env.eventHandlers.get('context')({ messages }, sessionCtx)
+  const sent = result?.messages ?? messages
+  assert.equal(contentText(sent[1].content), advice)
+  assert.equal(contentText(sent[2].content), 'operator text\n[receipt:r-keep]', 'operator bytes are never rewritten')
+  assert.match(contentText(messages[1].content), /\[receipt:r-0123abcd\]$/, 'raw history keeps the receipt for message_start')
+})
+
 test('WHAT[context-compression-034] OMP purge preserves a user-attributed custom message and refuses a batch without an operator message', async () => {
   const env = createOmpTestEnvironment()
   await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
