@@ -695,6 +695,35 @@ module HostSignalBootstrap =
                 | Ok() -> ()
                 | Error reason -> invalidOp ("Could not settle the user question: " + reason)
 
+            let settleWorkHumanInput (key: ChatExecutionKey) (answered: bool) =
+                task {
+                    match workspaceDirectory with
+                    | None -> return ()
+                    | Some workspace ->
+                        let! root = RuntimePath.stateRoot workspace
+                        let sessionId = SessionId.value key.SessionId
+                        let messageId = PhysicalUserMessageId.value key.PhysicalUserMessageId
+                        let work = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected root sessionId
+                        let command =
+                            match work with
+                            | Some current when answered && current.Wait = "AwaitOperatorAnswer" ->
+                                Some("OperatorAnswer", [ "messageId", box messageId ])
+                            | Some current when current.Delivered ->
+                                Some("OperatorMessage", [ "kind", box "Operator"; "messageId", box messageId ])
+                            | _ -> None
+
+                        for kind, fields in Option.toList command do
+                            let receipt =
+                                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
+                                    root
+                                    sessionId
+                                    ("human-input:" + messageId)
+                                    (Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command kind fields)
+
+                            if receipt.Status <> "Committed" && receipt.Status <> "Replayed" && receipt.Status <> "Observed" then
+                                invalidOp ("Could not settle lifecycle human input: " + receipt.Reason)
+                }
+
 
             let continueManagedChatMessage intent output =
                 match intent with
@@ -743,10 +772,19 @@ module HostSignalBootstrap =
                         | _ -> None
 
                     for durable, key in Option.toList maybePair do
+                        let pending = UserQuestionJournal.pending durable key.SessionId
                         let! resumed =
                             UserQuestionJournal.observeHumanInput durable key.SessionId key.PhysicalUserMessageId
 
                         resumed |> requireQuestionSettled
+                        let answered =
+                            pending
+                            |> Option.bind (fun question ->
+                                UserQuestionJournal.tryFind durable key.SessionId question.ToolCallId)
+                            |> Option.bind (fun question -> question.Answer)
+                            |> Option.exists ((=) key.PhysicalUserMessageId)
+
+                        do! settleWorkHumanInput key answered
 
                     do! requireDurabilityActivation ()
                 }
