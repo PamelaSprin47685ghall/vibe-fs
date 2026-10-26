@@ -141,83 +141,9 @@ module BookkeeperRuntime =
         : string =
         Decisions.createRefreshPrompt lang q a relatedPaths diff
 
-    /// Host port wiring and in-flight Task completion coordination.
-    /// Live session attachments and prompt authorization gating are owned by wanxiangli/casebook (bookkeeperLedger).
-    module private Ledger =
-
-        let private gate = obj ()
-        // DSL-MUTABLE: resource — host-side session port and in-flight completion waiting.
-        let mutable private runtime: Runtime option = None
-
-        let private pendingCompletions =
-            Dictionary<string, TaskCompletionSource<Result<unit, string>>>()
-
-        let private cancelCompletionIfPending (completion: TaskCompletionSource<Result<unit, string>>) (reason: string) =
-            if not completion.Task.IsCompleted then
-                AsyncSupport.trySetResult completion (Error reason) |> ignore
-
-        let private cancelPending (sessionId: string) (reason: string) : unit =
-            match pendingCompletions.TryGetValue sessionId with
-            | true, completion ->
-                pendingCompletions.Remove sessionId |> ignore
-                cancelCompletionIfPending completion reason
-            | false, _ -> ()
-
-        let setPort
-            (port: ICasebookSessionPort)
-            (resolveActiveOwner: SessionId -> PromptAuthority.AuthorityExecutionProfile option)
-            : unit =
-            lock gate (fun () ->
-                runtime <-
-                    Some
-                        { Port = port
-                          ResolveActiveOwner = resolveActiveOwner })
-
-        let reset () : unit =
-            lock gate (fun () ->
-                runtime <- None
-                for KeyValue(sid, completion) in pendingCompletions do
-                    cancelCompletionIfPending completion "bookkeeper runtime reset"
-                pendingCompletions.Clear())
-            bookkeeperLedger?clear ()
-
-        let bind (sessionId: string) (txId: string) (ownerSessionId: string) : unit =
-            lock gate (fun () -> cancelPending sessionId "bookkeeper session re-bound to new transaction")
-            bookkeeperLedger?bind (sessionId, txId, ownerSessionId)
-
-        let unbind (sessionId: string) : unit =
-            bookkeeperLedger?unbind (sessionId)
-            lock gate (fun () -> cancelPending sessionId "bookkeeper session retired before completion")
-
-        let authorize (sessionId: SessionId) (agent: string) (text: string) : unit =
-            bookkeeperLedger?authorize (SessionId.value sessionId, agent, text) |> ignore
-
-        let tryConsume (sessionId: SessionId) (explicitAgent: string option) (text: string option) : bool =
-            match explicitAgent, text with
-            | Some agent, Some payload ->
-                unbox<bool> (bookkeeperLedger?tryConsume (SessionId.value sessionId, agent, payload))
-            | _ -> false
-
-        let tryGetCompletion (sessionId: SessionId) : TaskCompletionSource<Result<unit, string>> option =
-            lock gate (fun () ->
-                match pendingCompletions.TryGetValue(SessionId.value sessionId) with
-                | true, pending -> Some pending
-                | false, _ -> None)
-
-        let registerCompletion (childKey: string) (completion: TaskCompletionSource<Result<unit, string>>) : unit =
-            lock gate (fun () -> pendingCompletions.[childKey] <- completion)
-
-        let removeCompletion (childKey: string) : unit =
-            lock gate (fun () -> pendingCompletions.Remove childKey |> ignore)
-
-        let tryTxId (sessionId: string) : string option =
-            let res: string = unbox<string> (bookkeeperLedger?txIdFor (sessionId))
-            if String.IsNullOrEmpty res then None else Some res
-
-        let isAttached (sessionId: string) : bool =
-            unbox<bool> (bookkeeperLedger?isAttached (sessionId))
-
-        let current () : Runtime option = lock gate (fun () -> runtime)
+    let private runtimeGate = obj ()
+    // DSL-MUTABLE: resource — host-side session port and active owner resolution.
+    let mutable private runtime: Runtime option = None
 
     /// Host-effect coordination.
     module private Coordination =
@@ -230,14 +156,8 @@ module BookkeeperRuntime =
                 with _ ->
                     ()
 
-                Ledger.unbind (SessionId.value childId)
+                bookkeeperLedger?unbind (SessionId.value childId)
             }
-
-        let completePhysical (sessionId: SessionId) (outcome: Result<unit, string>) : unit =
-            let sid = SessionId.value sessionId
-            if Ledger.isAttached sid then
-                Ledger.tryGetCompletion sessionId
-                |> Option.iter (fun pending -> AsyncSupport.trySetResult pending outcome |> ignore)
 
         let awaitCompletion
             (sessions: ICasebookSessionPort)
@@ -306,12 +226,12 @@ module BookkeeperRuntime =
                 let sessions = runtime.Port
                 let childKey = SessionId.value childId
                 let ownerKey = SessionId.value ownerSessionId
-                Ledger.bind childKey txId ownerKey
+                bookkeeperLedger?bind (childKey, txId, ownerKey)
 
                 let completion =
                     TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-                Ledger.registerCompletion childKey completion
+                bookkeeperLedger?registerCompletion (childKey, txId, completion)
 
                 // DSL-MUTABLE: subscription — bookkeeper terminal subscription
                 let mutable subscription: System.IDisposable option = None
@@ -330,7 +250,7 @@ module BookkeeperRuntime =
                 let disposeSub () =
                     subscription |> Option.iter (fun active -> active.Dispose())
                     subscription <- None
-                    Ledger.removeCompletion childKey
+                    bookkeeperLedger?removeCompletion (childKey)
 
                 let activeOwner = runtime.ResolveActiveOwner ownerSessionId
 
@@ -342,7 +262,7 @@ module BookkeeperRuntime =
                     return Error(sprintf "bookkeeper identity seed rejected: %A" rejection)
                 | Ok participantIdentity ->
                     let promptText = Decisions.envelope kind ownerKey q a observations extraTranscript
-                    Ledger.authorize childId (ParticipantIdentity.selectedAgent participantIdentity) promptText
+                    bookkeeperLedger?authorize (childKey, ParticipantIdentity.selectedAgent participantIdentity, promptText) |> ignore
 
                     return!
                         sendBookkeeperPrompt
@@ -410,31 +330,44 @@ module BookkeeperRuntime =
         (port: ICasebookSessionPort)
         (resolveActiveOwner: SessionId -> PromptAuthority.AuthorityExecutionProfile option)
         : unit =
-        Ledger.setPort port resolveActiveOwner
+        lock runtimeGate (fun () ->
+            runtime <-
+                Some
+                    { Port = port
+                      ResolveActiveOwner = resolveActiveOwner })
 
-    let resetRuntime () : unit = Ledger.reset ()
+    let resetRuntime () : unit =
+        lock runtimeGate (fun () -> runtime <- None)
+        bookkeeperLedger?clear ()
 
     let bindSession (sessionId: string) (txId: string) (ownerSessionId: string) : unit =
-        Ledger.bind sessionId txId ownerSessionId
+        bookkeeperLedger?bind (sessionId, txId, ownerSessionId)
 
-    let unbindSession (sessionId: string) : unit = Ledger.unbind sessionId
+    let unbindSession (sessionId: string) : unit =
+        bookkeeperLedger?unbind (sessionId)
 
     let tryConsumePromptAuthorization
         (sessionId: SessionId)
         (explicitAgent: string option)
         (text: string option)
         : bool =
-        Ledger.tryConsume sessionId explicitAgent text
+        match explicitAgent, text with
+        | Some agent, Some payload ->
+            unbox<bool> (bookkeeperLedger?tryConsume (SessionId.value sessionId, agent, payload))
+        | _ -> false
 
     let completePhysical (sessionId: SessionId) (outcome: Result<unit, string>) : unit =
-        Coordination.completePhysical sessionId outcome
+        bookkeeperLedger?completePhysical (SessionId.value sessionId, outcome) |> ignore
 
-    let tryTxId (sessionId: string) : string option = Ledger.tryTxId sessionId
+    let tryTxId (sessionId: string) : string option =
+        let res: string = unbox<string> (bookkeeperLedger?txIdFor (sessionId))
+        if String.IsNullOrEmpty res then None else Some res
 
     let txIdFor (sessionId: string) : string =
         unbox<string> (bookkeeperLedger?txIdFor (sessionId))
 
-    let isAttached (sessionId: string) : bool = Ledger.isAttached sessionId
+    let isAttached (sessionId: string) : bool =
+        unbox<bool> (bookkeeperLedger?isAttached (sessionId))
 
     let runTransaction
         (kind: BookkeeperRequest)
@@ -445,8 +378,9 @@ module BookkeeperRuntime =
         (extraTranscript: string option)
         : Task<Result<string * string, string>> =
         task {
-            match Ledger.current () with
+            let activeRuntime = lock runtimeGate (fun () -> runtime)
+            match activeRuntime with
             | None -> return Error "bookkeeper runtime unavailable"
-            | Some runtime ->
-                return! Coordination.runWithRuntime runtime kind ownerSessionId q a observations extraTranscript
+            | Some active ->
+                return! Coordination.runWithRuntime active kind ownerSessionId q a observations extraTranscript
         }
