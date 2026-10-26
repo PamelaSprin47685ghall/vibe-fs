@@ -198,8 +198,22 @@ module PluginTransforms =
     let negotiationProjectMessages (sessionId: string) (outObj: obj) : bool =
         let questionOpt = latestTemporaryQuestion outObj
 
+        // The temporary turn's own steps after its question (a vetoed tool call
+        // and its denial) stay visible, so the model reads the rebuke.
+        let trailing =
+            let messages = negotiationMessages outObj
+
+            match questionOpt with
+            | Some question ->
+                match Array.tryFindIndexBack (fun m -> obj.ReferenceEquals(m, question)) messages with
+                | Some index -> messages[index + 1 ..]
+                | None -> [||]
+            | None -> [||]
+
         let projectedOpt =
-            questionOpt |> Option.bind (fun q -> Surface.projectMessages sessionId q)
+            questionOpt
+            |> Option.bind (fun q -> Surface.projectMessages sessionId q)
+            |> Option.map (fun projected -> Array.append projected trailing)
 
         match projectedOpt with
         | Some projected -> applyTemporaryQuestion outObj projected
