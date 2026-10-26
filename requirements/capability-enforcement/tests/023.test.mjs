@@ -107,7 +107,7 @@ const hostUtilityAllowFor = (_role) => HOST_UTILITY_ALLOW
 const cognitiveUtilityAllowFor = (_role) => COGNITIVE_UTILITY_ALLOW
 
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review', 'todowrite-for-manager'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'review', 'todowrite-for-manager'],
   Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
   Engineer: ['bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [

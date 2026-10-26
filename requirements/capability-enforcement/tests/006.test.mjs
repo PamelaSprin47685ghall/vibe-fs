@@ -98,7 +98,7 @@ const cognitiveUtilityAllowFor = (_role) => COGNITIVE_UTILITY_ALLOW
 //   `fork` / `resume` / `commission` 仍留在目录里（ToolSpec 构造器保留，委派线
 //   协议仍在），只有 `devops` 离开了权限目录。
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review', 'todowrite-for-manager'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'review', 'todowrite-for-manager'],
   Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
   Engineer: ['bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [

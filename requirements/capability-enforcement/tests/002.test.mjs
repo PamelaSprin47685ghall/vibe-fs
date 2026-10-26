@@ -113,7 +113,6 @@ const ROLE_ALLOW = {
     'resume',
     'join',
     'horizon',
-    'deliver',
     'review',
     'todowrite-for-manager',
   ],
