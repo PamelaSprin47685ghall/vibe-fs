@@ -524,10 +524,11 @@ test('WHAT[delegation-034] OMP physical negotiate canary against local provider'
 
 test('WHAT[scope-progress-018] true Bun/OMP SDK SSE Provider serves four Advisor turns and a physical steer', { timeout: 40000 }, async () => {
   if (process.env.OMP_ADVISOR_PHYSICAL_SMOKE !== '1') return
-  const { createAgentSession, discoverAuthStorage, ModelRegistry } = await import(
-    path.resolve(REPO, '../oh-my-pi/packages/coding-agent/src/index.ts'))
-  const { AgentRegistry } = await import(path.resolve(REPO, '../oh-my-pi/packages/coding-agent/src/registry/agent-registry.ts'))
-  const { initializeExtensions } = await import(path.resolve(REPO, '../oh-my-pi/packages/coding-agent/src/modes/runtime-init.ts'))
+  const sdkRoot = process.env.OH_MY_PI_PATH || process.env.PI_CODING_AGENT_PATH
+    || path.resolve(REPO, '../oh-my-pi/packages/coding-agent')
+  const { createAgentSession, discoverAuthStorage, ModelRegistry } = await import(path.join(sdkRoot,'src/index.ts'))
+  const { AgentRegistry } = await import(path.join(sdkRoot,'src/registry/agent-registry.ts'))
+  const { initializeExtensions } = await import(path.join(sdkRoot,'src/modes/runtime-init.ts'))
   const { activateOnOmp } = await import(path.join(REPO, 'dist/Omp/Adapter.js'))
   const { HostPlugin_create, HostPlugin_nodeClockPort, HostPlugin_nodeTimerPort } = await import(
     path.join(REPO, 'dist/Host/SecondHost/HostPlugin.js'))
@@ -645,6 +646,14 @@ test('WHAT[scope-progress-018] true Bun/OMP SDK SSE Provider serves four Advisor
         assert.equal(hasTools,true,'worker consultation must preserve native tool schema')
       }
     }
+    const dedicatedFinal = phases.find(item=>item.phase===4)
+    const dedicatedContext = JSON.stringify(dedicatedFinal.payload.messages)
+    assert.match(dedicatedContext,/Earlier exchanges from our continuing discussion/,
+      'the dedicated seat must carry its own previously confirmed exchange')
+    assert.match(dedicatedContext,/Previously you were asked/,
+      'the previous dedicated question must survive as original prose')
+    assert.match(dedicatedContext,/You answered/,
+      'the previous dedicated answer must be attributed to the same seat')
     await session.waitForIdle()
     await session.prompt('Consume the pending source-scoped agent advice, if any.')
     const root = await stateRoot(workspace)

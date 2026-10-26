@@ -2891,6 +2891,14 @@ module Adapter =
                         // never the temporary worker's unseen tool process.
                         let history = durableCall (fun journal ->
                             let frames: string array = unbox (journal?read("advisor-process:" + sid))
+                            let questions = System.Collections.Generic.Dictionary<string, string>()
+                            for serialized in frames do
+                                let value = parseJson serialized
+                                let kind = stringOf (fieldValue value "kind")
+                                let phase = optionalInt (fieldValue value "phase") |> Option.defaultValue 0
+                                if (phase = 2 || phase = 4) && kind = "StageBegan" then
+                                    let key = stringOf (fieldValue value "process") + ":" + string phase
+                                    questions[key] <- stringOf (fieldValue value "question")
                             let prior =
                                 frames
                                 |> Array.choose (fun serialized ->
@@ -2898,17 +2906,24 @@ module Adapter =
                                     let kind = stringOf (fieldValue value "kind")
                                     let phase = optionalInt (fieldValue value "phase") |> Option.defaultValue 0
                                     if (phase = 2 || phase = 4) && kind = "StageAnswered" then
-                                        Some(stringOf (fieldValue value "prose"))
+                                        let key = stringOf (fieldValue value "process") + ":" + string phase
+                                        match questions.TryGetValue key with
+                                        | true, question ->
+                                            Some("Previously you were asked:\n" + question
+                                                 + "\nYou answered:\n" + stringOf (fieldValue value "prose"))
+                                        | _ -> None
                                     else None)
+                                |> Array.rev
                                 |> Array.truncate 12
-                            createObj [ "ok" ==> true; "answers" ==> prior ])
+                                |> Array.rev
+                            createObj [ "ok" ==> true; "exchanges" ==> prior ])
                         let previous =
-                            if isNull (fieldValue history "answers") then ""
+                            if isNull (fieldValue history "exchanges") then ""
                             else
-                                let statements = unbox<string array> history?answers
-                                if statements.Length = 0 then ""
-                                else "Earlier conclusions from our continuing discussion:\n"
-                                     + String.concat "\n\n" (statements |> Array.toList) + "\n\n"
+                                let exchanges = unbox<string array> history?exchanges
+                                if exchanges.Length = 0 then ""
+                                else "Earlier exchanges from our continuing discussion:\n\n"
+                                     + String.concat "\n\n" (exchanges |> Array.toList) + "\n\n"
                         let prompt = previous + question
                         // The side-channel request is isolated from the working
                         // Session. SDK disables tool execution for ephemeral turns.
