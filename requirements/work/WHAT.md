@@ -336,6 +336,7 @@ Plan 与 Manager 的评审都是同一个 review。updates 按键覆盖、新增
 待执行上的空 review 提交成功后，系统启动一个 Manager 执行会话来承接当时的底稿。这次启动不消耗待执行，也不退休 Plan。
 
 - 允许后果：只有首次 Committed 的 DeliveryRequested 才创建会话一次。顺序是持久预留、创建 Session、持久绑定 Session ID、发送底稿全文、确认真实受理。底稿字节在发送前再核对。受理写成 DeliveryAdmitted，不写成 Plan 退休。
+- 允许后果：底稿即这次 review 的 note。`review` 工具的 `note` 参数与编程面 `this.review(findings, note)` 的第二参是同一份 note，原样成为 Manager 的会话标题与发送的底稿；编程面缺省或空白时读取规范路径上已保存的底稿全文，缺失或为空则在创建会话前拒绝。非字符串 note 在写入前拒绝，不预留、不启动。
 - 禁止后果：Replayed、Observed、Unknown、NotWritten 与 Conflict 不得再次创建。创建结果未知时不得发送底稿。不得摘要或改写底稿。execSessionId 不得进入 provider 可见面。不得用异常本身证明没有启动。
 - 失败后果：确切的创建前拒绝写 DeliveryRejected。无法证明是否承接时保留原预留，恢复只观察该 operation。待执行保持可再次接受另一个有效调用。
 
