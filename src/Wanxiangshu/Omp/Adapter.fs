@@ -2936,7 +2936,7 @@ module Adapter =
                 task {
                     if scopeEpoch sid <> epoch then return refuse "Advisor source Scope has advanced"
                     else
-                        let key = "advisor:" + processId
+                        let key = "r-" + processId.Replace("advisor:", "")
                         let tcs = System.Threading.Tasks.TaskCompletionSource<obj>()
                         pendingAdvisorSteers[key] <- (sid, epoch, tcs)
                         let text = prose + "\n[receipt:" + key + "]"
@@ -2944,9 +2944,12 @@ module Adapter =
                         try
                             let! _ = awaitObj (call2 (fieldValue pi "sendUserMessage") (box text) options)
                             let! confirmed = observedOrTimeout tcs.Task 30000
-                            if isNull confirmed then return refuse "Advisor steer has no confirmed physical acceptance"
+                            if isNull confirmed then
+                                pendingAdvisorSteers.Remove key |> ignore
+                                return refuse "Advisor steer has no confirmed physical acceptance"
                             else return confirmed
                         with ex ->
+                            pendingAdvisorSteers.Remove key |> ignore
                             return refuse ("Advisor steer physical delivery unknown: " + ex.Message)
                 })
             createObj [ "CurrentEpoch" ==> current; "LanguageFor" ==> language

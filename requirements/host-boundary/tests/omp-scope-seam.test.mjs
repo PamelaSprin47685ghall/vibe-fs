@@ -1407,6 +1407,8 @@ test('WHAT[scope-progress-016] OMP native todowrite settles min and triggers fou
       'the worker retains its provider tools while the dedicated Advisor has none')
     assert.equal(steers.length,1)
     assert.equal(steers[0].options.attribution,'agent')
+    assert.doesNotMatch(steers[0].text,/advisor:|StageBegan|StageAnswered|AdvisorFlow/,
+      'the working model must not receive internal Advisor process labels')
     const root=await stateRoot(workspace)
     const journal=new SqliteJournal(new DatabaseSync(join(root,'wanxiangshu','advisor-process.sqlite')))
     try {
@@ -1430,6 +1432,9 @@ test('WHAT[scope-progress-016] OMP native todowrite settles min and triggers fou
       assert.equal(scopeProgress.status(sid).resetDue,true)
       const finalProgress=journal.read('scope-progress:'+sid.length+':'+sid+':1:0').map(JSON.parse)
       assert.deepEqual(finalProgress.filter(x=>x.kind==='Settled').map(x=>x.estimate),[3,3,0])
+      await new Promise(resolve=>setTimeout(resolve,20))
+      assert.equal(asks.length,4,'a settled AdvisorDue replay cannot cause a second paid consultation')
+      assert.equal(steers.length,1)
     }finally{journal.close()}
   }finally{
     scopeProgress.clear(sid)
