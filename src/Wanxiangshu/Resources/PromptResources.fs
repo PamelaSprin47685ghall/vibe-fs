@@ -35,22 +35,19 @@ module PromptResources =
     let instructionTextsForRole (lang: ProviderLanguage) (role: Role) =
         let law = ProviderResources.readText lang (roleSemanticPath role)
 
-        if role = Role.Advisor then
-            composeInstructions [ law ]
-        else
-            let common = ProviderResources.readText lang "world/common-law"
-            let inherited = libraryPaths role
+        match role, libraryPaths role with
+        | Role.Advisor, _ -> composeInstructions [ law ]
+        | _, [] -> composeInstructions [ ProviderResources.readText lang "world/common-law"; law ]
+        | _, inherited ->
+            let books = inherited |> List.map (ProviderResources.readText lang)
 
-            if List.isEmpty inherited then
-                composeInstructions [ common; law ]
-            else
-                let books = inherited |> List.map (ProviderResources.readText lang)
-
-                composeInstructions (
-                    [ common; law; ProviderResources.readText lang "library/ingress" ]
-                    @ books
-                    @ [ ProviderResources.readText lang "library/closing" ]
-                )
+            composeInstructions (
+                [ ProviderResources.readText lang "world/common-law"
+                  law
+                  ProviderResources.readText lang "library/ingress" ]
+                @ books
+                @ [ ProviderResources.readText lang "library/closing" ]
+            )
 
     let systemForRole (lang: ProviderLanguage) (role: Role) =
         instructionTextsForRole lang role |> LlmFacing.renderInstructions
