@@ -30,73 +30,6 @@ export const EVENTS = [
 ]
 export const END_TOOL = 'review'
 
-export function confirmationCount(sequence) {
-  if (sequence.join(',') === 'S1,S2,S3') return 1
-  if (sequence.join(',') === 'S4') return 1
-  return null
-}
-
-export function openWork(input) {
-  const sequence = input.sequence
-  const count = confirmationCount(sequence)
-  if (count == null) return { ok: false, written: [] }
-  if (!input.observedHead) return { ok: false, written: [] }
-  if ('snapshotId' in input || 'certificate' in input) return { ok: false, written: [] }
-  const opened = {
-    type: 'WorkOpened',
-    workId: input.workId,
-    root: input.root,
-    sequence,
-    authorityInitial: `authority-initial-v1:${input.workId}`,
-  }
-  const incumbency = {
-    type: 'IncumbencyOpened',
-    workId: input.workId,
-    incumbencyId: input.incumbencyId,
-    projection: sequence[0],
-    openingCursor: input.observedHead,
-  }
-  return { ok: true, written: [opened, incumbency], confirmationCount: count }
-}
-
-export function admitAction(view, action) {
-  if (!view.active) return { admitted: false }
-  if (view.reviewed) return { admitted: true }
-  if (action === 'read' || action === 'observe' || action === 'review') return { admitted: true }
-  if (action === 'write-source' || action === 'dispatch-devops') return { admitted: false }
-  if (action === 'deliver' && confirmationCount(view.sequence) === 1 && !view.deliveryAuthorized) return { admitted: true }
-  return { admitted: true }
-}
-
-export function deliverOnce() {
-  return { ok: false, reason: 'review is the only lifecycle entry', written: [] }
-}
-
-export function deliverTwice(view, call) {
-  const outcome = view.reviewOutcome === 'Promoted' ? 'Delivered' : 'Relayed'
-  const retired = { type: 'IncumbencyRetired', outcome, projectionCut: { providerRunId: call.providerRunId, toolCallId: call.toolCallId } }
-  if ('retirementCursor' in retired || 'digest' in retired || 'snapshotId' in retired) return { ok: false, written: [] }
-  if (outcome === 'Relayed') {
-    return {
-      ok: true,
-      finished: true,
-      outcome,
-      written: [retired, { type: 'IncumbencyOpened', openingCursor: call.head }],
-    }
-  }
-  return { ok: true, finished: true, outcome, written: [retired] }
-}
-
-export function projectSuccessor(messages, openingCursor, first) {
-  // Relay no longer strips predecessor context. The projection keeps every
-  // physical row; only view declarations may remove history.
-  const projected = messages.filter((message) => !message.synthetic)
-  if (projected.some((message) => message.role === 'synthetic_predecessor' || String(message.id ?? '').startsWith('synthetic-prev-'))) {
-    return { ok: false }
-  }
-  return { ok: true, projected, first: Boolean(first), retainedPriorAssistant: projected.some((message) => message.role === 'assistant' && message.firstSeen <= openingCursor) }
-}
-
 export function admitOldBytes(bytes) {
   return { admitted: false, reason: 'old-bytes-are-not-input', bytes }
 }
@@ -104,14 +37,6 @@ export function admitOldBytes(bytes) {
 export function bindDevOps(input) {
   if (input.bound) return { ok: true, written: [] }
   return { ok: true, written: [{ type: 'DevOpsBound', workId: input.workId, devopsId: input.devopsId }] }
-}
-
-export function reviewFromFindings(findings) {
-  if (!Array.isArray(findings)) return { ok: false, written: [] }
-  if (findings.some((pair) => !Array.isArray(pair) || pair.length !== 2 || pair.some((item) => typeof item !== 'string' || item.length === 0))) {
-    return { ok: false, written: [] }
-  }
-  return { ok: true, outcome: findings.length === 0 ? 'Promoted' : 'Stayed' }
 }
 
 export function relayHandover(relayed, owned) {
