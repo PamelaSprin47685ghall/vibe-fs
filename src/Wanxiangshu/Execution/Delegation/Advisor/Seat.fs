@@ -494,8 +494,10 @@ module AdvisorSeat =
         attempt (fun () -> consultCore deps callerSessionId intent)
 
     let clear (callerSessionId: string) : unit =
-        advisorSeatRegistry?clear callerSessionId
-        settledRunLedger?clearSession callerSessionId
+        let maybeChildId: string option = advisorSeatRegistry?clear callerSessionId
+        match maybeChildId with
+        | Some childId -> settledRunLedger?retire childId
+        | None -> ()
 
     let clearAll () : unit =
         advisorSeatRegistry?clearAll ()
