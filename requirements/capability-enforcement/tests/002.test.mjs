@@ -149,7 +149,9 @@ test('WHAT[capability-enforcement-002] AGENT_006_role_tool_matrix_reaches_the_ho
 test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_the_host_schema_matrix', () => {
   // Edit remains an office permission but projects no separate JS capability
   // (string replacement uses Read + Write; Grep projects rg).
-  const DIRECT_PERMISSION_ONLY = new Set(['Edit', 'Ask', 'JsPlan'])
+  // Finality names no host tool any more: the review entry closes cleanup
+  // (OfficeMatrix: 收尾由 review 结案), so Finality only gates that close.
+  const DIRECT_PERMISSION_ONLY = new Set(['Edit', 'Ask', 'JsPlan', 'Finality'])
   const permissionOf = (toolName) =>
     ({
       resetScope: 'ResetScope',
@@ -163,7 +165,6 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
       'bash-honeypot': 'BashHoneypot',
       review: 'ReviewAssessment',
       fetch: 'Fetch',
-      deliver: 'Finality',
     })[toolName]
 
   const permissionsForTool = (toolName) => {
