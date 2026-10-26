@@ -130,7 +130,7 @@ test('WHAT[capability-enforcement-023] devops_host_schema_contains_direct_mutati
   assert.equal(surface.toolName, 'todowrite-for-devops')
   assert.deepEqual(
     surface.capabilities.slice().sort(),
-    ['Advisor', 'Exec', 'Glob', 'Grep', 'Horizon', 'Move', 'Read', 'Remove', 'Write'],
+    ['Exec', 'Glob', 'Grep', 'Horizon', 'Move', 'Read', 'Remove', 'Write'],
   )
   const memberNames = surface.members.map((m) => m.memberName)
   for (const member of ['cat', 'ls', 'rg', 'stat', 'where', 'whereAll', 'mkdir', 'write', 'mv', 'rm', 'call', 'signal', 'send']) {
