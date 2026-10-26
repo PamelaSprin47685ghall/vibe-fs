@@ -430,6 +430,7 @@ module PluginHooks =
             let eventPort = host.EventPort
             let chatParams = ChatParamsHook.createWith journal
 
+            // DSL-MUTABLE: resource — durable progress journal factory resolved once at activation
             let mutable progressJournalFactory: obj option = None
 
             // The JS todowrite port is synchronous. Resolve the physical store once
