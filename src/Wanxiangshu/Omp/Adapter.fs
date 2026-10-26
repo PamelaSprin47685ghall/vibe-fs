@@ -2205,9 +2205,9 @@ module Adapter =
         elif not (isNull plan?strong) then ompScopeSteer scoped (stringOf plan?strong) true
         elif progressUnknown then scoped
         elif not (isNull progress?resetDue) && unbox<bool> progress?resetDue then
-            ompScopeSteer scoped "你已报告当前 Scope 尚需 0 个计费回合。现在调用 resetScope，提交上一 Scope 的交接文本和新 Scope 的目标。" true
+            ompScopeSteer scoped (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) "host/scope-steer/reset-due" Map.empty) true
         elif isNull progress?known || not (unbox<bool> progress?known) then
-            ompScopeSteer scoped "当前 Scope 尚无剩余计费回合估计。在本次 todowrite 中提交 remainingScopeTurnsEstimate。" true
+            ompScopeSteer scoped (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) "host/scope-steer/missing-estimate" Map.empty) true
         else scoped
 
     let private contextMessagesReply (rawList: obj) (withSteer: obj array) : obj =
@@ -2878,8 +2878,9 @@ module Adapter =
                     match sessionContexts.TryGetValue sid with
                     | false, _ -> return refuse "OMP source Session has no active Provider context"
                     | true, ctx ->
+                        let retry = ProviderProse.render (ProviderLanguageBinding.forSessionText sid) "host/advisor-seat/prose-retry" Map.empty
                         let! result = runEphemeralConsultation ctx question
-                                        ("Please respond in ordinary prose without tool calls: " + question)
+                                        (retry + "\n" + question)
                                         ("scope-worker:" + sid + ":" + Guid.NewGuid().ToString("N"))
                         return match result with | Ok prose -> answer prose | Error reason -> refuse reason
                 })
@@ -2888,6 +2889,7 @@ module Adapter =
                     match sessionContexts.TryGetValue sid with
                     | false, _ -> return refuse "Dedicated Advisor has no active parent model context"
                     | true, ctx ->
+                        let label path = ProviderProse.render (ProviderLanguageBinding.forSessionText sid) path Map.empty
                         // Preserve the Advisor's earlier confirmed discussions
                         // after a restart. These are the seat's own Stage 2/4 facts,
                         // never the temporary worker's unseen tool process.
@@ -2911,8 +2913,9 @@ module Adapter =
                                         let key = stringOf (fieldValue value "process") + ":" + string phase
                                         match questions.TryGetValue key with
                                         | true, question ->
-                                            Some("Previously you were asked:\n" + question
-                                                 + "\nYou answered:\n" + stringOf (fieldValue value "prose"))
+                                            Some(label "host/advisor-seat/asked" + "\n" + question
+                                                 + "\n" + label "host/advisor-seat/answered" + "\n"
+                                                 + stringOf (fieldValue value "prose"))
                                         | _ -> None
                                     else None)
                                 |> Array.rev
@@ -2924,7 +2927,7 @@ module Adapter =
                             else
                                 let exchanges = unbox<string array> history?exchanges
                                 if exchanges.Length = 0 then ""
-                                else "Earlier exchanges from our continuing discussion:\n\n"
+                                else label "host/advisor-seat/history" + "\n\n"
                                      + String.concat "\n\n" (exchanges |> Array.toList) + "\n\n"
                         let prompt = previous + question
                         // The side-channel request is isolated from the working
