@@ -44,6 +44,12 @@ type ToolRegistration =
 
 module ToolRegistry =
 
+    /// An unanswered question refuses source writes. The ledger being empty does not admit them.
+    let planSourceWriteAllowed (waitingForUser: bool) = not waitingForUser
+
+    /// The same unanswered question refuses a dispatch to the fixed DevOps member.
+    let devopsDispatchAllowed (waitingForUser: bool) = not waitingForUser
+
     [<RequireQualifiedAccess>]
     module Path =
         /// Algorithm G1: deliver is blocked while any parked site is unresolved.
@@ -97,7 +103,7 @@ module ToolRegistry =
                 let runId = ProviderRunIdentity.value providerRun
                 let callId = ToolCallId.value toolCallId
 
-                let reply =
+                let produced =
                     Wanxiangshu.Mission.Lifecycle.DurableWorkHost.submitReview
                         gitCommonDir
                         ctx.SessionId
@@ -111,6 +117,16 @@ module ToolRegistry =
                          |> Array.ofList
                          |> box)
                         ""
+                        (runtime.ReviewPorts ctx)
+
+                let! reply =
+                    if
+                        produced <> null
+                        && emitJsExpr produced "typeof $0.then === 'function'"
+                    then
+                        unbox<Task<obj>> produced
+                    else
+                        Task.FromResult produced
 
                 let status = string reply?status
 
@@ -575,11 +591,11 @@ module ToolRegistry =
                             && not frozen
                     }
 
-                // reviewFinishedOnly: a Plan tenure's draft writes are locked
-                // until its first review is finished. Ordinary reads stay
-                // available; only write/rm/mv are gated by scopePlanWriteOnly.
-                // Source writes stay available. Review no longer locks a promotion eligibility.
-                let planWriteCheck (_ctx: HostToolContext) : bool = true
+                // Source writes stay available except while a question is unanswered.
+                // Review no longer locks a promotion eligibility. The check is the
+                // same predicate the DevOps member uses.
+                let planWriteCheck (ctx: HostToolContext) : bool =
+                    planSourceWriteAllowed (runtime.IsWaitingForUser ctx.SessionId)
 
                 let spec =
                     let createSpec =
@@ -661,15 +677,21 @@ module ToolRegistry =
 
                             let devopsDelegate (payload: obj) : Task<obj> =
                                 task {
-                                    let! gitCommonDir = askGitCommonDir workspaceDirectory
-
-                                    if String.IsNullOrWhiteSpace gitCommonDir then
+                                    if not (devopsDispatchAllowed (runtime.IsWaitingForUser ctx.SessionId)) then
                                         return
                                             refusalWithReason
-                                                "devops-failed"
-                                                "devops failed: git common directory is missing"
+                                                "devops-refused"
+                                                "a question is waiting for the user"
                                     else
-                                        return! askDevops payload gitCommonDir
+                                        let! gitCommonDir = askGitCommonDir workspaceDirectory
+
+                                        if String.IsNullOrWhiteSpace gitCommonDir then
+                                            return
+                                                refusalWithReason
+                                                    "devops-failed"
+                                                    "devops failed: git common directory is missing"
+                                        else
+                                            return! askDevops payload gitCommonDir
                                 }
 
                             // The commit-side fact of a delivery: the live cell

@@ -108,6 +108,7 @@ module ReviewShell =
                     (updatesOf findings)
                     (blockersOf context.SessionId)
                     (digestOf args.Raw)
+                    (scope.ReviewPorts context)
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         let findingSchema =
@@ -128,7 +129,14 @@ module ReviewShell =
                     | Some ws -> RuntimePath.stateRoot ws
                     | None -> Task.FromResult ""
 
-                let reply = run gitCommonDir scope args context
+                let produced = run gitCommonDir scope args context
+
+                let! reply =
+                    if produced <> null && emitJsExpr produced "typeof $0.then === 'function'" then
+                        unbox<Task<obj>> produced
+                    else
+                        Task.FromResult produced
+
                 let status = string reply?status
 
                 if status = "Committed" || status = "Replayed" || status = "Observed" then

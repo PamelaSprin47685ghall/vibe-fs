@@ -313,6 +313,7 @@ module PlanningSurface =
                             findings
                             null
                             ""
+                            null
 
                     let status = string reply?status
                     let accepted = status = "Committed" || status = "Replayed" || status = "Observed"

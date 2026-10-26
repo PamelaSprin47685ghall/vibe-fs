@@ -32,7 +32,11 @@ module DurableWorkHost =
         updates: obj ->
         blockers: obj ->
         digest: string ->
+        effects: obj ->
             obj
+
+    /// Builds the DurableWork effect ports from park, send, open, draft and stop.
+    val reviewEffects: ports: obj -> obj
 
     val inspect: gitCommonDir: string -> workId: string -> obj
 
@@ -59,6 +63,7 @@ module DurableWorkHost =
         { Opened: bool
           Sequence: string list
           Stage: string
+          Wait: string
           ActiveId: string option
           OpeningStage: string option
           Reviewed: bool

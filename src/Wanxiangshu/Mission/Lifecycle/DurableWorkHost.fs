@@ -109,6 +109,18 @@ module DurableWorkHost =
     [<Emit("Array.isArray($0) ? $0 : []")>]
     let private asArray (_value: obj) : obj array = jsNative
 
+    [<Emit("$0 != null && (typeof $0 === 'object' || typeof $0 === 'function') && typeof $0.then === 'function'")>]
+    let private isThenable (_value: obj) : bool = jsNative
+
+    [<Emit("$0.then($1)")>]
+    let private continueWith (_promise: obj) (_step: obj -> obj) : obj = jsNative
+
+    [<Emit("$0.then($1, $2)")>]
+    let private continueEither (_promise: obj) (_ok: obj -> obj) (_err: obj -> obj) : obj = jsNative
+
+    let private settle (produced: obj) (step: obj -> obj) : obj =
+        if isThenable produced then continueWith produced step else step produced
+
     /// Sibling of `.Herdchestra/wanxiangshu/events/`, not inside it. The library takes a
     /// connection, not a path; this file is the host-owned journal for new work.
     let journalPath (stateRoot: string) : string =
@@ -262,18 +274,17 @@ module DurableWorkHost =
             let durable = work?execute (requestId, command)
             observe requestId durable)
 
-    /// Sync ports for the one review coordinator. Each returns only after the
-    /// domain commit; DurableWork confirms that outcome in the following record.
-    /// Launch stays unbound here: a review does not open a second manager.
-    let private protocolEffects () : obj =
-        let ask (_effect: obj) = "Parked"
-        let dispatch (_effect: obj) = "Sent"
-        let stop (_effect: obj) = "Requested"
+    /// A review with no live session reports the effect unknown. It does not
+    /// pretend the user was parked, the prompt was sent, or a manager was opened.
+    let private honestEffects () : obj =
+        let ask (_effect: obj) = "Unknown"
+        let dispatch (_effect: obj) = "Unknown"
+        let stop (_effect: obj) = "Unknown"
 
         let createSession (_effect: obj) =
             createObj
                 [ "status", box "NotStarted"
-                  "reason", box "this review does not open a manager session" ]
+                  "reason", box "no manager session is bound to this review" ]
 
         let sendDraft (_effect: obj) = "Unknown"
 
@@ -284,16 +295,96 @@ module DurableWorkHost =
               "createSession", box createSession
               "sendDraft", box sendDraft ]
 
+    let private succeeded (result: obj) = isRecord result && unbox<bool> result?ok
+
+    /// The review coordinator calls these ports only after the domain commit.
+    /// park, send, draft and stop receive one request object and return
+    /// `{ ok: true }` or `{ ok: false, reason }`, or a promise of that object.
+    /// open returns `{ ok: true, sessionId }` or `{ ok: false, reason }`.
+    let reviewEffects (ports: obj) : obj =
+        let ask (effect: obj) =
+            settle (ports?park (createObj [ "text", effect?text ])) (fun result ->
+                if succeeded result then "Parked" else "Unknown")
+
+        let dispatch (effect: obj) =
+            settle (ports?send (createObj [ "text", effect?text ])) (fun result ->
+                if succeeded result then "Sent" else "Unknown")
+
+        let createSession (effect: obj) =
+            settle (ports?``open`` (createObj [ "digest", effect?digest ])) (fun result ->
+                if succeeded result && isString result?sessionId && not (String.IsNullOrEmpty(unbox<string> result?sessionId)) then
+                    createObj
+                        [ "status", box "SessionCreated"
+                          "execSessionId", result?sessionId ]
+                else
+                    let reason =
+                        if isString result?reason && not (String.IsNullOrEmpty(unbox<string> result?reason)) then
+                            unbox<string> result?reason
+                        else
+                            "manager session was not created"
+
+                    createObj [ "status", box "NotStarted"; "reason", box reason ])
+
+        let sendDraft (effect: obj) =
+            settle
+                (ports?draft (
+                    createObj
+                        [ "sessionId", effect?execSessionId
+                          "digest", effect?digest ]
+                ))
+                (fun result -> if succeeded result then "Admitted" else "Unknown")
+
+        let stop (effect: obj) =
+            settle (ports?stop (createObj [ "incumbencyId", effect?incumbencyId ])) (fun result ->
+                if succeeded result then "Requested" else "Unknown")
+
+        createObj
+            [ "ask", box ask
+              "dispatch", box dispatch
+              "stop", box stop
+              "createSession", box createSession
+              "sendDraft", box sendDraft ]
+
+    /// The journal stays open until a thenable effect chain has confirmed.
+    /// Closing in a synchronous finally would drop the confirmation append.
     let private executeWithEffects
         (gitCommonDir: string)
         (workId: string)
         (requestId: string)
         (command: obj)
         (effects: obj)
-        : HostReceipt =
-        useWritableJournal gitCommonDir (fun journal ->
-            let durableWork: obj = createNew DurableWork (workId, journal, effects)
-            observe requestId (durableWork?execute (requestId, command)))
+        : obj =
+        let path = journalPath gitCommonDir
+        ensureDir (parentOf path)
+
+        let run () =
+            let connection = openDatabase path
+            let opened: obj = createNew SqliteJournal connection
+
+            let close () =
+                closeJournal (Some opened) connection
+
+            try
+                let durableWork: obj = createNew DurableWork (workId, opened, effects)
+                let produced: obj = durableWork?execute (requestId, command)
+
+                if isThenable produced then
+                    continueEither
+                        produced
+                        (fun value ->
+                            close ()
+                            value)
+                        (fun error ->
+                            close ()
+                            failwith (if isNull error then "review effect failed" else string error))
+                else
+                    close ()
+                    produced
+            with error ->
+                close ()
+                raise error
+
+        retryBusy run
 
     /// The only lifecycle command the host sends. Office, call identity, and the
     /// obligation updates are the caller's; Work decides relay, advance, and close.
@@ -307,6 +398,7 @@ module DurableWorkHost =
         (updates: obj)
         (blockers: obj)
         (digest: string)
+        (effects: obj)
         : obj =
         let fields =
             [ "office", box office
@@ -326,17 +418,23 @@ module DurableWorkHost =
             else
                 ("digest", box digest) :: withBlockers
 
-        let receipt = executeWithEffects gitCommonDir workId requestId (command "Review" withDigest) (protocolEffects ())
+        let ports = if isNull effects then honestEffects () else effects
 
-        createObj
-            [ "requestId", box receipt.RequestId
-              "status", box receipt.Status
-              "kind", box receipt.Kind
-              "reason", box receipt.Reason
-              "revision", box receipt.Revision
-              "milestone", box (resultText receipt "milestone")
-              "wait", box (resultText receipt "wait")
-              "incumbencyId", box (resultText receipt "incumbencyId") ]
+        let present (durable: obj) =
+            let receipt = observe requestId durable
+
+            createObj
+                [ "requestId", box receipt.RequestId
+                  "status", box receipt.Status
+                  "kind", box receipt.Kind
+                  "reason", box receipt.Reason
+                  "revision", box receipt.Revision
+                  "milestone", box (resultText receipt "milestone")
+                  "wait", box (resultText receipt "wait")
+                  "incumbencyId", box (resultText receipt "incumbencyId") ]
+
+        let raw = executeWithEffects gitCommonDir workId requestId (command "Review" withDigest) ports
+        if isThenable raw then continueWith raw present else present raw
 
     let inspect (gitCommonDir: string) (workId: string) : obj =
         useWork gitCommonDir workId (fun work -> work?inspect ())
@@ -378,6 +476,9 @@ module DurableWorkHost =
             Opened: bool
             Sequence: string list
             Stage: string
+            /// The work snapshot's wait: AwaitReview, AwaitOperatorAnswer,
+            /// AwaitEmptyReview, AwaitOperatorMessage, or ConfirmEffect.
+            Wait: string
             ActiveId: string option
             OpeningStage: string option
             Reviewed: bool
@@ -435,6 +536,7 @@ module DurableWorkHost =
         { Opened = true
           Sequence = []
           Stage = textOf snapshot?milestone
+          Wait = textOf snapshot?wait
           ActiveId = activeIdOf active
           OpeningStage = None
           Reviewed = false
