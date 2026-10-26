@@ -24,6 +24,7 @@ function safeCaps() {
     InjectPairGuideline: yes,
     SettleAndReplaceDeferredInspections: yes,
     SanitizeMessages: () => {},
+    IsPureChatSession: () => false,
     AdjudicateDelivery: async () => new DeliveryAdjudication(0, []),
     StopAfterDelivery: yes,
   }

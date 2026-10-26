@@ -39,6 +39,7 @@ function safeCaps() {
     InjectPairGuideline: yes,
     SettleAndReplaceDeferredInspections: yes,
     SanitizeMessages: () => {},
+    IsPureChatSession: () => false,
     AdjudicateDelivery: async () => new DeliveryAdjudication(0, []),
     StopAfterDelivery: yes,
   }
@@ -795,6 +796,37 @@ test('WHAT[context-compression-051] a cold OpenCode request with historical rese
     scopeProgress.clear(sid)
     clearSessionState(sid)
   })
+})
+
+
+test('WHAT[advisor-pure-chat] an Advisor session is pure chat: no Pair Hint steer, estimate request or Scope protocol', async () => {
+  const { Role } = await import('../../../dist/Foundation/Roles.js')
+  const advisorSid = 'pure-chat-advisor', workerSid = 'pure-chat-control-engineer'
+  const caps = { ...safeCaps(), IsPureChatSession: sid => sid === advisorSid }
+  const outgoing = async sid => {
+    clearSessionState(sid)
+    const out = { messages: [user('u-' + sid, 'Please think this through with me', 1)] }
+    await normalTransform(caps, sid, {}, out)
+    clearSessionState(sid)
+    scopeProgress.clear(sid)
+    return out.messages
+  }
+  const worker = await outgoing(workerSid)
+  assert.match(JSON.stringify(worker), /remainingScopeTurnsEstimate/, 'control: a worker still gets its estimate request')
+  const advisor = await outgoing(advisorSid)
+  assert.doesNotMatch(JSON.stringify(advisor), /remainingScopeTurnsEstimate/, 'Advisor is never asked for a Scope estimate')
+  assert.equal(advisor.length, 1, 'no Pair Hint steer reaches Advisor')
+  assert.equal(advisor[0].parts[0].text, 'Please think this through with me')
+
+  const roleOf = sid => (String(sid?.fields?.[0] ?? sid) === advisorSid ? Role.Advisor : Role.Engineer)
+  const transform = createWith(roleOf, async () => undefined)
+  const systemFor = async sid => {
+    const output = { system: ['Provider configuration'] }
+    await transform({ sessionID: sid })(output)
+    return JSON.stringify(output.system)
+  }
+  assert.match(await systemFor(workerSid), /resetScope/, 'control: a worker system carries the Scope protocol')
+  assert.doesNotMatch(await systemFor(advisorSid), /resetScope|turnBudget/, 'Advisor system carries no Scope protocol')
 })
 
 

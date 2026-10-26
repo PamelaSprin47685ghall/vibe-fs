@@ -51,6 +51,8 @@ module PluginTransforms =
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
           SanitizeMessages: string option -> obj -> unit
+          /// Advisor is pure chat: no Pair Hint plan, steer or estimate request.
+          IsPureChatSession: string option -> bool
           AdjudicateDelivery: string option -> obj -> Task<DeliveryAdjudication>
           StopAfterDelivery:
               string option
