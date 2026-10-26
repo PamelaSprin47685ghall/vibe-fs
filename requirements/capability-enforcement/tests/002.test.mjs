@@ -320,17 +320,20 @@ test('WHAT[capability-enforcement-002] TOOLSPEC_plugin_owned_cognitive_utility_t
     assert.equal(rolePredicate(tool, 'predictor'), false, `${tool} should fail closed for retired predictor`)
   }
 })
-test('WHAT[capability-enforcement-002] TOOLSPEC_negotiation_and_reset_admission_includes_advisor_protocol_only', () => {
+test('WHAT[capability-enforcement-002] TOOLSPEC_negotiation_and_reset_admission_excludes_the_tool_less_advisor_seat', () => {
+  // The dedicated Advisor seat is tool-less (`tools:false`): its Host
+  // AgentConfig, Provider tool map and execution admission all refuse every
+  // tool, including the protocol-only `negotiate` and `resetScope`.
   assert.equal(admissionAuthority('resetScope'), 'office', 'resetScope must have an office-role admission')
-
   for (const role of ['manager', 'orchestrator', 'engineer', 'devops', 'plan']) {
     assert.equal(rolePredicate('resetScope', role), true, `resetScope must be admitted for ${role}`)
   }
-  assert.equal(rolePredicate('resetScope', 'advisor'), true, 'advisor must be able to initialize after its first negotiation answer')
+  assert.equal(rolePredicate('resetScope', 'advisor'), false, 'the tool-less Advisor seat must not be admitted to resetScope')
   assert.equal(admissionAuthority('negotiate'), 'office')
-  for (const role of ['manager','orchestrator','engineer','devops','plan','advisor']) {
-    assert.equal(rolePredicate('negotiate', role), true, 'the protocol-only negotiation tool is admitted for active roles')
+  for (const role of ['manager', 'orchestrator', 'engineer', 'devops', 'plan']) {
+    assert.equal(rolePredicate('negotiate', role), true, `the protocol-only negotiation tool is admitted for ${role}`)
   }
+  assert.equal(rolePredicate('negotiate', 'advisor'), false, 'the tool-less Advisor seat must not be admitted to negotiate')
   assert.equal(rolePredicate('negotiate', 'unknown'), false, 'unknown callers cannot negotiate')
   assert.equal(rolePredicate('resetScope', 'unknown'), false, 'resetScope must fail closed for unknown role')
 })
