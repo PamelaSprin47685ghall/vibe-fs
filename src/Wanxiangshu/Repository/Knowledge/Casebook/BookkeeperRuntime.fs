@@ -33,10 +33,8 @@ module BookkeeperRuntime =
     [<Import("bookkeeperStaging", "wanxiangli/casebook")>]
     let private staging: obj = jsNative
 
-    type private LiveAttachment =
-        { TxId: string
-          OwnerSessionId: string
-          Attachment: string }
+    [<Import("bookkeeperLedger", "wanxiangli/casebook")>]
+    let private bookkeeperLedger: obj = jsNative
 
     type private Runtime =
         { Port: ICasebookSessionPort
@@ -143,17 +141,27 @@ module BookkeeperRuntime =
         : string =
         Decisions.createRefreshPrompt lang q a relatedPaths diff
 
-    /// Attachment bookkeeping only.
+    /// Host port wiring and in-flight Task completion coordination.
+    /// Live session attachments and prompt authorization gating are owned by wanxiangli/casebook (bookkeeperLedger).
     module private Ledger =
 
         let private gate = obj ()
-        // DSL-MUTABLE: resource
+        // DSL-MUTABLE: resource — host-side session port and in-flight completion waiting.
         let mutable private runtime: Runtime option = None
-        let private live = Dictionary<string, LiveAttachment>()
-        let private pendingPromptAuthorizations = Dictionary<string, string * string>()
 
         let private pendingCompletions =
             Dictionary<string, TaskCompletionSource<Result<unit, string>>>()
+
+        let private cancelCompletionIfPending (completion: TaskCompletionSource<Result<unit, string>>) (reason: string) =
+            if not completion.Task.IsCompleted then
+                AsyncSupport.trySetResult completion (Error reason) |> ignore
+
+        let private cancelPending (sessionId: string) (reason: string) : unit =
+            match pendingCompletions.TryGetValue sessionId with
+            | true, completion ->
+                pendingCompletions.Remove sessionId |> ignore
+                cancelCompletionIfPending completion reason
+            | false, _ -> ()
 
         let setPort
             (port: ICasebookSessionPort)
@@ -168,37 +176,27 @@ module BookkeeperRuntime =
         let reset () : unit =
             lock gate (fun () ->
                 runtime <- None
-                live.Clear()
-                pendingPromptAuthorizations.Clear()
+                for KeyValue(sid, completion) in pendingCompletions do
+                    cancelCompletionIfPending completion "bookkeeper runtime reset"
                 pendingCompletions.Clear())
+            bookkeeperLedger?clear ()
 
         let bind (sessionId: string) (txId: string) (ownerSessionId: string) : unit =
-            lock gate (fun () ->
-                live.[sessionId] <-
-                    { TxId = txId
-                      OwnerSessionId = ownerSessionId
-                      Attachment = "bookkeeper:" + txId })
+            lock gate (fun () -> cancelPending sessionId "bookkeeper session re-bound to new transaction")
+            bookkeeperLedger?bind (sessionId, txId, ownerSessionId)
 
         let unbind (sessionId: string) : unit =
-            lock gate (fun () ->
-                live.Remove sessionId |> ignore
-                pendingPromptAuthorizations.Remove sessionId |> ignore
-                pendingCompletions.Remove sessionId |> ignore)
+            bookkeeperLedger?unbind (sessionId)
+            lock gate (fun () -> cancelPending sessionId "bookkeeper session retired before completion")
 
         let authorize (sessionId: SessionId) (agent: string) (text: string) : unit =
-            lock gate (fun () -> pendingPromptAuthorizations.[SessionId.value sessionId] <- agent, text)
+            bookkeeperLedger?authorize (SessionId.value sessionId, agent, text) |> ignore
 
         let tryConsume (sessionId: SessionId) (explicitAgent: string option) (text: string option) : bool =
-            lock gate (fun () ->
-                let key = SessionId.value sessionId
-
-                match pendingPromptAuthorizations.TryGetValue key, explicitAgent, text with
-                | (true, (expectedAgent, expectedText)), Some agent, Some payload when
-                    agent = expectedAgent && payload = expectedText
-                    ->
-                    pendingPromptAuthorizations.Remove key |> ignore
-                    true
-                | _ -> false)
+            match explicitAgent, text with
+            | Some agent, Some payload ->
+                unbox<bool> (bookkeeperLedger?tryConsume (SessionId.value sessionId, agent, payload))
+            | _ -> false
 
         let tryGetCompletion (sessionId: SessionId) : TaskCompletionSource<Result<unit, string>> option =
             lock gate (fun () ->
@@ -213,13 +211,11 @@ module BookkeeperRuntime =
             lock gate (fun () -> pendingCompletions.Remove childKey |> ignore)
 
         let tryTxId (sessionId: string) : string option =
-            lock gate (fun () ->
-                match live.TryGetValue sessionId with
-                | true, attachment -> Some attachment.TxId
-                | false, _ -> None)
+            let res: string = unbox<string> (bookkeeperLedger?txIdFor (sessionId))
+            if String.IsNullOrEmpty res then None else Some res
 
         let isAttached (sessionId: string) : bool =
-            lock gate (fun () -> live.ContainsKey sessionId)
+            unbox<bool> (bookkeeperLedger?isAttached (sessionId))
 
         let current () : Runtime option = lock gate (fun () -> runtime)
 
@@ -238,8 +234,10 @@ module BookkeeperRuntime =
             }
 
         let completePhysical (sessionId: SessionId) (outcome: Result<unit, string>) : unit =
-            Ledger.tryGetCompletion sessionId
-            |> Option.iter (fun pending -> AsyncSupport.trySetResult pending outcome |> ignore)
+            let sid = SessionId.value sessionId
+            if Ledger.isAttached sid then
+                Ledger.tryGetCompletion sessionId
+                |> Option.iter (fun pending -> AsyncSupport.trySetResult pending outcome |> ignore)
 
         let awaitCompletion
             (sessions: ICasebookSessionPort)
@@ -434,9 +432,7 @@ module BookkeeperRuntime =
     let tryTxId (sessionId: string) : string option = Ledger.tryTxId sessionId
 
     let txIdFor (sessionId: string) : string =
-        match tryTxId sessionId with
-        | Some txId -> txId
-        | None -> ""
+        unbox<string> (bookkeeperLedger?txIdFor (sessionId))
 
     let isAttached (sessionId: string) : bool = Ledger.isAttached sessionId
 
