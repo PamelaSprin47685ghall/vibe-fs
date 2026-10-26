@@ -1392,9 +1392,9 @@ type ToolRuntimeScope
 
         let acceptedText =
             if chinese then
-                "问题已受理并发送给委托者，本次协商已完成，时序继续，可立即调用 resetScope。不必等待答复，答复随后作为 steer 到达。"
+                "问题已受理并发送给委托者，本次协商已完成，时序继续，可立即调用 resetScope。不必也不要等待答复；若取得委托者答复，可能随后作为 steer 补到。"
             else
-                "Questions accepted for delivery to delegator. Negotiation is complete and the timeline continues; resetScope is available now. Do not wait for the answer; it arrives later as a steer."
+                "Questions accepted for delivery to delegator. Negotiation is complete and the timeline continues; resetScope is available now. Do not wait for an answer; if the delegator's answer is obtained, it may arrive later as a steer."
 
         let unavailableText =
             if chinese then

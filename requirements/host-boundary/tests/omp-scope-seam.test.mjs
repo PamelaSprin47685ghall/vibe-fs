@@ -105,7 +105,7 @@ function createOmpTestEnvironment() {
                 }
               })()
             }
-            return { Text: 'Clarification requested (receipt ' + admitted.receipt + '). Negotiation is complete and the timeline continues; resetScope is available now. Do not wait for the answer; it arrives later as a steer.', Truncated: false, IsError: false, Details: null }
+            return { Text: 'Clarification requested (receipt ' + admitted.receipt + '). Negotiation is complete and the timeline continues; resetScope is available now. Do not wait for an answer; if the delegator\'s answer is obtained, it may arrive later as a steer.', Truncated: false, IsError: false, Details: null }
           },
         }
         await ports.Tools.Register(ofArray([negotiateSpec]))

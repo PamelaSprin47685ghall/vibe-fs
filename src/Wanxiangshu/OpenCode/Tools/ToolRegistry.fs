@@ -865,7 +865,7 @@ module ToolRegistry =
         let negotiateSpec: ToolSpec =
             { Name = "negotiate"
               Description =
-                "Ask your delegator clarifying questions. The first call is required before resetScope initialization; once it is accepted, negotiation is complete and resetScope is available immediately. Later calls are optional and can happen at any time. Pass all questions together in questions (plural). The call immediately acknowledges sending and does not wait for an answer. The answer later arrives as a user steer and never blocks resetScope or ongoing work."
+                "Ask your delegator clarifying questions. The first call is required before resetScope initialization; once it is accepted, negotiation is complete and resetScope is available immediately. Later calls are optional and can happen at any time. Pass all questions together in questions (plural). Acceptance completes the negotiation and the timeline continues; do not wait for an answer. If the delegator's answer is obtained, it may arrive later as a user steer; it never blocks resetScope or ongoing work."
               Arguments =
                 [ "questions",
                   ToolHostCodec.stringSchemaDescribed
