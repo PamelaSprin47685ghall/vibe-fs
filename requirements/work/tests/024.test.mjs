@@ -31,10 +31,11 @@ const withStore = async (body) => {
 
 test('WHAT[work-024] Plan admits its role tools on every stage; handoff and resume stay denied', () => {
   const rules = rolePermissionRules('plan')
-  for (const tool of ['todowrite-for-plan', 'review', 'deliver']) {
+  for (const tool of ['todowrite-for-plan', 'review']) {
     assert.equal(rules[tool], 'allow', `plan must admit ${tool}`)
     assert.notEqual(rolePermissionRules('engineer')[tool], 'allow', `engineer must not admit ${tool}`)
   }
+  assert.equal(Object.hasOwn(rules, 'deliver'), false, 'lifecycle deliver is not a plan tool')
   // DevOps 调查不再注册宿主工具：它是 Plan 编程面的成员。
   assert.ok(!toolSpecNames().includes('devops'), 'the host devops tool must be retired')
   assert.equal(Object.hasOwn(rules, 'devops'), false, 'the retired devops name must carry no admission rule')
@@ -48,11 +49,7 @@ test('WHAT[work-024] Plan admits its role tools on every stage; handoff and resu
   for (const tool of ['handoff', 'resume', 'read', 'edit', 'write']) {
     assert.notEqual(rules[tool], 'allow', `plan must deny ${tool}`)
   }
-  // Stage is not an action gate: S1, S2 and S3 share the same admission.
-  for (const stage of ['S1', 'S2', 'S3']) {
-    assert.equal(rules.deliver, 'allow', stage)
-    assert.notEqual(rules.handoff, 'allow', stage)
-  }
+  assert.notEqual(rules.handoff, 'allow', 'plan must deny handoff')
 })
 
 test('WHAT[work-024] the Plan devops member requires bound lifecycle work and never fabricates a delegation', async () => {

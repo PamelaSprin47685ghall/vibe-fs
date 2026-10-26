@@ -21,6 +21,19 @@ module DurableWorkHost =
     val useWork: gitCommonDir: string -> workId: string -> body: (obj -> 'a) -> 'a
     val useEphemeralWork: workId: string -> records: string array -> body: (obj -> 'a) -> 'a
     val execute: gitCommonDir: string -> workId: string -> requestId: string -> command: obj -> HostReceipt
+
+    val submitReview:
+        gitCommonDir: string ->
+        workId: string ->
+        requestId: string ->
+        office: string ->
+        providerRunId: string ->
+        toolCallId: string ->
+        updates: obj ->
+        blockers: obj ->
+        digest: string ->
+            obj
+
     val inspect: gitCommonDir: string -> workId: string -> obj
 
     type HostRunFence =
@@ -70,7 +83,9 @@ module DurableWorkHost =
           Root: string option
           Retirements: HostRetirement list
           ProjectionCut: HostRunFence option
-          Advances: HostAdvance list }
+          Advances: HostAdvance list
+          BarrierToolCallId: string option
+          SuccessorTenureId: string option }
 
     val inspected: gitCommonDir: string -> workId: string -> InspectedWork option
 

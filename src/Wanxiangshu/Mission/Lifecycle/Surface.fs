@@ -27,6 +27,28 @@ module LifecycleSurface =
     let execute (gitCommonDir: string) (workId: string) (requestId: string) (command: obj) =
         DurableWorkHost.execute gitCommonDir workId requestId command
 
+    let submitReview
+        (gitCommonDir: string)
+        (workId: string)
+        (requestId: string)
+        (office: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (updates: obj)
+        (blockers: obj)
+        (digest: string)
+        =
+        DurableWorkHost.submitReview
+            gitCommonDir
+            workId
+            requestId
+            office
+            providerRunId
+            toolCallId
+            updates
+            blockers
+            digest
+
     let inspect (gitCommonDir: string) (workId: string) =
         DurableWorkHost.inspect gitCommonDir workId
 
