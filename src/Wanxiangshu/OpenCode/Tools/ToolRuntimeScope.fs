@@ -1047,6 +1047,8 @@ type ToolRuntimeScope
         let budget = if awaitPhysical then Some AdvisorSteerAcceptanceBudgetMs else None
         let observer = privateConsultationObserver recipient receipt confirm budget
 
+        let consultationPort = DispatchSessionPort.ofSessionPort sessions |> DispatchSessionPort.forConsultation
+
         let active =
             journal
             |> Option.bind (fun durable ->
@@ -1072,7 +1074,7 @@ type ToolRuntimeScope
             let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
             dispatcher.SendAgentOwnerRoot
-                (DispatchSessionPort.ofSessionPort sessions)
+                consultationPort
                 target
                 (LlmFacing.renderInstruction answer)
                 closed.IdentitySeed

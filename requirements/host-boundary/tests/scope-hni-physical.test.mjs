@@ -422,6 +422,8 @@ test('WHAT[delegation-negotiation-004] registered negotiate sends ephemeral BTW 
     assert.match(visibleAnswer, /byte-preserving parser/)
     assert.ok(guidance.body.metadata?.wanxiangshu_prompt_key,
       'real continuation must carry a durable PromptKey')
+    assert.equal(guidance.body.parts[0].metadata.wanxiangshu_consultation_steer, true,
+      'the physical consultation answer carries its origin into the last request gate')
     assert.equal(guidance.body.noReply, undefined,
       'do not fake a private promptAsync steer with a status-dependent noReply flag')
     const childHistory = (await session.messages({ path: { id: child } })).data
@@ -675,6 +677,7 @@ test('WHAT[context-compression-047] registered OpenCode reset archives physical 
     assert.equal(providerAttempts, 2, 'one real old-model answer after bounded tool-veto retry, no replay duplicate')
     assert.equal(toolVetoes, 1)
     assert.equal(outboundSteers().length, 1, 'old answer delivered through one real PromptDispatcher continuation')
+    assert.equal(outboundSteers()[0].body.parts[0].metadata.wanxiangshu_consultation_steer, true)
     clearSessionState(sid)
   })
 })
