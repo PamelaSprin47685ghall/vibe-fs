@@ -72,3 +72,25 @@ dispose 收尾。
 `tests/005.test.mjs` 进一步通过真实 HostSessionNudge、SQLite/AgentJournal 验证首次明确拒绝、迟到 Refused、真实 PhysicalAccepted 与 OutcomeUnknown 都由对应原生回执驱动。
 
 `tests/004.test.mjs` 的 seeded fast-check 使用生产同构 Watchdog，随机交错中断受理／拒绝／抛错、继续提交／拒绝、真实物理接纳／迟到、两种 idle 与拒绝顺序以及新旧回合切换；不使用人为的等待超时给无回执请求制造假成功。外部宿主若永远不发送任何完成或拒绝回执，领域不能伪造其结果；保证的是插件事件循环不等待它，下一次可核验 Host 事件仍能正常前进，并只凭可观察事件判定终局。
+
+## [010] 精确物理取消不等待中断 Promise 才开始接力
+
+看门狗已针对一个确切 `SessionId + ProviderRunId` 触发
+`InterruptAttempt` 后，宿主可能先报告该 Provider 的真实
+`UserCancelled` 终态，而 `InterruptAttempt` 的宿主回执 Promise 仍悬而未决。
+这条精确终态已经证明原 Provider 停止，不能再用通常的 `Discard`
+把看门狗的恢复身份删掉并令受管子代理无声停止。
+
+- 中断回执仍待定且终态属于原 Provider 时，由终态事件接力发送
+  `ProviderRetryAttempt`；只记录一次删失样本，真正
+  `PhysicalAccepted` 才确认续跑，确定拒绝则向父方返回失败。
+- 宿主先明确拒绝中断，但同一 Provider 随后真实取消时，原请求已经不再
+  运行，应明确返回失败，不能只释放测量。
+- 迟到的成功、拒绝或异常中断回执不得撤销已经发起的续行，也不得双重结算。
+  旧 Provider 的迟到终态不得影响新的 ProviderRun。
+- 由 steer 引起的 `Superseded` 不等于 Host 中断已成立，不能
+  借此再派发一次 degeneration 续行。没有任何外部物理回执时继续
+  保留未知事实；不增设第二个超时来伪造无死锁。
+
+验收：`tests/010.test.mjs` 的可复现反例和 seeded fast-check
+验证两种回执顺序、未决 Promise、物理接纳幂等及新旧 Provider 的隔离。

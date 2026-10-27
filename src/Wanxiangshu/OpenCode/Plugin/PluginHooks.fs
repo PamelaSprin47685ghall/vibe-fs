@@ -16,6 +16,7 @@ open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Advisor
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Git
@@ -1717,6 +1718,11 @@ module PluginHooks =
                         match observation.Outcome with
                         | Wanxiangshu.Execution.Session.ChatExecution.HostProviderTerminalOutcome.Completed _ ->
                             latencyWatchdog.Complete(
+                                SessionId.value sessionId,
+                                Some(ProviderRunIdentity.value providerRun)
+                            )
+                        | Wanxiangshu.Execution.Session.ChatExecution.HostProviderTerminalOutcome.Cancelled ExecutionFailure.UserCancelled ->
+                            latencyWatchdog.OnProviderCancelled(
                                 SessionId.value sessionId,
                                 Some(ProviderRunIdentity.value providerRun)
                             )

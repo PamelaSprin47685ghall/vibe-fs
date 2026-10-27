@@ -126,7 +126,7 @@ Join 只等待当前进程真正在跑或已产生可 join 结果的工作：真
 
 ## [027] Busy nudge 不承载新 assignment
 
-同一 logical route 同时至多一个 active work unit。对忙碌 participant 调用 `resume` 时，charge 作为 `BusyAgentNudge` 追加到既有 LogicalRun，在 Host 保存后进入下一次尚未开始准备的 LLM 请求，不中断当前输出或工具。Engineer 与固定 DevOps 均允许此行为；保留原 work 的 Root、身份与完成订阅，不创建新 assignment，不因提示文本与旧 charge 相同而假装发送成功。
+同一 logical route 同时至多一个 active work unit。对忙碌 participant 调用 `resume` 时，charge 作为 `BusyAgentNudge` 追加到既有 LogicalRun，以 `steer` 立刻进入运行中会话的下一模型步骤，供子代理及时纠偏；宿主不得自行多发一个 `AbortSession`。SDK 因 steer 导致旧 attempt 切换时，以确切 Provider 终态与随后新尝试的证据区分正常切换与无故中断。Engineer 与固定 DevOps 均允许此行为；保留原 work 的 Root、身份与完成订阅，不创建新 assignment，不因提示文本与旧 charge 相同而假装发送成功。
 
 忙碌提示只包含本次追加指令，不再夹带调用方任何 post-scope 历史；它不改写既有 work，也不新建 assignment。已有真实回复后的可选 `negotiate` 不抑制正常 `resetScope`。
 
@@ -173,7 +173,7 @@ Engineer 完成工作或到达需 Manager 决定的边界即返回，不自行�
 
 **与跨 Scope 回问的对称性与交叉引用**：本协商 pending 状态与 `context-compression` [044] 中定义的跨 Scope 回问（`askPreviousScope`）pending 机制共用完全相同的底层 `PairHint` 呈现路径与时序冻结规则（请求副本不呈现预算后缀、不递减、弱提示关闭、每个新首次呈现的工具结果及 assistant part 持续携带 MUST 提醒且逐字重放、普通工具不被拦、`resetScope` 自身自拒）；两者解除条件相同：首问有效调用的 receipt 经宿主受理后即刻解除 pending 并恢复时序；协商即告完成，不等待答复。若取得答复，可能随后作为 steer 补到，只是内容，不是门禁，也不作送达承诺。
 
-OpenCode 暂时建立一个作为接收方子会话的临时孙会话，Host 中仅有本次协商问题；在发往 LLM 的 provider transform 把这条消息扩展为委托者最后一次出站请求的只读 system、messages 与已观察的模型身份，工具定义不因临时任务而改写。临时会话任何工具调用都必须在 `tool.execute.before` 阶段无条件拒绝；一旦确实尝试工具或没有普通文本回复，应在临时回合重新提示、直到正常文本回答，而不能执行工具或伪造答复。实际回答**必须复用父→子追加指导的真实发送接口**：忙碌子会话走 `HostForkBusyNudge → PromptDispatcher.SendContinuation(BusyAgentNudge, Detached)`；已经关闭当前 Logical Run 的接收方则经同一 PromptDispatcher 建立新的受控 AgentOwnerRoot。文本成为宿主拥有的可见 user 消息，带持久 PromptKey，并排队供之后的 LLM 请求自然消费。严禁私自调用 SDK `session.promptAsync`、猜测 busy/noReply、轮询 `session.messages` 伪造回复到达，更严禁通过 provider transform 偷偷注入协商答案。
+OpenCode 暂时建立一个作为接收方子会话的临时孙会话，Host 中仅有本次协商问题；在发往 LLM 的 provider transform 把这条消息扩展为委托者最后一次出站请求的只读 system、messages 与已观察的模型身份，工具定义不因临时任务而改写。临时会话任何工具调用都必须在 `tool.execute.before` 阶段无条件拒绝；一旦确实尝试工具或没有普通文本回复，应在临时回合重新提示、直到正常文本回答，而不能执行工具或伪造答复。实际回答**必须复用父→子追加指导的真实发送接口**：忙碌子会话走 `HostForkBusyNudge → PromptDispatcher.SendContinuation(BusyAgentNudge, Detached)`；已经关闭当前 Logical Run 的接收方则经同一 PromptDispatcher 建立新的受控 AgentOwnerRoot。文本成为宿主拥有的可见 user 消息，带持久 PromptKey，并以 steer 由下一模型步骤优先消费，不等待 Session idle。严禁私自调用 SDK `session.promptAsync`、猜测 busy/noReply、轮询 `session.messages` 伪造回复到达，更严禁通过 provider transform 偷偷注入协商答案。
 
 **omp (oh-my-pi) 宿主实现机制：**
 
@@ -187,10 +187,10 @@ OpenCode 暂时建立一个作为接收方子会话的临时孙会话，Host 中
 **user-facing session 不提供协商工具。** 在 OpenCode 的 `chat.message` 钩子里，凡 `IsManagedChild = false` 的根会话，其真实 `UserMessage.tools.negotiate` 必须显式为 `false`，因此工具不进入该次 LLM 请求可用列表；`tool.execute.before` 仍必须对根会话伪造的协商调用硬拒绝。受委托子会话和 Advisor 必须保留工具。本判定按真实物理会话父子身份，**不能按 Manager / Engineer 等角色统一禁用**，以免误杀同角色子代理的首次协商。
 
 
-## [036] Busy 子代理的普通追加指令不得抢占当前 Scope
+## [036] Busy 子代理必须即时 steer 而不是等待空闲
 
-当 Manager 对**仍在执行**的 Engineer／DevOps 调用 `resume` 或追加普通工作指令，复用现有子会话的 `BusyAgentNudge` 只记录一条带真实 PromptKey、原始 LogicalRun 与身份种子的后继输入，**不拥有中断当下 ProviderRun／工具调用的权利**。OpenCode 的 `session.promptAsync` 在未给出 `delivery` 时默认为 `steer`；这种普通 Busy 输入必须显式给 `delivery: "queue"`（兼容 SDK body 与顶层载体），由 Host 在下一个合法输入边界自然消费，不抢占正在执行的 `resetScope` 和新 Scope。
+Manager 对仍活跃的 Engineer／DevOps 执行 `resume` 时，已有子会话的 `BusyAgentNudge` 必须明确使用 `delivery: "steer"`（SDK body 与顶层载体一致）。它沿原 LogicalRun 和身份种子保存真实 PromptKey，供正在运行的子代理在下一模型步骤优先消费，不允许退化成 `queue` 等待 idle，也不创建新 assignment。宿主发送者不另发 `AbortSession`；若 SDK 为消费 steer 切换旧 Provider attempt，须按真实 Provider 终态核对，不把任何 `Cancelled` 一概认作非预期中断。
 
-这不修改专席、`negotiate`／`askPreviousScope` 回答的真实咨询 steer：只有明确携带 `wanxiangshu_consultation_steer=true` 的咨询消息才保持既定的最新一轮 assistant、tool-free 完成裁判，也不改变 degeneration 的 `ProviderRetryAttempt` 续跑投递语义。队列接纳仍不冒称工作指令已被模型消费；未物理接纳时继续按 PromptKey 的原持久恢复合同处理。
+普通 Busy steer 不伪装成 `wanxiangshu_consultation_steer=true`，咨询消息仍单独按最近一轮 assistant 已完成且无工具调用的判据裁决，不限定为咨询发起回合；degeneration 的 `ProviderRetryAttempt` 也不改变。SDK 入队确认不等于模型消费，物理接纳与 PromptKey 恢复仍按原合同处理。
 
-事故证据：2026-10-27 09:54–09:55 UTC 的 `.Herdchestra/wanxiangshu/events/4e175784b9dc41548b338edc175b87bf-0000.ndjson` 中，两个 Engineer 在 `ScopeReanchored` 后的原执行分别遇到 `BusyAgentNudge` 输入及 `Terminal(Cancelled)`；其中一次 Cancel 仅晚于 reset 73ms。OpenCode 本地 SDK 的 Session.prompt 默认 delivery=steer，而此前 SdkClientPort 没有传送 delivery。验收：`requirements/execution-model-routing/tests/009.test.mjs` 的 SDK payload 先红后绿验证普通 Busy 走 queue、咨询 steer 和 ProviderRetry 仍按原语义；`requirements/delegation/tests/036.test.mjs` 使用真正注册的 Manager `fork`／`resume` 验证忙碌子会话不被发送者中断、PromptKey 保持且 payload 物理指定 queue。
+现场依据：2026-10-27 09:54–09:55 UTC 的 `.Herdchestra/wanxiangshu/events/4e175784b9dc41548b338edc175b87bf-0000.ndjson` 显示重锚前后有 BusyAgentNudge 与 Terminal(Cancelled)，但单凭这些事件不能证明是谁调用了中断，也不能反推出应该排队。用户明确要求父方指导及时纠偏。验收：`requirements/execution-model-routing/tests/009.test.mjs` 检验 SDK Busy 的 body／顶层都明确 steer，咨询与 ProviderRetry 独立；`requirements/delegation/tests/036.test.mjs` 经真实 Manager `fork`／`resume` 验证原会话 PromptKey、立即 steer 且发送端未另调 AbortSession。

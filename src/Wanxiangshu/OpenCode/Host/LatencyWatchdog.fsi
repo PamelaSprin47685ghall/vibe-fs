@@ -40,6 +40,8 @@ type LatencyWatchdog =
     member Complete: sessionId: string * providerRun: string option -> unit
     /// End a failed/cancelled exact provider attempt without treating it as a complete sample.
     member Discard: sessionId: string * providerRun: string option -> unit
+    /// React to a physically cancelled exact Provider request, including an abort with no Host receipt.
+    member OnProviderCancelled: sessionId: string * providerRun: string option -> unit
     /// Session deletion: drop the measurement, record nothing.
     member Cancel: sessionId: string -> unit
     /// Idle drops an armed measurement; an interrupt in flight remains until

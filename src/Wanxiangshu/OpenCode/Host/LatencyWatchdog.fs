@@ -109,6 +109,30 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
             with _ ->
                 ()
 
+    let continueInterrupted sessionId turn (recorded: LatencyMeasurement) =
+        if validRecovery sessionId turn then
+            let onAccepted () =
+                if finishRecovery sessionId turn then
+                    diagnostic "latency-degeneration-resumed" sessionId
+
+            let onContinueFailure reason =
+                failRecovery sessionId turn ("continuation: " + reason)
+
+            try
+                detector.ObserveCensored(
+                    sessionId,
+                    max (ports.Now() - recorded.StartedAt) recorded.ThresholdMs
+                )
+
+                observe
+                    (ports.Continue sessionId (ports.Text sessionId) onAccepted onContinueFailure)
+                    (fun reason ->
+                        if not (String.IsNullOrEmpty reason) then
+                            onContinueFailure reason)
+                    (fun error -> onContinueFailure (string error))
+            with error ->
+                onContinueFailure error.Message
+
     /// The timer body. Everything it does re-validates the generation first,
     /// because the host may have completed, cancelled or replaced the request
     /// while the callback was pending or while Abort was in flight.
@@ -125,15 +149,7 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
                     | _ -> false)
 
             if armed then
-                // Callback-driven handoff: no Task is awaited by this timer,
-                // the event hook, or the physical acceptance dispatcher.
-                let onAccepted () =
-                    if finishRecovery sessionId thisGeneration then
-                        diagnostic "latency-degeneration-resumed" sessionId
-
-                let onContinueFailure reason =
-                    failRecovery sessionId thisGeneration ("continuation: " + reason)
-
+                // The event hook never waits for a Host promise.
                 let onAbortAccepted accepted =
                     let stillOurs =
                         lock gate (fun () ->
@@ -142,8 +158,7 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
                             | _ -> None)
 
                     match stillOurs with
-                    | None ->
-                        finishRecovery sessionId thisGeneration |> ignore
+                    | None -> ()
                     | Some recorded when not accepted ->
                         // A definite refusal leaves the original request alive,
                         // unless the Host has already observed it idle. The
@@ -178,20 +193,8 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
                                     true
                                 | _ -> false)
 
-                        if released && validRecovery sessionId thisGeneration then
-                            try
-                                detector.ObserveCensored(
-                                    sessionId,
-                                    max (ports.Now() - recorded.StartedAt) thresholdMs
-                                )
-                                observe
-                                    (ports.Continue sessionId (ports.Text sessionId) onAccepted onContinueFailure)
-                                    (fun reason ->
-                                        if not (String.IsNullOrEmpty reason) then
-                                            onContinueFailure reason)
-                                    (fun error -> onContinueFailure (string error))
-                            with error ->
-                                onContinueFailure error.Message
+                        if released then
+                            continueInterrupted sessionId thisGeneration recorded
 
                 try
                     observe
@@ -312,6 +315,33 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
                         revokeRecovery sessionId
                         disposeQuietly recorded.Timer
                     | _ -> ())
+
+    /// An exact physical cancellation can acknowledge an in-flight abort
+    /// before the Host returns its interrupt promise. Never await that promise
+    /// after the provider has already stopped.
+    member _.OnProviderCancelled(sessionId: string, providerRun: string option) =
+        if not disposed && not (String.IsNullOrWhiteSpace sessionId) then
+            match providerRun with
+            | None -> ()
+            | Some observedRun ->
+                let cancelled =
+                    lock gate (fun () ->
+                        match measurements.TryGetValue sessionId with
+                        | true, recorded when recorded.ProviderRun = Some observedRun ->
+                            measurements.Remove(sessionId) |> ignore
+                            disposeQuietly recorded.Timer
+                            Some recorded
+                        | _ -> None)
+
+                match cancelled with
+                | Some recorded when recorded.Aborting ->
+                    continueInterrupted sessionId recorded.Generation recorded
+                | Some recorded ->
+                    failRecovery
+                        sessionId
+                        recorded.Generation
+                        "source provider cancelled after the interrupt was refused"
+                | None -> ()
 
     /// Session deletion: drop the measurement, record nothing.
     member _.Cancel(sessionId: string) =
