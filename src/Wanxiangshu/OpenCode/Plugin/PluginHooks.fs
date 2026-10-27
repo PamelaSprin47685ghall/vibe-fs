@@ -123,6 +123,12 @@ module PluginHooks =
     [<Import("ProviderCalibration", "wanxiangli/provider-calibration")>]
     let private calibration: obj = jsNative
 
+    [<Import("requestLatencyDetector", "wanxiangli/degeneration")>]
+    let private requestLatencyDetector: obj = jsNative
+
+    [<Emit("performance.now()")>]
+    let private performanceNow () : float = jsNative
+
     [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
     let private hasOwnProperty (target: obj) (prop: string) : bool = jsNative
 
@@ -449,6 +455,80 @@ module PluginHooks =
             let snapshotOpt = host.SnapshotOpt
             let eventPort = host.EventPort
             let chatParams = ChatParamsHook.createWith journal
+
+            // Latency watchdog: per-session request-latency state machine. The
+            // statistics live in the library singleton; every physical effect
+            // is a port. Now is the Node monotonic clock (ms); Schedule wraps
+            // the Node timer port's one-shot delay with a cancellation handle.
+            let latencyTimerPort = NodeTiming.nodeTimerPort ()
+
+            let latencyPorts: LatencyWatchdogPorts =
+                { Now = performanceNow
+                  Schedule = fun milliseconds callback ->
+                      let handle = latencyTimerPort.Delay(int milliseconds)
+
+                      (task {
+                          do! handle.Delay
+                          callback ()
+                      })
+                      |> ignore<Task<unit>>
+
+                      { new IDisposable with
+                          member _.Dispose() = handle.Cancel() }
+                  Abort = fun sessionId ->
+                      task {
+                          let! outcome = sessionPort.InterruptAttempt (SessionId.create sessionId)
+
+                          return
+                              match outcome with
+                              | Ok() -> true
+                              | Error _ -> false
+                      }
+                  Continue = fun sessionId prompt ->
+                      task {
+                          let! sent =
+                              HostSessionNudge.sendContinuationResult
+                                  sessionPort
+                                  host.RootWorkspace
+                                  (SessionId.create sessionId)
+                                  prompt
+                                  PromptAuthority.ContinuationKind.ProviderRetryAttempt
+                                  None
+                                  journal
+                                  PromptDispatcher.AwaitMode.Detached
+                                  None
+
+                          return
+                              match sent with
+                              | Ok _ -> ""
+                              | Error reason -> reason
+                      }
+                  Managed = fun sessionId ->
+                      HostSessionNudge.tryActiveProfile journal (SessionId.create sessionId)
+                      |> Option.isSome
+                  Text = fun sessionId ->
+                      ProviderProse.render
+                          (ProviderLanguageBinding.forSessionText sessionId)
+                          RuntimeNudge.LatencyDegeneration
+                          Map.empty
+                  Diagnostic = fun kind reason -> Diagnostic.emit kind [ "detail", reason ] }
+
+            let latencyWatchdog =
+                new LatencyWatchdog(
+                    latencyPorts,
+                    { new RequestLatencyDetector with
+                        member _.ThresholdMs sessionId =
+                            unbox<float> (requestLatencyDetector?ThresholdMs sessionId)
+
+                        member _.ObserveCompleted(sessionId, durationMs) =
+                            requestLatencyDetector?ObserveCompleted (sessionId, durationMs) |> ignore
+
+                        member _.ObserveCensored(sessionId, censoredMs) =
+                            requestLatencyDetector?ObserveCensored (sessionId, censoredMs) |> ignore
+
+                        member _.Forget sessionId =
+                            requestLatencyDetector?Forget sessionId |> ignore }
+                )
 
             // DSL-MUTABLE: resource — durable progress journal factory resolved once at activation
             let mutable progressJournalFactory: obj option = None
@@ -1547,7 +1627,45 @@ module PluginHooks =
                         PluginTransforms.negotiationForgetSession (SessionId.value sessionId)
                         outboundViewStore?clearSession (SessionId.value sessionId) |> ignore
                         activeCompactingSessions.Remove(SessionId.value sessionId) |> ignore
-                        AdvisorSeat.clear (SessionId.value sessionId))
+                        AdvisorSeat.clear (SessionId.value sessionId)
+                        latencyWatchdog.Cancel (SessionId.value sessionId)
+                        latencyWatchdog.ForgetDetector (SessionId.value sessionId))
+
+            /// The watchdog's boundaries use the exact provider-run identity:
+            /// the assistant message's own id, present on both the provider
+            /// start and the terminal event. The physical user message id
+            /// (assistant parentID) is shared by every provider step of the
+            /// same turn, so it cannot pair one terminal to one attempt; the
+            /// provider run can. Compaction runs are not measured. An idle
+            /// signal with a measurement still in hand means the completion
+            /// event is missing or the interrupt never settled.
+            let settleLatencyWatchdog raw =
+                match HostEventCodec.tryDecodeExactProviderStart raw with
+                | Some observation ->
+                    let sessionId = SessionId.value observation.SessionId
+
+                    if not (activeCompactingSessions.Contains sessionId) then
+                        latencyWatchdog.Begin(
+                            sessionId,
+                            Some(ProviderRunIdentity.value observation.ProviderRun)
+                        )
+                | None -> ()
+
+                match HostEventCodec.tryDecodeExactProviderTerminal raw with
+                | Some observation ->
+                    match observation.Outcome with
+                    | Wanxiangshu.Execution.Session.ChatExecution.HostProviderTerminalOutcome.Completed _ ->
+                        latencyWatchdog.Complete(
+                            SessionId.value observation.SessionId,
+                            Some(ProviderRunIdentity.value observation.ProviderRun)
+                        )
+                    | _ -> ()
+                | None -> ()
+
+                match HostEventCodec.tryDecode raw with
+                | Some(SessionIdle sessionId) ->
+                    latencyWatchdog.OnIdle(SessionId.value sessionId)
+                | _ -> ()
 
             let observeEvent raw =
                 task {
@@ -1555,6 +1673,7 @@ module PluginHooks =
                     recordProviderTokenUse raw
                     do! settleUserQuestion raw
                     do! settlePostS3Deliver raw
+                    settleLatencyWatchdog raw
                     do! wired.ObserveEvent raw
                 }
 
@@ -1564,6 +1683,8 @@ module PluginHooks =
                 let disposeAll () =
                     task {
                         AdvisorSeat.clearAll ()
+                        // Idempotent, never throws; cancels any armed timer.
+                        latencyWatchdog.Dispose()
                         do! product.Dispose()
                         do! scope.DisposeAsync()
                     }
