@@ -807,6 +807,31 @@ test('WHAT[context-compression-051] a cold OpenCode request with historical rese
 })
 
 
+test('WHAT[context-compression-053] the OpenCode request copy retires closed Scope thinking, keeps prose and leaves history intact', async () => {
+  const sid = 'ses_scope_053_thinking'
+  clearSessionState(sid)
+  const reasoning = text => ({ type: 'reasoning', text })
+  const prose = text => ({ type: 'text', text })
+  const operator = user('u-053', 'work the scope', 1)
+  const oldAssistant = assistant('a-old-053', reasoning('closed scratch'), prose('closed prose'), tool('read-053', 'read', 'old body'))
+  const resetAssistant = assistant('a-reset-053', tool('reset-053', 'resetScope', 'Scope reset'))
+  const liveAssistant = assistant('a-live-053', reasoning('live scratch'), prose('live prose'))
+  const raw = [operator, oldAssistant, resetAssistant, liveAssistant]
+  const copy = await outbound(sid, raw)
+  const sentOld = copy.find(message => message.info?.id === 'a-old-053')
+  assert.deepEqual(sentOld.parts.map(part => part.type), ['text'],
+    'the closed Scope thinking is retired while its prose stays')
+  assert.equal(sentOld.parts[0].text, 'closed prose')
+  assert.equal(copy.some(message => message.parts?.some(part => part.callID === 'read-053')), false,
+    'the ordinary old tool call is retired')
+  const sentLive = copy.find(message => message.info?.id === 'a-live-053')
+  assert.deepEqual(sentLive.parts.map(part => part.type), ['reasoning', 'text'],
+    'thinking inside the live Scope is untouched')
+  assert.deepEqual(oldAssistant.parts.map(part => part.type), ['reasoning', 'text', 'tool'],
+    'the raw Host message object keeps every original part')
+  clearSessionState(sid)
+})
+
 test('WHAT[advisor-pure-chat] an Advisor session is pure chat: no Pair Hint steer, estimate request or Scope protocol', async () => {
   const { Role } = await import('../../../dist/Foundation/Roles.js')
   const advisorSid = 'pure-chat-advisor', workerSid = 'pure-chat-control-engineer'
@@ -1175,6 +1200,7 @@ test('WHAT[context-compression-052] one actual OpenCode provider run charges onc
     assert.equal(tool.args.remainingScopeTurnsEstimate.safeParse(undefined).success,false)
     assert.equal(tool.args.remainingScopeTurnsEstimate.safeParse(-1).success,false)
     assert.equal(tool.args.remainingScopeTurnsEstimate.safeParse(0).success,true)
+    assert.equal(tool.args.remainingScopeTurnsEstimate.safeParse(2.5).success,true,'the estimate is a real number')
     const context=(callID,messageID)=>({sessionID:sid,agent:'devops',callID,messageID})
     const [left,right]=await Promise.all([
       tool.execute(estimateArgs('estimate-high',8),context('todo-high-052','physical-run-one-052')),
@@ -1191,7 +1217,11 @@ test('WHAT[context-compression-052] one actual OpenCode provider run charges onc
     assert.ok(typeof replay==='string')
     await hooks['chat.params']({sessionID:sid,model},{})
     assert.equal(scopeProgress.status(sid).estimate,4,'same run cannot double charge or invent advisor trigger')
-    const zero=await tool.execute(estimateArgs('scope-complete',0),context('todo-zero-052','physical-run-two-052'))
+    const fractional=await tool.execute(estimateArgs('estimate-fraction',3.5),context('todo-fraction-052','physical-run-two-052'))
+    assert.match(String(fractional),/# ok/,'a real Host call accepts a fractional estimate')
+    await hooks['chat.params']({sessionID:sid,model},{})
+    assert.equal(scopeProgress.status(sid).estimate,3.5,'the charged estimate keeps its fractional value')
+    const zero=await tool.execute(estimateArgs('scope-complete',0),context('todo-zero-052','physical-run-three-052'))
     assert.match(String(zero),/# ok/)
     await hooks['chat.params']({sessionID:sid,model},{})
     assert.equal(scopeProgress.status(sid).estimate,0)

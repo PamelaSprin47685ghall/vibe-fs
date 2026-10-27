@@ -1482,7 +1482,7 @@ module PluginTransforms =
         elif kind = "toolResult" || kind = "tool-result" || kind = "tool_result" then
             createObj [ "resultFor", scopeToolId part ]
         else
-            createObj []
+            createObj [ "type", box kind ]
 
     let private neutralScopeMessage (message: obj) =
         let kind = scopeRole message

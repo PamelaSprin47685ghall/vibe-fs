@@ -1,4 +1,4 @@
-提交且只提交四个必填参数：`name`、`program`、`intent` 为字符串，`remainingScopeTurnsEstimate` 为非负整数。每个程序在本会话内选一个非空白名字，`intent` 必须非空。源码定义 `class Js extends JsProgram` 并实现 `async run()`。估计放在工具顶层参数中，不是程序变量，不另加解释字段。
+提交且只提交四个必填参数：`name`、`program`、`intent` 为字符串，`remainingScopeTurnsEstimate` 为非负实数，可以带小数。每个程序在本会话内选一个非空白名字，`intent` 必须非空。源码定义 `class Js extends JsProgram` 并实现 `async run()`。估计放在工具顶层参数中，不是程序变量，不另加解释字段。
 
 工具在准入时按 `UTF8Bytes(intent) × 50ms` 一次性确定整次请求的期限。所有操作及本次唤醒的目标共用剩余时间。程序内使用 `call(command)` 和 `unpark(name, value?)`，不能新建或续期预算。
 

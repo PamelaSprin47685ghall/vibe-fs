@@ -1,4 +1,4 @@
-Submit exactly four required arguments: `name`, `program`, and `intent` are strings; `remainingScopeTurnsEstimate` is a nonnegative integer. Choose a non-blank name in this session. `intent` must be non-empty. Define `class Js extends JsProgram` with `async run()`. The estimate is a top-level tool argument, not a program variable. Do not add explanatory fields.
+Submit exactly four required arguments: `name`, `program`, and `intent` are strings; `remainingScopeTurnsEstimate` is a nonnegative number and may carry a fraction. Choose a non-blank name in this session. `intent` must be non-empty. Define `class Js extends JsProgram` with `async run()`. The estimate is a top-level tool argument, not a program variable. Do not add explanatory fields.
 
 At admission, `UTF8Bytes(intent) × 50ms` sets one deadline for the entire request. All operations and all targets resumed by this request share its remaining time. Use `call(command)` and `unpark(name, value?)`; program code cannot create or renew a budget.
 
