@@ -550,19 +550,31 @@ module PluginHooks =
                       | _ -> ()
                   Return = fun sessionId reason ->
                       let sid = SessionId.create sessionId
-                      match HostSessionNudge.tryActiveProfile journal sid with
-                      | Some owner when sessionPort.IsManagedChild sid ->
-                          let stop =
-                              Wanxiangshu.Foundation.TerminalSignal.TerminalStop.forAuthority
-                                  owner.AuthorityRootUserMessageId
-                                  ("degeneration continuation unavailable: " + reason)
+                      let text = "degeneration continuation unavailable: " + reason
+                      // The active profile can close while the interrupt is in
+                      // flight. The parent must still hear Failed: an
+                      // authority-less session stop addresses its live run.
+                      let stop =
+                          if sessionPort.IsManagedChild sid then
+                              match HostSessionNudge.tryActiveProfile journal sid with
+                              | Some owner ->
+                                  Some(
+                                      Wanxiangshu.Foundation.TerminalSignal.TerminalStop.forAuthority
+                                          owner.AuthorityRootUserMessageId
+                                          text
+                                  )
+                              | None -> Some(Wanxiangshu.Foundation.TerminalSignal.TerminalStop.session text)
+                          else
+                              None
+                      match stop with
+                      | Some stop ->
                           if not (eventPort.NotifyTerminal
                                       sid
                                       (Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Failed stop)) then
                               Diagnostic.emit
                                   "latency-degeneration-return-unobserved"
                                   [ "session_id", sessionId; "reason", reason ]
-                      | _ ->
+                      | None ->
                           Diagnostic.emit
                               "latency-degeneration-return-unowned"
                               [ "session_id", sessionId; "reason", reason ]
