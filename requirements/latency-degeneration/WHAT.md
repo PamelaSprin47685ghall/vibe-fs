@@ -4,8 +4,10 @@
 当一次请求的耗时超过该 session 的正常水平（由库侧 RequestLatencyDetector 的
 统计阈值决定）时，中断该请求一次，并发送一条保留既有产出的续行提示。
 
-**中断的是正在生成的 Provider attempt，而非关闭 Session**：受管会话须调用
-`ISessionHostPort.InterruptAttempt`，不得用 `AbortSession` 结束整个子会话后再向已结束会话投递。
+**中断不关闭 Session**：受管会话须调用 `ISessionHostPort.InterruptAttempt`，不得用
+`AbortSession`（它还会摘除并中止子代理）。但 OpenCode 没有单次 Provider attempt 的中断，
+`InterruptAttempt` 在宿主侧就是对该 session 的 abort：它停止整个 Session 循环（含正在执行的工具），
+子会话本身保留。所以中断一旦受理，续跑由看门狗负责到底（见 [011]、[012]）。
 中断真实获接纳后在同一个 Session 发起 continuation，保持已产生的思考与输出。该动作以 `PromptDispatcher.AwaitMode.Detached` fire-and-forget 提交，并注册 `ContinuationAcceptanceObserver`；调用端不等待 SDK promise 或物理接受，只有 Host 的 `PhysicalAccepted` 回调能宣布已续跑。已明确拒绝或抛错则向原受管子会话的 `TerminalOutcome.Failed` 返回，供父 Join 收到失败；单纯排队不是成功。原请求的中断回执也由独立 callback 处理，不串行阻塞事件 hook。不设置第二个任意的恢复超时。`requirements/latency-degeneration/tests/002.test.mjs` 通过真实 SQLite/AgentJournal 验证 Detached 返回与物理确认的因果区别。
 
 统计、阈值与样本语义（完整样本、右删失样本、遗忘）由 wanxiangli/degeneration
