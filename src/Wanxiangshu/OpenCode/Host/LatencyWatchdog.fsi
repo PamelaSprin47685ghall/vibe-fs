@@ -38,6 +38,10 @@ type LatencyWatchdog =
     /// untouched; a terminal whose identity is missing on either side drops
     /// the measurement without a sample.
     member Complete: sessionId: string * providerRun: string option -> unit
+    /// A tool-calls step boundary of the exact provider run. Same as Complete,
+    /// except that an interrupt already in flight keeps its recovery: the Host
+    /// abort stops the session loop and the continuation is still owed.
+    member CompleteStep: sessionId: string * providerRun: string option -> unit
     /// End a failed/cancelled exact provider attempt without treating it as a complete sample.
     member Discard: sessionId: string * providerRun: string option -> unit
     /// React to a physically cancelled exact Provider request, including an abort with no Host receipt.

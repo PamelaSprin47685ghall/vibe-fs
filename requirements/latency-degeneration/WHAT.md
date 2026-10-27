@@ -94,3 +94,22 @@ dispose 收尾。
 
 验收：`tests/010.test.mjs` 的可复现反例和 seeded fast-check
 验证两种回执顺序、未决 Promise、物理接纳幂等及新旧 Provider 的隔离。
+
+## [011] 中断在途时请求先行结束，已受理的中断仍须续跑
+
+`InterruptAttempt` 在宿主侧是 `AbortSession`：一旦受理，它停止整个 Session 循环，
+包括中断回执待定期间开始的工具执行与新的模型请求。因此看门狗已发出中断
+（Aborting）后，若同一 ProviderRun 先以工具边界（`finish=tool-calls`）、失败终态结束，
+或同一 session 已开始新的 ProviderRun，**不得**随测量一起撤销恢复所有权。
+该次中断被停放到回执到达：回执为受理则发送一次续行（或续行被拒时返回 Failed）；
+新 ProviderRun 在回执前被精确物理取消时立即续行；回执为拒绝或抛错则说明中断
+没有停止任何东西，静默结束恢复所有权。最终 `Completed`（stop/length/content-filter）
+已交付工作，不再补发续行。看门狗每次触发中断都记一条
+`latency-degeneration-interrupt` 诊断，带阈值，使打断原因可见。
+
+旧实现在上述窗口里只做 `Discard`/`Complete` 并撤销恢复，回执到达时找不到测量即
+静默返回：子会话被 Abort 后无人续跑，父 Join 视 `Aborted` 为观察而继续等待，形成死锁。
+
+回归：`tests/011.test.mjs` 的 seeded fast-check 随机交错工具边界、失败终态、新 run
+启动／取消／丢弃与 idle，断言受理的中断恰好续行或返回一次；旧实现的最小反例为
+`[["step-end"]]`。

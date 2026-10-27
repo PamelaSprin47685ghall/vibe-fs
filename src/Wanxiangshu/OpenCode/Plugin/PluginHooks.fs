@@ -1733,7 +1733,7 @@ module PluginHooks =
                             )
                     | None ->
                         // Tool-calls finishes this exact model request, not the Session.
-                        latencyWatchdog.Complete(
+                        latencyWatchdog.CompleteStep(
                             SessionId.value sessionId,
                             Some(ProviderRunIdentity.value providerRun)
                         )
