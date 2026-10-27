@@ -1615,7 +1615,7 @@ module PluginTransforms =
         let steer =
             createObj
                 [ "info", box info
-                  "parts", box [| createObj [ "type", box "text"; "text", box prose ] |]
+                  "parts", box [| createObj [ "type", box "text"; "text", box prose; "synthetic", box true ] |]
                   "steering", box true
                   "attribution", box "agent"
                   "strong", box strong ]

@@ -65,6 +65,9 @@ test('WHAT[context-compression-039] OpenCode prompts for a first chargeable esti
   assert.equal(copy.length,3)
   assert.equal(copy[2].attribution,'agent')
   assert.equal(copy[2].strong,true)
+  const realUsers = copy.filter(message => message.info.role === 'user'
+    && !message.parts.every(part => 'synthetic' in part && part.synthetic))
+  assert.deepEqual(realUsers, [original[0]], 'OpenCode automatic title must still see exactly the original user message')
   assert.match(copy[2].parts[0].text,/remainingScopeTurnsEstimate/)
   assert.equal(original[0].parts[0].text, 'read this file')
   assert.equal(toolText(original[1]), 'file body')

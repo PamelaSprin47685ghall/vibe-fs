@@ -182,5 +182,8 @@ omp 入口模块（`src/Wanxiangshu/Composition/Omp/` 下携带 `[<ExportDefault
 3. **宿主自动 compaction 策略保留**：万象术不得物理禁用宿主自动压缩。配置钩子必须保留 `auto=true, prune=false, autocontinue=true`，允许宿主自发触发安全压缩，且该压缩不推进 Scope epoch、不扣减计费估计、不更改在途委托事实；
 4. **准入与执行旁路**：功能性角色在 `chat.message` 中不受 managed lease 约束或强加 tools 屏蔽，允许其无阻碍直接执行。
 5. **参数隔离**：chat.params 以实际调用的 agent 为准，非 managed 请求不得结算 Scope 进度、触发 Advisor、覆盖模型快照或记录 managed 模型容量；宿主参数原样保留。
+6. **共享历史中的作者身份**：产品在请求副本追加的 Scope 提醒必须将每个文本 part 标记为宿主原生 `synthetic=true`，不伪装成真实用户消息。OpenCode 的后台 title 与普通请求变换可共享同一数组；变换后 title 的真实用户计数必须仍只包含原始用户消息，不能因产品提醒从一条变成两条而静默取消自动命名。
+
+2026-10-27 实测：上一轮仅 system/params 旁路不能修复 title。未标记的 Scope steer 使真实 DevOps 会话不发出 title 请求；补齐 synthetic 后，OpenCode 1.19.4 在开启插件的真实 DevOps 新会话中发出 `small=true agent=title`，并将持久标题更新为「自动标题生成诊断」。普通 DevOps 模型请求在诊断上限被停止，此证据仅证明后台自动标题完成，不冒充普通任务完成。
 
 源码依据：[OpenCode v1.19.4 request.ts](https://github.com/anomalyco/opencode/blob/v1.19.4/packages/opencode/src/session/llm/request.ts)、[compaction.ts](https://github.com/anomalyco/opencode/blob/v1.19.4/packages/opencode/src/session/compaction.ts)、[prompt.ts](https://github.com/anomalyco/opencode/blob/v1.19.4/packages/opencode/src/session/prompt.ts)。
