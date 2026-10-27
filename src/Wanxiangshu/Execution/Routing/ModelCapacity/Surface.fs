@@ -77,13 +77,13 @@ module internal ExecutionPermitBinding =
         else
             Error(rejection (unbox<string> value?rejection))
 
-type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
     [<Emit("{ tag: 0, fields: [BigInt($0)] }")>]
     let leaseIdFromNumber (value: float) : CapacityLeaseId = jsNative
 
     [<Emit("{ tag: 0, fields: [BigInt($0)] }")>]
     let fenceFromNumber (value: float) : CapacityFence = jsNative
 
+type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
     let permits = ExecutionPermitBinding.create ()
     let sessionLeases = ExecutionPermitBinding.createHandles ()
 
@@ -101,8 +101,8 @@ type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
 
     let createHandle (identity: ExecutionAdmissionExactIdentity) (capacityCredit: CapacityCreditId) (permit: obj) =
         Func<float, float, obj>(fun leaseId fence ->
-            let lid = leaseIdFromNumber leaseId
-            let f = fenceFromNumber fence
+            let lid = ExecutionPermitBinding.leaseIdFromNumber leaseId
+            let f = ExecutionPermitBinding.fenceFromNumber fence
             ExecutionAdmissionLease.Create(permit, capacityCredit, lid, f, identity) :> obj)
 
     member _.Issue(identity: ExecutionAdmissionExactIdentity, capacityCredit: CapacityCreditId) =

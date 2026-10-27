@@ -224,6 +224,20 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
                     (sessionId + ": terminal without request identity")
             | NoInFlightMeasurement -> ()
 
+    /// An observed failed or cancelled provider attempt has ended, but is not
+    /// a completed latency sample. Ignore a late terminal from an older run.
+    member _.Discard(sessionId: string, providerRun: string option) =
+        if not disposed && not (String.IsNullOrWhiteSpace sessionId) then
+            match providerRun with
+            | None -> ()
+            | Some observedRun ->
+                lock gate (fun () ->
+                    match measurements.TryGetValue sessionId with
+                    | true, recorded when recorded.ProviderRun = Some observedRun ->
+                        measurements.Remove(sessionId) |> ignore
+                        disposeQuietly recorded.Timer
+                    | _ -> ())
+
     /// Session deletion: drop the measurement, record nothing.
     member _.Cancel(sessionId: string) =
         if not (String.IsNullOrWhiteSpace sessionId) then

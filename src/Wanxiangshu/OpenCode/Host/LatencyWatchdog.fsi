@@ -36,6 +36,8 @@ type LatencyWatchdog =
     /// untouched; a terminal whose identity is missing on either side drops
     /// the measurement without a sample.
     member Complete: sessionId: string * providerRun: string option -> unit
+    /// End a failed/cancelled exact provider attempt without treating it as a complete sample.
+    member Discard: sessionId: string * providerRun: string option -> unit
     /// Session deletion: drop the measurement, record nothing.
     member Cancel: sessionId: string -> unit
     /// Idle drops an armed measurement; an interrupt in flight remains until

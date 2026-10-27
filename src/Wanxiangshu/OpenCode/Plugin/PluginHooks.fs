@@ -1661,15 +1661,29 @@ module PluginHooks =
                         )
                 | None -> ()
 
-                match HostEventCodec.tryDecodeExactProviderTerminal raw with
-                | Some observation ->
-                    match observation.Outcome with
-                    | Wanxiangshu.Execution.Session.ChatExecution.HostProviderTerminalOutcome.Completed _ ->
+                // The model also finishes a request when it hands tools to
+                // the Host. Its timer must never cover execution of resetScope.
+                match HostEventCodec.tryDecodeProviderStepEnd raw with
+                | Some(sessionId, _, providerRun) ->
+                    match HostEventCodec.tryDecodeExactProviderTerminal raw with
+                    | Some observation ->
+                        match observation.Outcome with
+                        | Wanxiangshu.Execution.Session.ChatExecution.HostProviderTerminalOutcome.Completed _ ->
+                            latencyWatchdog.Complete(
+                                SessionId.value sessionId,
+                                Some(ProviderRunIdentity.value providerRun)
+                            )
+                        | _ ->
+                            latencyWatchdog.Discard(
+                                SessionId.value sessionId,
+                                Some(ProviderRunIdentity.value providerRun)
+                            )
+                    | None ->
+                        // Tool-calls finishes this exact model request, not the Session.
                         latencyWatchdog.Complete(
-                            SessionId.value observation.SessionId,
-                            Some(ProviderRunIdentity.value observation.ProviderRun)
+                            SessionId.value sessionId,
+                            Some(ProviderRunIdentity.value providerRun)
                         )
-                    | _ -> ()
                 | None -> ()
 
                 match HostEventCodec.tryDecode raw with
