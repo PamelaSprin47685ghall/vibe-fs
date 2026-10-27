@@ -12,7 +12,7 @@ module Pty =
     let newId () =
         PtyId("pty-" + Guid.NewGuid().ToString("N").Substring(0, 8))
 
-    [<Import("parentAbortRegistry", "wanxiangli/session")>]
+    [<Import("parentAbortRegistry", "wanxiangli/ownership")>]
     let private parentAbortRegistry: obj = jsNative
 
     let registerParentAbort (parentId: string) (abort: unit -> unit) : int =

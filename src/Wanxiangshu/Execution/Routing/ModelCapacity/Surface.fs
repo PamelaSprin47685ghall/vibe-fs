@@ -77,13 +77,13 @@ module internal ExecutionPermitBinding =
         else
             Error(rejection (unbox<string> value?rejection))
 
-[<Emit("{ tag: 0, fields: [BigInt($0)] }")>]
-let private leaseIdFromNumber (value: float) : CapacityLeaseId = jsNative
-
-[<Emit("{ tag: 0, fields: [BigInt($0)] }")>]
-let private fenceFromNumber (value: float) : CapacityFence = jsNative
-
 type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
+    [<Emit("{ tag: 0, fields: [BigInt($0)] }")>]
+    let leaseIdFromNumber (value: float) : CapacityLeaseId = jsNative
+
+    [<Emit("{ tag: 0, fields: [BigInt($0)] }")>]
+    let fenceFromNumber (value: float) : CapacityFence = jsNative
+
     let permits = ExecutionPermitBinding.create ()
     let sessionLeases = ExecutionPermitBinding.createHandles ()
 

@@ -10,8 +10,12 @@ type private ILiveHostConfigStore =
     abstract read: path: string array -> obj
     abstract apply: settings: obj array -> obj
 
-[<Import("LiveHostConfigStore", "wanxiangli/capability")>]
-let private createStore (initialConfig: obj) : ILiveHostConfigStore = jsNative
+module private LiveHostConfigInterop =
+    [<Import("LiveHostConfigStore", "wanxiangli/capability")>]
+    let storeClass: obj = jsNative
+
+    [<Emit("new $0($1)")>]
+    let createStore (cls: obj) (initialConfig: obj) : ILiveHostConfigStore = jsNative
 
 /// The live host config, shared between the adapter (which owns the host object)
 /// and the product (which reads and writes settings through `IHostConfigPort`).
@@ -22,7 +26,7 @@ let private createStore (initialConfig: obj) : ILiveHostConfigStore = jsNative
 /// the live object, never a stale snapshot.
 type LiveHostConfig(config: obj) =
 
-    let store = createStore config
+    let store = LiveHostConfigInterop.createStore LiveHostConfigInterop.storeClass config
 
     let safeString (rawVal: obj) : string =
         if isNull rawVal then "" else string rawVal

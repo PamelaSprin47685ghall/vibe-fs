@@ -48,7 +48,7 @@ module RuntimePath =
             resolvePath path
 
     let private outsideGit (path: string) =
-        let segments = path.Split([| '/'; '\' |], StringSplitOptions.RemoveEmptyEntries)
+        let segments = path.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
 
         if
             segments
@@ -150,8 +150,7 @@ module RuntimePath =
             let ignore = joinPath target ".gitignore"
 
             try
-                writeFile ignore "*
-" (createObj [ "flag" ==> "wx"; "encoding" ==> "utf8" ])
+                writeFile ignore "*\n" (createObj [ "flag" ==> "wx"; "encoding" ==> "utf8" ])
             with error when alreadyExists error ->
                 let entry = lstat ignore (createObj [ "throwIfNoEntry" ==> false ])
 

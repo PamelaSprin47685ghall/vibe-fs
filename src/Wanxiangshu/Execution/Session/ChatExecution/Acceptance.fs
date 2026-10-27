@@ -126,9 +126,7 @@ type internal ManagedChatExecutionFlight() =
 
         let preceding : Task =
             let existing: obj = inner?get(rid, sid, msgId)
-            match existing with
-            | :? Task as t -> t
-            | _ -> AsyncSupport.completedTask ()
+            if isNull existing then AsyncSupport.completedTask () else unbox<Task> existing
 
         // DSL-MUTABLE: single-flight
         let mutable marker: Task = null
