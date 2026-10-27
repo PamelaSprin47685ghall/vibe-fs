@@ -569,7 +569,9 @@ module PluginHooks =
                           (ProviderLanguageBinding.forSessionText sessionId)
                           RuntimeNudge.LatencyDegeneration
                           Map.empty
-                  Diagnostic = fun kind reason -> Diagnostic.emit kind [ "detail", reason ] }
+                  // CTX-014 only admits whitelisted fields; a non-whitelisted
+                  // name makes Diagnostic.emit drop the whole record.
+                  Diagnostic = fun kind reason -> Diagnostic.emit kind [ "reason", reason ] }
 
             let latencyWatchdog =
                 new LatencyWatchdog(
