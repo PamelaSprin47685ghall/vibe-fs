@@ -15,8 +15,10 @@
    除已修复的 FCS 引用检查外，失败标题和 5 个挂起均在 upstream 复现。
    完整套件没有全绿；原格式、静态、业务、打包和测试工具问题详见 RESULTS.txt。
    用户已明确只修本次引入的问题，不扩大到既有业务失败。
-5. [进行中] 库正式提交 d8c1dfe 已推送，upstream PR #5 已创建。
-   主仓正在提交关联 PR；原仓未改动，没有部署。
+5. [完成] 两仓正式分支已推送，并创建关联 PR；先合库，再合主仓。
+   库：https://github.com/PamelaSprin47685ghall/wanxiangli/pull/5
+   主仓：https://github.com/PamelaSprin47685ghall/vibe-fs/pull/66
+   本工作树的测试服务已停止。原仓未改动，没有合并或部署。
    原始库实验保留在本地 codex/checker-resident-evidence-20261027。
 
 首次启动仍初始化；每次检查前和完成后清项目缓存。
