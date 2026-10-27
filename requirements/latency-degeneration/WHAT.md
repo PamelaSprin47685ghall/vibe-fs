@@ -113,3 +113,13 @@ dispose 收尾。
 回归：`tests/011.test.mjs` 的 seeded fast-check 随机交错工具边界、失败终态、新 run
 启动／取消／丢弃与 idle，断言受理的中断恰好续行或返回一次；旧实现的最小反例为
 `[["step-end"]]`。
+
+## [012] 看门狗自己的 Abort 不是 Advisor / SyncDelegate 的答案
+
+Advisor 咨询与 SyncDelegate 调用一见 `Aborted` 就立即失败（DidNotAnswer / "run aborted"）。
+看门狗的中断就是一次宿主 Abort，随后由看门狗续跑或返回 `Failed`；把它当成答案，
+等于还没续就把咨询判死，用户只看到「advisor 被打断」而不知原因。宿主在发出中断
+**之前**为该 session 记一次（`DegenerationInterrupts.record`，宿主拒绝则撤回），
+上述消费者各持一个游标，每次中断只豁免一条 `Aborted`；续跑失败时看门狗返回的
+`Failed` 带 `degeneration continuation unavailable: …` 原因，照常让咨询失败。
+Fork 的 Join 本来就把 `Aborted` 当观察，不受影响。

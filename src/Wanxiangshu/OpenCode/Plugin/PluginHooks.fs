@@ -479,12 +479,18 @@ module PluginHooks =
                           member _.Dispose() = handle.Cancel() }
                   Abort = fun sessionId ->
                       task {
-                          let! outcome = sessionPort.InterruptAttempt (SessionId.create sessionId)
+                          let sid = SessionId.create sessionId
+                          // Recorded before the Host acts: its Aborted terminal
+                          // can arrive before this promise resolves.
+                          Wanxiangshu.Foundation.TerminalSignal.DegenerationInterrupts.record sid
+                          let! outcome = sessionPort.InterruptAttempt sid
 
                           return
                               match outcome with
                               | Ok() -> true
-                              | Error _ -> false
+                              | Error _ ->
+                                  Wanxiangshu.Foundation.TerminalSignal.DegenerationInterrupts.unrecord sid
+                                  false
                       }
                   Continue = fun sessionId prompt accepted onLateRefused ->
                       task {
@@ -1689,7 +1695,8 @@ module PluginHooks =
                         activeCompactingSessions.Remove(SessionId.value sessionId) |> ignore
                         AdvisorSeat.clear (SessionId.value sessionId)
                         latencyWatchdog.Cancel (SessionId.value sessionId)
-                        latencyWatchdog.ForgetDetector (SessionId.value sessionId))
+                        latencyWatchdog.ForgetDetector (SessionId.value sessionId)
+                        Wanxiangshu.Foundation.TerminalSignal.DegenerationInterrupts.forget sessionId)
 
             /// The watchdog's boundaries use the exact provider-run identity:
             /// the assistant message's own id, present on both the provider
