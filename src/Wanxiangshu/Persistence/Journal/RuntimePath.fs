@@ -48,7 +48,7 @@ module RuntimePath =
             resolvePath path
 
     let private outsideGit (path: string) =
-        let segments = path.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
+        let segments = path.Split([| '/'; '\' |], StringSplitOptions.RemoveEmptyEntries)
 
         if
             segments
@@ -58,13 +58,11 @@ module RuntimePath =
 
         path
 
-    // DSL-MUTABLE: resource — 主工作树位置缓存，不保存任何业务事实。
-    let private roots = Collections.Generic.Dictionary<string, Task<string>>()
+    type private IRuntimePathStore =
+        abstract getOrCompute: workspace: string * compute: (string -> obj) -> obj
 
-    let private evictFailedRoot key (task: Task<string>) =
-        match roots.TryGetValue key with
-        | true, cached when obj.ReferenceEquals(cached, task) -> roots.Remove key |> ignore
-        | _ -> ()
+    [<Import("runtimePathStore", "wanxiangli/git-porcelain")>]
+    let private runtimePathStore: IRuntimePathStore = jsNative
 
     let private parsePrimaryWorktree (listingZ: string) =
         match GitPorcelain.primaryWorktree listingZ with
@@ -127,21 +125,9 @@ module RuntimePath =
             let key = workspace |> resolvePath |> outsideGit
 
             let primaryTask =
-                match roots.TryGetValue key with
-                | true, taskValue -> taskValue
-                | _ ->
-                    let taskValue = primaryWorktree key
-                    roots.[key] <- taskValue
-                    taskValue
+                unbox<Task<string>> (runtimePathStore.getOrCompute (key, fun (k: string) -> box (primaryWorktree k)))
 
-            let! primary =
-                task {
-                    try
-                        return! primaryTask
-                    with ex ->
-                        evictFailedRoot key primaryTask
-                        return raise ex
-                }
+            let! primary = primaryTask
 
             let target = joinPath primary ".Herdchestra"
             let existing = lstat target (createObj [ "throwIfNoEntry" ==> false ])
@@ -164,7 +150,8 @@ module RuntimePath =
             let ignore = joinPath target ".gitignore"
 
             try
-                writeFile ignore "*\n" (createObj [ "flag" ==> "wx"; "encoding" ==> "utf8" ])
+                writeFile ignore "*
+" (createObj [ "flag" ==> "wx"; "encoding" ==> "utf8" ])
             with error when alreadyExists error ->
                 let entry = lstat ignore (createObj [ "throwIfNoEntry" ==> false ])
 

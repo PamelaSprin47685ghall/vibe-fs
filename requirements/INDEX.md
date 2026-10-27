@@ -89,7 +89,7 @@
 | Package | 一句话 WHY |
 |---|---|
 | `obligation-ledger` | 待办消极边界：宿主原生 `todowrite` 退役，待办推进归各角色编程面 `todowrite-for-<role>`；原视图声明与 compression checkpoint 退役，插件不维护第二份待办真相。 |
-| `work` | Work 与 Plan 生命周期只有一套事件：S1–S3 晋级接力与 S4 交付；接力不主动清除上下文，由 `resetScope` 协议管理；Engineer 与 DevOps 免除 nudge 且自然停机完成，Manager 与 Plan 保持长程连续性与生命周期 deliver。Plan 编程面、devops 调查、任期隔离、review 与交付同属本包。 |
+| `work` | Work 与 Plan 生命周期只有一套事件：S1–S3 晋级接力与 S4 交付；接力不主动清除上下文，由 `resetScope` 协议管理；Engineer 与 DevOps 以有正文的真实自然终态交回工作，所有角色的无正文无工具终止须 nudge；Manager 与 Plan 只通过 review 处理生命周期。Plan 编程面、devops 调查、任期隔离、review 与交付同属本包。 |
 
 
 

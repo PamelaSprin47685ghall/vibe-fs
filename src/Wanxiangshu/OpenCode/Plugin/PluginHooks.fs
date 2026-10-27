@@ -486,6 +486,16 @@ module PluginHooks =
                       }
                   Continue = fun sessionId prompt ->
                       task {
+                          let registrations = ResizeArray<IDisposable>()
+                          use observing =
+                              { new IDisposable with
+                                  member _.Dispose() =
+                                      for registration in registrations do
+                                          registration.Dispose() }
+                          let acceptance: Wanxiangshu.Foundation.HostSession.ContinuationAcceptanceObserver =
+                              { Notify = fun _ -> ()
+                                AttachDisposable = registrations.Add
+                                Budget = Some 30000 }
                           let! sent =
                               HostSessionNudge.sendContinuationResult
                                   sessionPort
@@ -495,8 +505,8 @@ module PluginHooks =
                                   PromptAuthority.ContinuationKind.ProviderRetryAttempt
                                   None
                                   journal
-                                  PromptDispatcher.AwaitMode.Detached
-                                  None
+                                  PromptDispatcher.AwaitMode.Await
+                                  (Some acceptance)
 
                           return
                               match sent with

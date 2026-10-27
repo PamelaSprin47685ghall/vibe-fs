@@ -6,7 +6,7 @@
 
 **中断的是正在生成的 Provider attempt，而非关闭 Session**：受管会话须调用
 `ISessionHostPort.InterruptAttempt`，不得用 `AbortSession` 结束整个子会话后再向已结束会话投递。
-中断真实获接纳后在同一个 Session 发送 continuation，使模型接着已保留的思考与输出继续；拒绝中断不谎报成功。
+中断真实获接纳后在同一个 Session 发送 continuation，使模型接着已保留的思考与输出继续；拒绝中断不谎报成功。该 continuation 由既有 `HostSessionNudge.sendContinuationResult` 经 `PromptDispatcher.AwaitMode.Await` 和真实 `ContinuationAcceptanceObserver` 发送，等待 Host `PhysicalAccepted` 后才报告续行成功（接受观察预算 30 秒）；单纯 SDK 排队回执不能冒充续行。`requirements/latency-degeneration/tests/002.test.mjs` 验证生产 managed child 中断后 Session 仍活跃、port 实际接线以及 SQLite/AgentJournal 上排队和物理接纳的区别。
 
 统计、阈值与样本语义（完整样本、右删失样本、遗忘）由 wanxiangli/degeneration
 的 RequestLatencyDetector 拥有；本域只承诺宿主侧状态机与接线行为。
