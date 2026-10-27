@@ -32,6 +32,12 @@ type private LatencyMeasurement =
       Armed: bool
       Idle: bool
       Aborting: bool
+      /// Parked after a final Completed terminal: the work was delivered, and
+      /// only a newer Provider start proves the session loop went on.
+      EndedFinal: bool
+      /// The request already counted as a complete sample; a later
+      /// continuation must not add a censored one for it.
+      SampledComplete: bool
       ProviderRun: string option
       Timer: IDisposable option }
 
@@ -39,6 +45,8 @@ type private LatencyMeasurement =
 type private TerminalVerdict =
     | NoInFlightMeasurement
     | Sampled of LatencyMeasurement
+    /// Complete sample whose interrupt receipt is still pending (parked).
+    | SampledParked of LatencyMeasurement
     | ForeignProviderRun
     | DroppedUnattributable
 
@@ -144,10 +152,11 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
                 failRecovery sessionId turn ("continuation: " + reason)
 
             try
-                detector.ObserveCensored(
-                    sessionId,
-                    max (ports.Now() - recorded.StartedAt) recorded.ThresholdMs
-                )
+                if not recorded.SampledComplete then
+                    detector.ObserveCensored(
+                        sessionId,
+                        max (ports.Now() - recorded.StartedAt) recorded.ThresholdMs
+                    )
 
                 observe
                     (ports.Continue sessionId (ports.Text sessionId) onAccepted onContinueFailure)
@@ -193,7 +202,8 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
                         // still stopped the session loop: continue it. A
                         // refused or failed one stopped nothing.
                         match takeParked sessionId thisGeneration with
-                        | Some parked when accepted -> continueInterrupted sessionId thisGeneration parked
+                        | Some parked when accepted && not parked.EndedFinal ->
+                            continueInterrupted sessionId thisGeneration parked
                         | Some _ ->
                             if finishRecovery sessionId thisGeneration then
                                 diagnostic
@@ -279,6 +289,8 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
               Armed = true
               Idle = false
               Aborting = false
+              EndedFinal = false
+              SampledComplete = false
               ProviderRun = Some providerRun
               Timer = Some timer }
 
@@ -295,6 +307,11 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
             | Some run ->
                 lock gate (fun () ->
                     if not disposed then
+                        match interruptedInFlight.TryGetValue sessionId with
+                        | true, parked when parked.EndedFinal && parked.ProviderRun <> Some run ->
+                            interruptedInFlight[sessionId] <- { parked with EndedFinal = false }
+                        | _ -> ()
+
                         match measurements.TryGetValue sessionId with
                         | true, recorded when recorded.ProviderRun = Some run -> ()
                         | true, recorded when recorded.Aborting ->
@@ -338,12 +355,17 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
                     | false, _ -> NoInFlightMeasurement
                     | true, recorded ->
                         match recorded.ProviderRun, providerRun with
-                        | Some recordedRun, Some completingRun when
-                            recordedRun = completingRun && stepBoundary && recorded.Aborting
-                            ->
+                        | Some recordedRun, Some completingRun when recordedRun = completingRun && recorded.Aborting ->
+                            // The interrupt is in flight: whether it stopped
+                            // anything is decided by its receipt. A final
+                            // terminal is a real complete sample.
                             measurements.Remove(sessionId) |> ignore
-                            parkInterrupted sessionId recorded
-                            NoInFlightMeasurement
+                            parkInterrupted
+                                sessionId
+                                { recorded with
+                                    EndedFinal = not stepBoundary
+                                    SampledComplete = not stepBoundary }
+                            if stepBoundary then NoInFlightMeasurement else SampledParked recorded
                         | Some recordedRun, Some completingRun when recordedRun = completingRun ->
                             measurements.Remove(sessionId) |> ignore
                             disposeQuietly recorded.Timer
@@ -360,6 +382,7 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
                     try ports.DropObserver sessionId
                     with error -> diagnostic "latency-degeneration-dispose-observer-failed" error.Message
                 detector.ObserveCompleted(sessionId, ports.Now() - recorded.StartedAt)
+            | SampledParked recorded -> detector.ObserveCompleted(sessionId, ports.Now() - recorded.StartedAt)
             | ForeignProviderRun -> ()
             | DroppedUnattributable ->
                 diagnostic

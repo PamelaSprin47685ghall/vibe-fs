@@ -29,7 +29,7 @@ function rig() {
   return {watchdog, events, fire: () => {now = 12; timers[0].fire()}, conclude: v => finishAbort(v)}
 }
 
-const window = fc.array(fc.constantFrom('step-end', 'failure', 'next-start', 'next-cancelled', 'next-discarded', 'idle'),
+const window = fc.array(fc.constantFrom('step-end', 'final', 'failure', 'next-start', 'next-cancelled', 'next-discarded', 'idle'),
   {minLength: 1, maxLength: 5})
 
 test('WHAT[latency-degeneration-011] fast-check: an accepted interrupt resumes exactly once whatever ended the request first', async () => {
@@ -41,6 +41,7 @@ test('WHAT[latency-degeneration-011] fast-check: an accepted interrupt resumes e
       assert.ok(r.events.includes('latency-degeneration-interrupt'), 'the interrupt reason is visible')
       for (const step of steps) {
         if (step === 'step-end') r.watchdog.CompleteStep('engineer', 'run-1')
+        else if (step === 'final') r.watchdog.Complete('engineer', 'run-1')
         else if (step === 'failure') r.watchdog.Discard('engineer', 'run-1')
         else if (step === 'next-start') r.watchdog.Begin('engineer', 'run-2')
         else if (step === 'next-cancelled') r.watchdog.OnProviderCancelled('engineer', 'run-2')
@@ -49,11 +50,17 @@ test('WHAT[latency-degeneration-011] fast-check: an accepted interrupt resumes e
       }
       r.conclude(true)
       await flush()
+      // A final Completed with no later step means the work was delivered.
+      const firstEnd = steps.find(s => s !== 'idle' && s !== 'next-discarded' && s !== 'next-cancelled')
+      const delivered = firstEnd === 'final' && !steps.slice(steps.indexOf('final')).includes('next-start')
       const continued = r.events.filter(e => e === 'continue').length
       const returned = r.events.filter(e => e.startsWith('returned:')).length
-      assert.equal(continued + returned, 1, JSON.stringify({steps, events: r.events}))
-      assert.ok(r.events.filter(e => e === 'censored').length <= 1)
-      assert.equal(r.events.includes('completed'), false, 'an interrupted request is never a complete sample')
+      assert.equal(continued + returned, delivered ? 0 : 1, JSON.stringify({steps, events: r.events}))
+      // One request, one sample: complete when it delivered first, else censored.
+      const samples = r.events.filter(e => e === 'completed' || e === 'censored')
+      assert.ok(samples.length <= 1, JSON.stringify({steps, events: r.events}))
+      if (firstEnd === 'final') assert.deepEqual(samples, ['completed'])
+      else assert.equal(samples.includes('completed'), false)
     } finally {r.watchdog.Dispose()}
   }), {seed: 0xDE6E011, numRuns: 300})
 })
@@ -92,5 +99,17 @@ test('WHAT[latency-degeneration-011] a final Completed terminal before the recei
   r.conclude(true)
   await flush()
   assert.equal(r.events.includes('continue'), false)
+  r.watchdog.Dispose()
+})
+
+test('WHAT[latency-degeneration-011] a final Completed followed by a newer step before an accepted receipt: the loop was stopped, continue', async () => {
+  const r = rig()
+  r.watchdog.Begin('engineer', 'run-1')
+  r.fire()
+  r.watchdog.Complete('engineer', 'run-1')
+  r.watchdog.Begin('engineer', 'run-2')
+  r.conclude(true)
+  await flush()
+  assert.equal(r.events.filter(e => e === 'continue').length, 1)
   r.watchdog.Dispose()
 })
