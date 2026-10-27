@@ -11,7 +11,8 @@
 中断真实获接纳后在同一个 Session 发起 continuation，保持已产生的思考与输出。该动作以 `PromptDispatcher.AwaitMode.Detached` fire-and-forget 提交，并注册 `ContinuationAcceptanceObserver`；调用端不等待 SDK promise 或物理接受，只有 Host 的 `PhysicalAccepted` 回调能宣布已续跑。已明确拒绝或抛错则向原受管子会话的 `TerminalOutcome.Failed` 返回，供父 Join 收到失败；单纯排队不是成功。原请求的中断回执也由独立 callback 处理，不串行阻塞事件 hook。不设置第二个任意的恢复超时。`requirements/latency-degeneration/tests/002.test.mjs` 通过真实 SQLite/AgentJournal 验证 Detached 返回与物理确认的因果区别。
 
 统计、阈值与样本语义（完整样本、右删失样本、遗忘）由 wanxiangli/degeneration
-的 RequestLatencyDetector 拥有；本域只承诺宿主侧状态机与接线行为。
+的 RequestLatencyDetector 拥有；本域只承诺宿主侧状态机与接线行为。阈值是 p99、**无先验**，
+前 100 条观测是新手保护期（阈值 +∞，不打断），见 [014]。
 
 ## [001] 按 session 统计完整样本，完成按请求身份精确归属
 
@@ -62,6 +63,8 @@ session 的一次中断。重复的请求开始不重置起算点，也不重复
 dispose 收尾。
 
 ## [008] 工具边界终结模型请求计时
+
+**更正（见 [013]）**：OpenCode 1.18.29 在同一个 Provider step 内执行工具，`finish=tool-calls` 与 `time.completed` 要等该步全部工具返回后才写入。所以本条单靠这个事件拦不住长工具，真正的工具边界是 `tool.execute.before`。以下原文保留：
 
 模型返回 `finish=tool-calls` 并带真实 `time.completed` 时，该 **Provider 请求已结束**，虽然整个 Session 仍将在工具执行后继续。按 `SessionId + Assistant ProviderRunId` 精确完成本轮耗时计量，立即撤销定时器；不得把 `resetScope`、其它工具的执行、下一次模型请求累加成旧 Provider 请求的延迟并错误中断 Engineer。确认失败或用户取消亦按同一 ProviderRunId 精确撤销，但不记成功样本；迟到的旧终态不得撤销新回合。
 
@@ -126,3 +129,25 @@ Advisor 咨询与 SyncDelegate 调用一见 `Aborted` 就立即失败（DidNotAn
 上述消费者各持一个游标，每次中断只豁免一条 `Aborted`；续跑失败时看门狗返回的
 `Failed` 带 `degeneration continuation unavailable: …` 原因，照常让咨询失败。
 Fork 的 Join 本来就把 `Aborted` 当观察，不受影响。
+
+## [013] 工具开始执行即结束模型请求计时（真机）
+
+真机事件序（OpenCode 1.18.29，`/event` 实录）：assistant `message.updated`（开始）→ 工具 part
+`pending → running → completed` → **之后**才有同一 assistant 的 `finish=tool-calls` + `time.completed`。
+工具在 Provider step 内执行，[008] 依赖的终态事件要等工具全部返回才到。旧实现因此把 `join`、bash、
+咨询（advisor / askPreviousScope）、`negotiate` 等长工具的执行时间都算成模型延迟；阈值随快速步骤收紧
+（无地板，几秒级）后，长工具几乎必被看门狗 Abort——这就是「经常被打断」「advisor 都被打断」的来源。
+
+宿主 `tool.execute.before` 一到，就把该 session 的在途测量按工具边界结束（`LatencyWatchdog.ToolStarted`，
+样本是模型自己的耗时）。中断已在途时仍按 [011] 停放、由回执决定续跑。同一步的并行工具、无测量时的
+工具开始均为空操作；下一次模型请求由新的 assistant 开始重新计量。
+
+验收：`tests/013.test.mjs`（状态机 + 生产接线）。真机对照：`tests/support/run-real-host-degeneration.mjs`
+（`REPRO_MODE=slowtool`，配合 `tests/support/slow-tool-plugin.mjs` 让 `negotiate` 在 step 内阻塞）——
+撤掉 `ToolStarted` 时 15s 的工具在 3.3s 被 Abort（`aborted=true`），接上后完整执行（`aborted=false`）。
+
+## [014] 新手保护期不武装定时器
+
+库侧阈值无先验，p99 至少要 100 条观测：之前 `ThresholdMs` 为 +∞。宿主照常测量与记样本（样本本身
+结束保护期），但 +∞ 阈值不调度任何定时器、不中断；这类从未武装的测量在 idle 时也不返回失败。
+验收：`tests/013.test.mjs` 的 `latency-degeneration-014`。

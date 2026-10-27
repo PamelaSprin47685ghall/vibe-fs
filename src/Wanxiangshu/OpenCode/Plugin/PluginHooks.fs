@@ -1337,6 +1337,9 @@ module PluginHooks =
                 task {
                     let sessionId = toolField toolInput "sessionID"
                     let toolName = toolField toolInput "tool"
+                    // latency-degeneration [013]: the model request ended when
+                    // it handed this tool over; tool execution is not latency.
+                    latencyWatchdog.ToolStarted sessionId
 
                     if PluginTransforms.negotiationIsTemporary sessionId then
                         PluginTransforms.negotiationRecordToolViolation sessionId

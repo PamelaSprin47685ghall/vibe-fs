@@ -42,6 +42,11 @@ type LatencyWatchdog =
     /// except that an interrupt already in flight keeps its recovery: the Host
     /// abort stops the session loop and the continuation is still owed.
     member CompleteStep: sessionId: string * providerRun: string option -> unit
+    /// The Host starts executing a tool of this session: the model request of
+    /// the current step has ended (OpenCode only completes the assistant
+    /// message after its tools return). Ends the in-flight measurement as a
+    /// step boundary; tool execution time is never measured or interrupted.
+    member ToolStarted: sessionId: string -> unit
     /// End a failed/cancelled exact provider attempt without treating it as a complete sample.
     member Discard: sessionId: string * providerRun: string option -> unit
     /// React to a physically cancelled exact Provider request, including an abort with no Host receipt.

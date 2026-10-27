@@ -280,19 +280,28 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
         generation <- generation + 1
         let thisGeneration = generation
         let startedAt = ports.Now()
-        let timer = ports.Schedule threshold (fun () -> fire sessionId thisGeneration threshold)
+        // Novice protection: until the detector has enough observations its
+        // threshold is +Infinity. The request is still measured (its sample
+        // is what ends the protection) but no timer is armed at all.
+        let armed = not (Double.IsPositiveInfinity threshold) && not (Double.IsNaN threshold)
+
+        let timer =
+            if armed then
+                Some(ports.Schedule threshold (fun () -> fire sessionId thisGeneration threshold))
+            else
+                None
 
         measurements[sessionId] <-
             { Generation = thisGeneration
               StartedAt = startedAt
               ThresholdMs = threshold
-              Armed = true
+              Armed = armed
               Idle = false
               Aborting = false
               EndedFinal = false
               SampledComplete = false
               ProviderRun = Some providerRun
-              Timer = Some timer }
+              Timer = timer }
 
     /// A provider attempt starts. Unmanaged sessions and duplicate starts are
     /// ignored; an existing measurement keeps its start. A start without the
@@ -346,6 +355,25 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
     /// stop that loop, so the recovery is parked instead of finished.
     member this.CompleteStep(sessionId: string, providerRun: string option) =
         this.Settle(sessionId, providerRun, true)
+
+    /// The Host is about to execute a tool of this session. OpenCode runs
+    /// tools inside the provider step: the assistant message only gets its
+    /// finish=tool-calls / time.completed after every tool of the step has
+    /// returned. The model request itself ended when it handed the tool over,
+    /// so the in-flight measurement ends here as a step boundary, whatever
+    /// its provider run. A long tool (join, bash, a consultation) is never
+    /// timed as model latency and never interrupted by this watchdog.
+    member this.ToolStarted(sessionId: string) =
+        if not disposed && not (String.IsNullOrWhiteSpace sessionId) then
+            let run =
+                lock gate (fun () ->
+                    match measurements.TryGetValue sessionId with
+                    | true, recorded -> recorded.ProviderRun
+                    | _ -> None)
+
+            match run with
+            | Some _ -> this.Settle(sessionId, run, true)
+            | None -> ()
 
     member private _.Settle(sessionId: string, providerRun: string option, stepBoundary: bool) =
         if not disposed && not (String.IsNullOrWhiteSpace sessionId) then
@@ -471,7 +499,15 @@ type LatencyWatchdog(ports: LatencyWatchdogPorts, detector: RequestLatencyDetect
                     | true, recorded when not recorded.Aborting ->
                         measurements.Remove(sessionId) |> ignore
                         disposeQuietly recorded.Timer
-                        true, (if not recorded.Armed then Some recorded.Generation else None)
+                        // Not armed and finite threshold: the timer fired and its
+                        // interrupt was refused. A never-armed (novice) measurement
+                        // has no recovery to fail.
+                        let refused =
+                            not recorded.Armed
+                            && not (Double.IsPositiveInfinity recorded.ThresholdMs)
+                            && not (Double.IsNaN recorded.ThresholdMs)
+
+                        true, (if refused then Some recorded.Generation else None)
                     | true, recorded ->
                         measurements[sessionId] <- { recorded with Idle = true }
                         false, None
