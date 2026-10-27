@@ -579,7 +579,9 @@ test('WHAT[context-compression-047] registered OpenCode reset archives physical 
         parts: [{ type: 'text', text: 'Do not use the replacement parser. Exact counterexample 37.' }] },
     ]
     const originalBytes = JSON.stringify(prefix)
-    const system = { system: ['Prior real provider system: preserve counterexample 37 verbatim'] }
+    const config = { agent: {} }
+    await hooks.config(config)
+    const system = { system: [config.agent.engineer.prompt + '\nPrior real provider system: preserve counterexample 37 verbatim'] }
     await hooks['experimental.chat.system.transform']({ sessionID: sid }, system)
     await hooks['chat.params']({ sessionID: sid, model: { providerID: 'fixture', modelID: 'old-model' } }, {})
     const outbound = { messages: structuredClone(prefix) }
@@ -719,7 +721,9 @@ test('WHAT[context-compression-050] real OpenCode first reset has no previous-sc
     clearSessionState(sid)
     await acceptAuthorityRoot(runtime,sid,'engineer')
     async function physicallyObserve(run) {
-      const first={system:['Observed real provider system for '+run]}
+      const config = { agent: {} }
+      await hooks.config(config)
+      const first={system:[config.agent.engineer.prompt + '\nObserved real provider system for '+run]}
       await hooks['experimental.chat.system.transform']({sessionID:sid},first)
       await hooks['chat.params']({sessionID:sid,model:{providerID:'fixture',modelID:'old-model'}},{})
       await normalTransform(safeCaps(),sid,{},{messages:[
@@ -890,7 +894,9 @@ test('WHAT[context-compression-043] OpenCode resetScope commits durable archive 
     await acceptAuthorityRoot(runtime, sid, 'engineer')
 
     // 1. Establish full outbound observation triad via actual host hooks
-    const system = { system: ['System instruction for scope verification 043'] }
+    const config = { agent: {} }
+    await hooks.config(config)
+    const system = { system: [config.agent.engineer.prompt + '\nSystem instruction for scope verification 043'] }
     await hooks['experimental.chat.system.transform']({ sessionID: sid }, system)
     await hooks['chat.params']({ sessionID: sid, model: { providerID: 'anthropic', modelID: 'claude-3-5-sonnet' } }, {})
 
@@ -990,7 +996,9 @@ test('WHAT[context-compression-043] OpenCode resetScope write blob failure leave
     await acceptAuthorityRoot(runtime, sid, 'engineer')
 
     // Establish full observation
-    await hooks['experimental.chat.system.transform']({ sessionID: sid }, { system: ['System prompt'] })
+    const config = { agent: {} }
+    await hooks.config(config)
+    await hooks['experimental.chat.system.transform']({ sessionID: sid }, { system: [config.agent.engineer.prompt] })
     await hooks['chat.params']({ sessionID: sid, model: { providerID: 'anthropic', modelID: 'claude-3-5-sonnet' } }, {})
     await normalTransform(safeCaps(), sid, {}, {
       messages: [{ info: { id: 'u1', role: 'user', sessionID: sid, time: { created: 1 } }, parts: [{ type: 'text', text: 'Task' }] }],
@@ -1050,7 +1058,9 @@ test('WHAT[context-compression-043] OpenCode resetScope appendAgent failure prop
     await acceptAuthorityRoot(runtime, sid, 'engineer')
 
     // Establish full observation
-    await hooks['experimental.chat.system.transform']({ sessionID: sid }, { system: ['System prompt for append failure'] })
+    const config = { agent: {} }
+    await hooks.config(config)
+    await hooks['experimental.chat.system.transform']({ sessionID: sid }, { system: [config.agent.engineer.prompt + '\nSystem prompt for append failure'] })
     await hooks['chat.params']({ sessionID: sid, model: { providerID: 'anthropic', modelID: 'claude-3-5-sonnet' } }, {})
     await normalTransform(safeCaps(), sid, {}, {
       messages: [{ info: { id: 'u1', role: 'user', sessionID: sid, time: { created: 1 } }, parts: [{ type: 'text', text: 'Task' }] }],
