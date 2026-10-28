@@ -358,6 +358,8 @@ module ForkToolSurface =
                 |> Ok
                 |> Task.FromResult
 
+            member _.AwaitRunnerIdle(_, _) = Task.FromResult(()) :> Task
+
             member _.FamilyRootOf sessionId =
                 children
                 |> Seq.tryFind (fun child -> child.SessionId = sessionId)

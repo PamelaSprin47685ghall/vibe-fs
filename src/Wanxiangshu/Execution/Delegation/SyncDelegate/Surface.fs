@@ -673,6 +673,7 @@ module SyncDelegateSurface =
                     |> Ok
                     |> Task.FromResult
 
+            member _.AwaitRunnerIdle(_, _) = Task.FromResult(()) :> Task
             member _.FamilyRootOf sessionId =
                 match observationMode with
                 | Some _ -> SessionId.create "host-family-root"

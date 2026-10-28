@@ -75,6 +75,18 @@ module DispatchSurface =
             member _.ListChildren(parent) = typed.ListChildren parent
             member _.FamilyRootOf(sessionId) = typed.FamilyRootOf sessionId
 
+            // A JS port that models the Host runner supplies AwaitRunnerIdle;
+            // one that does not is treated as already idle.
+            member _.AwaitRunnerIdle(sessionId, directory) =
+                let awaitIdle = raw?``AwaitRunnerIdle``
+
+                if isNull awaitIdle then
+                    Task.FromResult(()) :> Task
+                else
+                    emitJsExpr
+                        (awaitIdle, SessionId.value sessionId, Option.toObj directory)
+                        "Promise.resolve($0($1, $2))"
+
         /// Dispatch view of the same physical host port: narrows the interface
         /// through a dedicated member so AttachMembers never collides.
         member this.DispatchPort: Wanxiangshu.Interaction.Dispatch.IDispatchSessionPort =
