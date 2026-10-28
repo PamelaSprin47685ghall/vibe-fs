@@ -316,14 +316,21 @@ module DurableWorkHost =
                     createObj
                         [ "status", box "SessionCreated"
                           "execSessionId", result?sessionId ]
-                else
+                elif isRecord result && unbox<bool> result?refused then
+                    // The host answered and refused: the session definitely was not created.
                     let reason =
                         if isString result?reason && not (String.IsNullOrEmpty(unbox<string> result?reason)) then
                             unbox<string> result?reason
                         else
                             "manager session was not created"
 
-                    createObj [ "status", box "NotStarted"; "reason", box reason ])
+                    createObj [ "status", box "NotStarted"; "reason", box reason ]
+                else
+                    // A failure we cannot classify (transport timeout, a thrown
+                    // open, a malformed reply) does not prove the session was
+                    // never created. It stays Unknown; Unknown never masquerades
+                    // as NotStarted.
+                    createObj [ "status", box "Unknown" ])
 
         let sendDraft (effect: obj) =
             settle

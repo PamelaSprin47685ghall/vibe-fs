@@ -1673,7 +1673,16 @@ type ToolRuntimeScope
                 match! sessions.CreateChildSession(SessionId.create ctx.SessionId, options) with
                 | Ok sessionId ->
                     return createObj [ "ok", box true; "sessionId", box (SessionId.value sessionId) ]
-                | Error reason -> return createObj [ "ok", box false; "reason", box reason ]
+                | Error reason ->
+                    // Only an answer from the host (an HTTP status, not a transport
+                    // failure) proves the session was never created; every other
+                    // failure — timeout included — leaves creation unknown.
+                    let refused =
+                        match box reason with
+                        | :? string as text -> text.StartsWith("HTTP ", StringComparison.Ordinal)
+                        | _ -> false
+
+                    return createObj [ "ok", box false; "reason", box reason; "refused", box refused ]
             }
 
         let draft (request: obj) =
