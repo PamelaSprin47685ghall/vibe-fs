@@ -136,6 +136,21 @@ TODO 从 261 变成 260 来自 upstream `cd55bd251`：horizon 不再读独立的
 
 完整运行记录 ID 为 `contracts-20261028-upstream-merged`，定向运行 ID 为 `contracts-20261028-upstream-focused`，原始日志仍位于前述实验目录。新记录保留工具版本、环境、摘要、日志路径、实际失败及其归因；未运行 integration/release 或连续真实宿主验收。
 
+## 小范围、低成本清理
+
+用户随后要求只修能独立完成、无需大改的问题。以 `9e1e71ae4` 为起点，手工修改 10 个文件，保持现有公开接口与判定结果：
+
+- `LifeClassification` 将根类别、角色和已知生命周期的分类展开为平坦匹配，保留 HumanRoot 的角色区分及 AgentOwnerRoot 的 Child 默认值。
+- `PhysicalAcceptance` 将 Accepted、Rejected 和空结果展开为平坦匹配；订阅创建、等待、超时和释放路径不变。
+- `CompletedTurn` 将正式文本判定放入同文件私有函数；存在真实工具调用时仍立即完成，只有无工具调用时才判定正文。没有把文本读取提前到工具分支。
+- 其余为签名换行、调用间距和布局修正。四个仅改格式的实现模块（Ablation Gate/Settings、ToolResultBound、LargeGate）生成的 JS 与修改前逐字节相同；三个 `.fsi` 的非空白内容完全一致。
+
+格式失败从 109 个文件降至 99 个；控制流检查从 120 项降至 116 项，恰好移除上述三处的四项嵌套，没有新增问题。检查器、测试正文、断言、预算与跳过设置均未修改。
+
+官方 Fable 构建 generation 14 成功；11 个相关测试文件完成，72 pass、0 fail、0 skip、2 个原有 TODO，约 5.08 秒，输入前后稳定。选择范围覆盖根身份闭合、物理接收/拒绝/未知/超时、正式文本判定、空回合继续及迟到咨询。详见 [quick-fixes.json](quick-fixes.json)。
+
+本轮没有重跑整套 unit；前节的 4174 pass 仍对应同步上游后的旧提交，不能直接当成本轮全量结果。官方完整入口仍停在格式阶段，独立静态检查仅剩 116 项控制流问题。剩余大文件格式整理，以及 watchdog、OMP 适配和取消/恢复状态机的控制流重构未纳入这次快速清理；它们需要另行逐段审阅。
+
 ## 边界
 
 完整 unit 不等于 format/check/build/unit/integration 的全流水线，也不等于真实宿主验收。后续结果仅适用于实际运行的版本与范围。
