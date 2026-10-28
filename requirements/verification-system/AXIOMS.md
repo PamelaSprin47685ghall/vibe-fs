@@ -133,7 +133,7 @@ Temporal 层使用虚拟时钟、可注入时间端口和显式因果轨迹（tr
 
 资源回归验证本作用域结束后的真实释放；涉及仍需运行的工作时，同时验证其合同保护。`Promise.race` 不自动取消另一方；强制退出或仅禁止资源保活不能代替释放。不要求其他测试或整个宿主的资源归零。
 
-- 证明：[调用结束](../repository-programming/tests/028.test.mjs)、[挂起与恢复](../repository-programming/tests/032.test.mjs) 的定时器回归及结果见[实验记录](../../evidence/test-optimization-20261027/README.md)。证明范围是这些调用路径；任意测试的断言充分性仍需审阅。
+- 证明：原优化分支的[定时器回归与实验记录](https://github.com/dyx13/vibe-fs/blob/4a29ac65e22b17b234b6c5816fb1380d53f90016/evidence/test-optimization-20261027/README.md)覆盖调用结束及挂起恢复路径；该实现未随本次规则变基移植。[TODO] 当前上游的相应资源路径须另行验证；任意测试的断言充分性仍需审阅。
 
 ### [009] 静态门禁命中真实路径
 
@@ -153,7 +153,7 @@ Temporal 层使用虚拟时钟、可注入时间端口和显式因果轨迹（tr
 
 等覆盖对照须保持需求场景、有效断言、属性样本、seed 和失败缩减能力一致。重构或新增回归单列，说明原义务如何继续受保护。减少覆盖、增加跳过或压低原有预算，不得计作等覆盖提速。
 
-- 证明入口：[010](tests/010.test.mjs) 覆盖预算与不重试调度；优化对照见[实验记录](../../evidence/test-optimization-20261027/README.md)。其他改动须分别核对覆盖与失败。
+- 证明入口：[010](tests/010.test.mjs) 覆盖预算与不重试调度；原优化分支的对照见[实验记录](https://github.com/dyx13/vibe-fs/blob/4a29ac65e22b17b234b6c5816fb1380d53f90016/evidence/test-optimization-20261027/README.md)。其他改动须分别核对覆盖与失败。
 
 ### [011] 覆盖率门禁分母完整
 
@@ -220,6 +220,8 @@ Long Stroke 必须在同一 OpenCode 进程的单次生命周期内，验证以�
 
 全仓禁止自建 FCS（`FSharp.Compiler.Service`）扫描，禁止为扫描取证额外启动或插桩编译器；正常构建使用 FCS 不受此禁令约束。
 
+实际构建的常驻适配器可在 `scripts/compiler/Checker.fs` 与 `scripts/compiler/toolchain.mjs` 使用编译器 API；这些文件同样不得增加扫描取证入口。
+
 - 证明入口：[018](tests/018.test.mjs)，以受控正反例验证已知扫描模式，允许普通构建。
 
 ### [019] 测试行为与准备成本
@@ -254,4 +256,4 @@ Long Stroke 必须在同一 OpenCode 进程的单次生命周期内，验证以�
 
 运行器的协议约定：嵌套监督将子进程 stdout/stderr 解码为 UTF-8 诊断文本后转发，不得继承外层协议流或向其中写入原始二进制块。node:test worker 的 stdout 专用于原生结果协议，子进程诊断转发到 stderr；普通独立命令保留两条流的区分。解码保留跨块的合法字符，非法 UTF-8 可用替换字符，不宣称保留了原始二进制。诊断中的协议头诱饵不产生结论；权威结果只来自独立 IPC 及完整收尾证据。
 
-- 证明入口：[021](tests/021.test.mjs) 覆盖结果分类、排空与嵌套输出协议；耗时与排除轮次见[实验记录](../../evidence/test-optimization-20261027/README.md)。[TODO] 全仓报告链的范围传播仍需核查，见[缺口记录](../GAP.md)。单次实验的提速比例不作为其他任务的目标或承诺。
+- 证明入口：[021](tests/021.test.mjs) 覆盖结果分类、排空与嵌套输出协议；原优化分支的耗时与排除轮次见[实验记录](https://github.com/dyx13/vibe-fs/blob/4a29ac65e22b17b234b6c5816fb1380d53f90016/evidence/test-optimization-20261027/README.md)。[TODO] 全仓报告链的范围传播仍需核查，见[缺口记录](../GAP.md)。单次实验的提速比例不作为其他任务的目标或承诺。

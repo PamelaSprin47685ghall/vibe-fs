@@ -1,5 +1,7 @@
 # 测试规则迁移记录
 
+本文件及所附日志记录原优化分支的迁移过程，结果不适用于变基后的上游代码。当前变基范围与验证见[上游适配记录](../test-rules-upstream-20261028/README.md)。
+
 日期：2026-10-28。基线提交：`fcae7e1d7`。工作分支：`codex/test-optimization-20261024`。
 
 ## 目标与完成范围
@@ -13,7 +15,7 @@
 ## 入口与权威
 
 - [旧 WHAT](../../requirements/verification-system/WHAT.md) 只保留导航，无条款定义。旧 `WHAT[verification-system-NNN]` 测试标题定位新 SPEC，不再决定读取旧文件。
-- [高效测试附加段落](../../proposals/高效测试Prompt.md)与[规范施工 prompt](../../proposals/规范施工Prompt.md)均要求开始测试工作前阅读新规则。README、规范索引、人工巡检及测试说明同步改为新入口。
+- [高效测试附加段落](../../proposals/高效测试Prompt.md)与[当时的规范施工 prompt](https://github.com/dyx13/vibe-fs/blob/a979a3f7707b30f5ac96d6f96c7f6a4b7ced8b45/proposals/规范施工Prompt.md)均要求开始测试工作前阅读新规则。README、规范索引、人工巡检及测试说明同步改为新入口。
 - requirement-system [005]、[006]、[007]、[008] 明确该包的唯一正文位置。其它未迁移包继续读取自己的 WHAT；被测业务的行为合同没有被测试规则取代。
 - `scripts/lib/spec-rules.mjs` 集中声明已迁移包的文件名，并只从 AXIOMS 的 SPEC 部分取得正式条款。规范完整性、实际全树扫描、唯一归属、语义接口清单和消融清单发现均使用这一选择。不存在“新文件缺失则继续读旧 WHAT”的路径。
 - 构建命令和测试运行器执行代码，不会解释 Markdown。规范检查能验证发现与引用，不能自动证明一条自然语言规则已经被全部实现。文档迁移与实现验收分别记账。
@@ -48,7 +50,7 @@
 
 ## 二次精炼：2026-10-28
 
-本轮基线为 `1c9a18cba`。对照当前依赖版本 `3bcb47be43c4ba1225c5a1928e2f7b974e9aad74` 的[规则写法](../../wanxiangli/AGENTS.md)、[构建与交付规则](../../wanxiangli/scripts/AGENTS.md)、[时间规则](../../wanxiangli/src/time/AGENTS.md)和[等待规则](../../wanxiangli/src/wait/AGENTS.md)，并以主仓 [requirement-system](../../requirements/requirement-system/WHAT.md) 的规范文件与条款编号约定为准。
+本轮基线为 `1c9a18cba`。对照当时依赖版本 `3bcb47be43c4ba1225c5a1928e2f7b974e9aad74` 的[规则写法](https://github.com/dyx13/wanxiangli/blob/3bcb47be43c4ba1225c5a1928e2f7b974e9aad74/AGENTS.md)、[构建与交付规则](https://github.com/dyx13/wanxiangli/blob/3bcb47be43c4ba1225c5a1928e2f7b974e9aad74/scripts/AGENTS.md)、[时间规则](https://github.com/dyx13/wanxiangli/blob/3bcb47be43c4ba1225c5a1928e2f7b974e9aad74/src/time/AGENTS.md)和[等待规则](https://github.com/dyx13/wanxiangli/blob/3bcb47be43c4ba1225c5a1928e2f7b974e9aad74/src/wait/AGENTS.md)，并以主仓 [requirement-system](../../requirements/requirement-system/WHAT.md) 的规范文件与条款编号约定为准。
 
 人工核对与修改：
 
