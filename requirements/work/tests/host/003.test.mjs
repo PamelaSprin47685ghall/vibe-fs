@@ -3,7 +3,7 @@ import test from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { isEligible, isReviewFinished } from '../../../../dist/Mission/Planning/PlanKernelSeam.js'
+import { isEligible, isReviewFinished } from '../../../../dist/Mission/Planning/Surface.js'
 import * as hostModule from '../../../../dist/Mission/Lifecycle/DurableWorkHost.js'
 
 const host = hostModule.DurableWorkHost ?? hostModule

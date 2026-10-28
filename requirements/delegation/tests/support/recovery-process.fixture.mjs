@@ -54,12 +54,13 @@ try {
   assert.notEqual(retryPrompt.promptKey, initialPrompt.promptKey)
   assert.equal(sync.promptOrigin(runtime, owner, 'Engineer', 1), 'ProviderRetryAttempt')
   assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 1, dispatch.admittedWithReceipt('retry-host-receipt')), true)
-  assert.equal(await failed, true)
+  assert.equal(await pendingAfterTurn(failed), 'pending', 'recovery waits for physical acceptance, not its transport receipt')
   assert.equal(sync.promptClaimState(runtime, owner, 'Engineer', 1).kind, 'Pending')
   assert.equal(await pendingAfterTurn(completion), 'pending', 'a receipt does not complete the invocation')
 
-  assert.equal(await sync.observeExactProviderFailure(runtime, initial.sessionId, initial.physicalUserMessageId,
-    initial.authorityRootUserMessageId, failedRun, 'confirmed provider failure'), true)
+  const duplicateFailure = sync.observeExactProviderFailure(runtime, initial.sessionId, initial.physicalUserMessageId,
+    initial.authorityRootUserMessageId, failedRun, 'confirmed provider failure')
+  await pendingAfterTurn(duplicateFailure)
   assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 2, 'Pending recovery reentry preserves one physical send')
   assert.deepEqual(sync.promptIdentity(runtime, owner, 'Engineer', 1), retryPrompt)
   const lateAcceptance = scenario === 'late-retry' || scenario === 'fallback-late-retry'
@@ -78,6 +79,7 @@ try {
     assert.equal(successor.origin, 'ProviderRetryAttempt')
     assert.notEqual(successor.physicalUserMessageId, initial.physicalUserMessageId)
     assert.equal(successor.authorityRootUserMessageId, initial.authorityRootUserMessageId)
+    assert.deepEqual(await Promise.all([failed, duplicateFailure]), [true, true])
     assert.equal(sync.promptClaimState(runtime, owner, 'Engineer', 1).kind, 'Accepted')
     assert.equal(await pendingAfterTurn(completion), 'pending')
     assert.equal(await sync.observeExactProviderFailure(runtime, initial.sessionId, initial.physicalUserMessageId,
@@ -121,6 +123,8 @@ try {
       assert.equal(successor.origin, 'ProviderRetryAttempt')
       assert.notEqual(successor.physicalUserMessageId, initial.physicalUserMessageId)
       assert.equal(successor.authorityRootUserMessageId, initial.authorityRootUserMessageId)
+      assert.deepEqual(await Promise.all([failed, duplicateFailure]), [false, true],
+        'a retry accepted after its invocation completed cannot handle that closed invocation')
     }
     const staleText = lateAcceptance ? 'LATE-RETRY-ANSWER' : 'RECOVERY-FORMAL-ANSWER'
     const staleAccepted = scenario.startsWith('fallback-')
@@ -136,8 +140,8 @@ try {
       secondAccepted.physicalUserMessageId, secondAccepted.authorityRootUserMessageId, secondFailedRun, 'second confirmed failure')
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 4)
     assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 3, dispatch.admittedWithReceipt('second-retry-receipt')), true)
-    assert.equal(await secondFailed, true)
     const secondSuccessor = await sync.confirmManagedPromptPhysical(runtime, owner, 'Engineer', 3, 'second-retry-physical')
+    assert.equal(await secondFailed, true)
     assert.equal(secondSuccessor.ok, true, JSON.stringify(secondSuccessor))
     assert.notEqual(secondSuccessor.physicalUserMessageId, secondAccepted.physicalUserMessageId)
     assert.equal(secondSuccessor.origin, 'ProviderRetryAttempt')

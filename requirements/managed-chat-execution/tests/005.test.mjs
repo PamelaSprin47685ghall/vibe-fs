@@ -191,7 +191,8 @@ const providerLifecycleSource = await readFile(new URL('../../../src/Wanxiangshu
 const bootstrapSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs', import.meta.url), 'utf8')
 const recoveryHostSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs', import.meta.url), 'utf8')
 const recoveryRuntimeSource = await readFile(new URL('../../../src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntime.fs', import.meta.url), 'utf8')
-const recoverySource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs', import.meta.url), 'utf8')
+const recoveryScope = await import('../../../dist/OpenCode/Host/PluginRecoveryScopeSurface.js')
+const plans = await import('../../../dist/Context/Prefix/XWireSurface.js')
 const terminal = ({
   sessionId = 'ses-terminal',
   physicalUserMessageId = 'msg-terminal',
@@ -242,8 +243,17 @@ test('WHAT[managed-chat-execution-005] exact public assistant observation alone 
   assert.match(providerLifecycleSource, /persistObservedProviderStart[\s\S]*?ChatExecutionProjection\.byKey key/)
   assert.match(providerLifecycleSource, /match execution with[\s\S]*?state\.terminalDisposition\.IsSome[\s\S]*?AcceptedExecutionAlreadyTerminal[\s\S]*?state\.startedEvidence\.IsSome[\s\S]*?Ok false[\s\S]*?bindAttemptPlan[\s\S]*?ManagedChatProviderLifecycle\.providerStarted[\s\S]*?return true/)
   assert.match(providerLifecycleSource, /persistObservedProviderStart[\s\S]*?bindAttemptPlan observation\.SessionId observation\.PhysicalUserMessageId observation\.ProviderRun/)
-  assert.match(recoverySource, /TryBindAttemptPlan[\s\S]*?established\.Profile\.PhysicalUserMessageId = physicalUserMessageId/)
-  assert.match(recoverySource, /\| Some _ -> None[\s\S]*?\| None -> this\.BindPendingAttemptPlan/)
+  const scope = recoveryScope.createRecoveryScope()
+  const plan = plans.pendingPlan({ session: 'ses-terminal', logicalRun: 'logical-terminal',
+    root: 'root-terminal', physical: 'msg-terminal', kind: 'WorkMain', probe: null })
+  assert.equal(plan.ok, true, plan.error)
+  assert.equal(recoveryScope.freezeAttemptPlan(scope, 'ses-terminal', 'msg-terminal', plan.handle).outcome, 'Admitted')
+  assert.equal(recoveryScope.bindAttempt(scope, 'ses-foreign', 'msg-terminal', 'run-terminal').bound, false)
+  assert.equal(recoveryScope.bindAttempt(scope, 'ses-terminal', 'msg-foreign', 'run-terminal').bound, false)
+  const bound = recoveryScope.bindAttempt(scope, 'ses-terminal', 'msg-terminal', 'run-terminal')
+  assert.equal(bound.bound, true)
+  assert.deepEqual(recoveryScope.bindAttempt(scope, 'ses-terminal', 'msg-terminal', 'run-terminal').view, bound.view)
+  assert.equal(recoveryScope.bindAttempt(scope, 'ses-terminal', 'msg-foreign', 'run-terminal').bound, false)
   assert.match(providerLifecycleSource, /ManagedChatProviderLifecycle\.providerStarted/)
 })
 }
@@ -256,7 +266,7 @@ const { readdirSync, readFileSync } = await import('node:fs')
 const { join } = await import('node:path')
 
 const acceptedRequest = async (hooks, sessionID, messageID) => {
-  const message = { id: messageID, sessionID, role: 'user', agent: 'engineer', model: {} }
+  const message = { id: messageID, sessionID, role: 'user', agent: 'engineer', model: { providerID: 'provider', modelID: 'engineer-model' } }
   const parts = [{ type: 'text', text: 'controlled provider request' }]
   await hooks['chat.message']({ sessionID, messageID, agent: 'engineer' }, { message, parts })
   return { messages: [{ info: message, parts }] }

@@ -1,20 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ToolRuntimeScope, ToolRuntimeScope__SendAdvisorSteer_17BF5BBB } from '../../../../dist/OpenCode/Tools/ToolRuntimeScope.js'
-import { JournalHandle__get_Journal } from '../../../../dist/Persistence/Journal/Surface.js'
+import { ToolRuntimeScopeSurface } from '../../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js'
 import * as dispatcher from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import {
   withJournal, hostPort, prepareAcceptanceObserver, acceptObservedPhysical,
 } from '../../../dispatch-protocol/tests/support/authority.mjs'
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
-const makeScope = (handle, sessionPort) => new ToolRuntimeScope(
-  sessionPort, {}, {}, JournalHandle__get_Journal(handle), undefined,
-  new Map(), () => undefined, new Map(),
-  undefined, undefined, undefined, undefined, undefined, undefined, undefined,
-)
+const makeScope = ToolRuntimeScopeSurface.createAdvisorSender
 
-test('WHAT[advisor-005] real ToolRuntimeScope cannot settle final steer before PhysicalAccepted', async () => {
+test('WHAT[advisor-005] real ToolRuntimeScope cannot settle final steer before PhysicalAccepted', async t => {
   await withJournal('advisor-runtime-physical', async handle => {
     const context = await prepareAcceptanceObserver(handle, 'continuation', 'advisor-runtime-physical')
     let resolveDispatched
@@ -27,9 +22,10 @@ test('WHAT[advisor-005] real ToolRuntimeScope cannot settle final steer before P
       return dispatcher.admittedWithReceipt('submitted-not-accepted')
     })
     const runtime = makeScope(handle, sessionPort)
+    t.after(() => runtime.dispose())
     let completed = false
-    const sending = ToolRuntimeScope__SendAdvisorSteer_17BF5BBB(
-      runtime, context.session, 'review this scope work', 'advisor:receipt', () => true,
+    const sending = runtime.send(
+      context.session, 'review this scope work', 'advisor:receipt', () => true,
     ).then(outcome => { completed = true; return outcome })
     try {
       await dispatched
@@ -38,7 +34,7 @@ test('WHAT[advisor-005] real ToolRuntimeScope cannot settle final steer before P
       const actual = await acceptObservedPhysical(handle, context, key, 'advisor-runtime-physical-landed')
       assert.equal(actual.ok, true, actual.error)
       const outcome = await sending
-      assert.equal(outcome.tag, 0, String(outcome.fields[0] ?? ''))
+      assert.deepEqual(outcome, { ok: true, error: null })
       assert.equal(dispatcher.pendingClaimCount(handle, context.session), 0)
     } finally {
       if (!completed && key) await acceptObservedPhysical(handle, context, key, 'advisor-runtime-cleanup')
@@ -47,7 +43,7 @@ test('WHAT[advisor-005] real ToolRuntimeScope cannot settle final steer before P
   })
 })
 
-test('WHAT[advisor-005] Source Scope retiring during pending send refuses success even after physical acceptance', async () => {
+test('WHAT[advisor-005] Source Scope retiring during pending send refuses success even after physical acceptance', async t => {
   await withJournal('advisor-runtime-epoch', async handle => {
     const context = await prepareAcceptanceObserver(handle, 'continuation', 'advisor-runtime-epoch')
     let key
@@ -60,20 +56,21 @@ test('WHAT[advisor-005] Source Scope retiring during pending send refuses succes
       return dispatcher.admittedWithReceipt('queue-only')
     })
     const runtime = makeScope(handle, port)
-    const sending = ToolRuntimeScope__SendAdvisorSteer_17BF5BBB(
-      runtime, context.session, 'stale final advice', 'advisor:old', () => current,
+    t.after(() => runtime.dispose())
+    const sending = runtime.send(
+      context.session, 'stale final advice', 'advisor:old', () => current,
     )
     await dispatched
     current = false
     const actual = await acceptObservedPhysical(handle, context, key, 'old-scope-physical-landed')
     assert.equal(actual.ok, true, actual.error)
     const result = await sending
-    assert.equal(result.tag, 1, 'old Scope cannot be confirmed by the final Advisor flow')
-    assert.match(result.fields[0], /Scope advanced before physical steer confirmation/)
+    assert.equal(result.ok, false, 'old Scope cannot be confirmed by the final Advisor flow')
+    assert.match(result.error, /Scope advanced before physical steer confirmation/)
   })
 })
 
-test('WHAT[advisor-005] unknown physical delivery from product runtime is not a successful steer', async () => {
+test('WHAT[advisor-005] unknown physical delivery from product runtime is not a successful steer', async t => {
   await withJournal('advisor-runtime-unknown', async handle => {
     const context = await prepareAcceptanceObserver(handle, 'continuation', 'advisor-runtime-unknown')
     let calls = 0
@@ -81,11 +78,12 @@ test('WHAT[advisor-005] unknown physical delivery from product runtime is not a 
       calls++
       return dispatcher.acceptanceUnknown('receipt alone cannot prove landing')
     }))
-    const result = await ToolRuntimeScope__SendAdvisorSteer_17BF5BBB(
-      runtime, context.session, 'unverified final advice', 'advisor:unknown', () => true,
+    t.after(() => runtime.dispose())
+    const result = await runtime.send(
+      context.session, 'unverified final advice', 'advisor:unknown', () => true,
     )
-    assert.equal(result.tag, 1)
-    assert.match(result.fields[0], /Acceptance unknown/)
+    assert.equal(result.ok, false)
+    assert.match(result.error, /Acceptance unknown/)
     assert.equal(calls, 1)
     assert.equal(dispatcher.pendingClaimCount(handle, context.session), 1)
   })

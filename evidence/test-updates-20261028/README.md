@@ -15,7 +15,7 @@
 ## 工作项
 
 1. 已完成：按真实行为修复包登记、编号与归属，保留有效断言；替换无合同依据的源码词形断言。
-2. 待做：修复新版宿主输入、已退出接口等导致的失效测试；真实产品问题独立记录，不以改期望掩盖。
+2. 局部验证已完成，等待完整复测：修复新版宿主输入、已退出接口等导致的失效测试；真实产品问题独立记录，不以改期望掩盖。
 3. 待做：从完整文件生命周期定位主要成本，完成等覆盖的优化前后对照。
 
 ## 第一批：归属与有效证据
@@ -28,6 +28,29 @@
 - 验证：官方构建 generation 5 成功；规范、消融、Latency、Advisor、移动后的 delegation/Fission/provider/work 共 143 项，141 pass、0 fail、0 cancelled、1 skip、1 TODO。原有 skip/TODO 没有改为通过。日志为 `/private/tmp/vibe-fs-test-updates-ownership-verified-20261028.log`。
 
 本批涉及用例归属和证据替换，不能把它与原失败基线的时间差直接解释为等覆盖提速。性能实验另建修复后的固定基线。
+
+## 第二批：现行输入、行为与资源
+
+| 改动 | 原因与保留的保护 |
+| --- | --- |
+| 给有效 `chat.message` 夹具补齐宿主模型；共享 admission surface 显式接收目标 | 上游已改为使用 Host 选择。保留缺模型拒绝、同一物理输入的目标冲突、重复受理、旧租约及容量隔离。没有给产品加默认模型。 |
+| 退役 MJS 调度加载、备用目标池和构建报告测试 | 用户按[处理说明](retired-tests-review.md)批准；有效容量保护移到 004/017，真实插件验证旧配置被忽略。报告工具的四项测试退出后，012 的其余编译测试从加载失败中恢复。 |
+| 两个 delegation 恢复夹具先保留在途调用，观察物理接受，再等待 handler | 旧夹具先等待必须由下一步物理事件才能结束的 handler，每项耗尽约 10 秒。十种进程恢复情形均通过，每项约 0.45–0.64 秒；保留重复消息、旧调用不能结算新调用和返回前未完成断言。属于纠正因果次序，不作为独立等覆盖性能结论。 |
+| Join 探针使用真实 PendingRunStore | Dictionary 已不能履行 claim/register 接口。保留实际自然完成和父级 join 保护，不修改生产委托流程。 |
+| 万象理 UTF-8 尾部扫描改为迭代 | 大文本触发真实栈溢出；不缩小宿主原有大输入。新增十万字符 ASCII、中文与代理对回归，完整比较最长合法后缀和字节上限；纠正两个原本没触发截断的夹具与误把 row-10 当成 row-1 的断言。核侧提交 `9c0230b`。 |
+| Plan 提示夹具使用真实自有首段 | 现行 transform 只处理自有提示。保留三个里程碑、草稿路径、幂等及替换断言，增加普通宿主提示不被改写的检查。 |
+| classifier 诊断文本和工具目录更新 | abort/error 分类、错误来源及完结条件不变；固定无错误名称时的新文本。目录包含上游已经注册的 todowrite。 |
+
+## 第三批：公开边界与检查归属
+
+- 日志根路径、Scope 记忆和 scope-progress 改用已有公开接口；没有重建产品模型。
+- 为现有 ToolRuntimeScope、Dispatch、HostSignalSubscribe 和 Planning surface 补齐原生 JS 调用；Result 转换由所属 F# 边界完成，测试仍调用真实 sender、观察实际 PhysicalAccepted，并保留未知送达、迟到拒绝、Scope 退役和资源清理检查。没有新建跨领域 facade。
+- 登记 LatencyWatchdog 已有的稳定工厂与不透明句柄，不暴露内部状态表示。修正辅助代码错误读取 `case/fields`，改读 HostSignalSurface 实际返回的 `kind/sessionId`。
+- 三个原始宿主边界用例登记为精确路径的 canary：delegation 037 检查投影前原始历史；managed-session 029 检查真实事件到 typed observer 的运行身份；work/host 008 检查 OpenCode 与 OMP 的实际提示屏障。相邻语义用例及辅助文件继续受检，新增子进程正反例确认没有目录级豁免。
+- `durable-events-010` 允许不同职责采用不同物理格式；`advisor-007` 已明确其 SQLite owner。旧检查错误拒绝两个宿主适配器中的 `advisor-process.sqlite`。只认可这两处的该字面量，其余 SQLite、私有库、旁路写入及相邻文件仍拒绝，并用受控反例验证。不豁免整个适配器，也不改变 EventStore 折叠规则。
+- 为现有可变回调、取消登记、订阅游标、试验标识和 watchdog 代次补充准确的资源用途注释；没有改弱可变状态检查器。
+
+局部验证：公开接口与调用方 87/87 通过；检查器最后一轮 23/23 通过；durable-events 019 的 18 项通过。前面的试跑失败和修正分别保留在 `/private/tmp/vibe-fs-test-updates-*.log`。完整套件状态以随后固定输入的运行记录为准，这些局部通过不代替整套结果。
 
 ## 边界
 

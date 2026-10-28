@@ -9,7 +9,7 @@ import {
   advisorClaim, advisorStageBegin, advisorPending,
 } from 'wanxiangli/scope-progress'
 import { outboundViewStore } from 'wanxiangli/pair-hint'
-import { stateRoot } from '../../../../dist/Persistence/Journal/RuntimePath.js'
+import { JournalSurface_initializeStateRoot as stateRoot } from '../../../../dist/Persistence/Journal/Surface.js'
 import { withExecutablePlugin, acceptAuthorityRoot } from '../../../verification-system/tests/support/plugin-fixture.mjs'
 
 const until = async predicate => {

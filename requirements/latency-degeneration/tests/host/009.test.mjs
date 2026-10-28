@@ -3,11 +3,7 @@ import assert from 'node:assert/strict'
 import {
   withJournal, prepareAcceptanceObserver, acceptObservedPhysical, ownAcceptanceRegistration,
 } from '../../../dispatch-protocol/tests/support/authority.mjs'
-import {sendContinuationDetachedObservedResult} from '../../../../dist/Interaction/Dispatch/SessionNudge.js'
-import {PromptContinuationKind} from '../../../../dist/Interaction/Authority/Origin.js'
-import {SessionIdModule_create} from '../../../../dist/Foundation/Identity.js'
 import * as dispatch from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
-import {JournalHandle__get_Journal} from '../../../../dist/Persistence/Journal/Surface.js'
 
 test('WHAT[latency-degeneration-009] real detached sender returns without waiting but only emits resumed on genuine PhysicalAccepted',async()=>{
   const {hostPort}=await import('../../../dispatch-protocol/tests/support/authority.mjs')
@@ -43,14 +39,9 @@ const port=send=>({
   SubscribeFutureTerminal:()=>({Dispose(){}}),
   IsManagedChild:()=>true,
 })
-const witness=(callback,handle)=>({
-  Notify:callback,
-  AttachDisposable:registration=>ownAcceptanceRegistration(handle,registration),
-  Budget:undefined,
-})
 const returned=result=>{
-  assert.equal(result?.tag,0,'detached claim must be accepted')
-  return result.fields[0]
+  assert.equal(result?.ok,true,result.error)
+  return result.key
 }
 
 test('WHAT[latency-degeneration-009] the production HostSessionNudge forwards a real late Refused after a detached claim',async()=>{
@@ -58,23 +49,22 @@ test('WHAT[latency-degeneration-009] the production HostSessionNudge forwards a 
     const context=await prepareAcceptanceObserver(handle,'continuation','late-refusal')
     let late
     const resumed=[],rejected=[]
-    const key=returned(await sendContinuationDetachedObservedResult(
+    const key=returned(await dispatch.sendContinuationDetachedObserved(
       port(async(_sid,_text,opts)=>{
         late=opts.DetachedListener
         return dispatch.admittedWithReceipt('host-queued-no-physical')
       }),
-      {TryRead:()=>undefined},SessionIdModule_create(context.session),
+      handle,context.session,
       'Continue interrupted Engineer work',
-      PromptContinuationKind.ProviderRetryAttempt,
-      undefined,JournalHandle__get_Journal(handle),witness(id=>resumed.push(id),handle),
+      'ProviderRetryAttempt',id=>resumed.push(id),
+      registration=>ownAcceptanceRegistration(handle,registration),
       reason=>rejected.push(reason),
     ))
     assert.ok(key)
     assert.equal(resumed.length,0)
     assert.equal(rejected.length,0)
     assert.equal(typeof late,'function','real port must install the Host late receipt listener')
-    const {DetachedSendVerdict}=await import('../../../../dist/Foundation/HostSendContract.js')
-    await late(new DetachedSendVerdict(1,['host did not accept prompt']))
+    await dispatch.deliverDetachedVerdict(late, 'Refused', 'host did not accept prompt')
     await flush()
     assert.deepEqual(rejected,['host did not accept prompt'])
     assert.deepEqual(resumed,[])
@@ -86,15 +76,15 @@ test('WHAT[latency-degeneration-009] the real detached sender receives physical 
     const context=await prepareAcceptanceObserver(handle,'continuation','late-accepted')
     let key
     const resumed=[],rejected=[]
-    const claim=await sendContinuationDetachedObservedResult(
+    const claim=await dispatch.sendContinuationDetachedObserved(
       port(async(_sid,_text,opts)=>{
         key=opts.Metadata.wanxiangshu_prompt_key
         return dispatch.admittedWithReceipt('queued-only')
       }),
-      {TryRead:()=>undefined},SessionIdModule_create(context.session),
+      handle,context.session,
       'Continue interrupted Engineer work',
-      PromptContinuationKind.ProviderRetryAttempt,
-      undefined,JournalHandle__get_Journal(handle),witness(id=>resumed.push(id),handle),
+      'ProviderRetryAttempt',id=>resumed.push(id),
+      registration=>ownAcceptanceRegistration(handle,registration),
       reason=>rejected.push(reason),
     )
     returned(claim)
@@ -109,15 +99,14 @@ test('WHAT[latency-degeneration-009] the real detached sender receives physical 
 
 
 test('WHAT[latency-degeneration-009] an initial definite SDK refusal returns through the real Sender without physical acceptance',async()=>{
-  const {Outcome_SendOutcome}=await import('../../../../dist/Foundation/Outcome.js')
   await withJournal('degeneration-direct-refused-009',async handle=>{
     const context=await prepareAcceptanceObserver(handle,'continuation','direct-refused')
     const resumed=[],rejected=[]
-    const result=await sendContinuationDetachedObservedResult(
-      port(async()=>new Outcome_SendOutcome(2,['initial Host admission refused'])),
-      {TryRead:()=>undefined},SessionIdModule_create(context.session),
-      'Continue interrupted Engineer work',PromptContinuationKind.ProviderRetryAttempt,
-      undefined,JournalHandle__get_Journal(handle),witness(id=>resumed.push(id),handle),
+    const result=await dispatch.sendContinuationDetachedObserved(
+      port(async()=>dispatch.retryable('initial Host admission refused')),
+      handle,context.session,
+      'Continue interrupted Engineer work','ProviderRetryAttempt',id=>resumed.push(id),
+      registration=>ownAcceptanceRegistration(handle,registration),
       reason=>rejected.push(reason),
     )
     returned(result)
@@ -128,15 +117,14 @@ test('WHAT[latency-degeneration-009] an initial definite SDK refusal returns thr
 })
 
 test('WHAT[latency-degeneration-009] ambiguous SDK delivery is not a definite refusal or fabricated PhysicalAccepted',async()=>{
-  const {Outcome_SendOutcome}=await import('../../../../dist/Foundation/Outcome.js')
   await withJournal('degeneration-outcome-unknown-009',async handle=>{
     const context=await prepareAcceptanceObserver(handle,'continuation','unknown')
     const resumed=[],rejected=[]
-    const result=await sendContinuationDetachedObservedResult(
-      port(async()=>new Outcome_SendOutcome(3,['provider never supplied acceptance evidence'])),
-      {TryRead:()=>undefined},SessionIdModule_create(context.session),
-      'Continue interrupted Engineer work',PromptContinuationKind.ProviderRetryAttempt,
-      undefined,JournalHandle__get_Journal(handle),witness(id=>resumed.push(id),handle),
+    const result=await dispatch.sendContinuationDetachedObserved(
+      port(async()=>dispatch.acceptanceUnknown('provider never supplied acceptance evidence')),
+      handle,context.session,
+      'Continue interrupted Engineer work','ProviderRetryAttempt',id=>resumed.push(id),
+      registration=>ownAcceptanceRegistration(handle,registration),
       reason=>rejected.push(reason),
     )
     returned(result)

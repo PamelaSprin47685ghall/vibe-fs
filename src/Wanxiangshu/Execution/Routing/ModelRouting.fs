@@ -218,9 +218,11 @@ module ModelRouting =
     let private targetProvider (target: ModelRoutingTarget) =
         target.Model.Substring(0, target.Model.IndexOf '/')
 
+    // DSL-MUTABLE: resource — installed durable-session lookup callback
     let mutable private sharedDurableResolver: (string -> string option) option = None
 
     type internal ModelRoutingRuntime(scheduler: obj, ?durableDevopsResolver: string -> string option) =
+        // DSL-MUTABLE: resource — runtime-local durable-session lookup callback
         let mutable durableResolver =
             match durableDevopsResolver with
             | Some r -> Some r
@@ -1686,11 +1688,11 @@ module ModelRouting =
             lock gate (fun () -> hasTheoreticalCapacityLocked role purpose)
 
     let private sharedGate = obj ()
-    // DSL-MUTABLE: resource — process-shared scheduler runtime singleton
 
     let internal setSharedDurableDevopsResolver (resolver: string -> string option) =
         sharedDurableResolver <- Some resolver
 
+    // DSL-MUTABLE: resource — process-shared scheduler runtime singleton
     let mutable private sharedRuntime: ModelRoutingRuntime option = None
     // DSL-MUTABLE: single-flight — in-flight scheduler bootstrap
     let mutable private sharedLoad: Task<ModelRoutingRuntime> option = None

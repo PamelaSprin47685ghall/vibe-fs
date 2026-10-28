@@ -499,6 +499,7 @@ module PluginHooks =
                           // continuation outcome through the observer callback.
                           let registrations = ResizeArray<IDisposable>()
                           let token = Guid.NewGuid().ToString("N")
+                          // DSL-MUTABLE: subscription — dispose this continuation's observers once
                           let mutable released = false
                           let release () =
                               if not released then

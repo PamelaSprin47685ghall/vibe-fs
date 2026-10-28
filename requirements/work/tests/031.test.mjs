@@ -48,9 +48,14 @@ test('WHAT[work-031] the registered plan system transform appends each milestone
     await withExecutablePlugin(async (hooks, directory, _created, runtime) => {
       assert.equal(typeof hooks['experimental.chat.system.transform'], 'function')
       await acceptAuthorityRoot(runtime, session, 'plan', 'user-root-031')
+      await hooks['chat.message']({ sessionID: session, messageID: 'user-root-031', agent: 'plan' }, {
+        message: { id: 'user-root-031', sessionID: session, role: 'user', agent: 'plan',
+          model: { providerID: 'fixture', modelID: 'plan-model' } }, parts: [],
+      })
       const commonDir = await journalSurface.JournalSurface_initializeStateRoot(directory)
       const draftPath = draftPathFor(directory, session)
-      const initial = { system: ['host preface'] }
+      const ownedPrompt = prompts.loadForLanguage('en').PlanSystemPrompt
+      const initial = { system: [ownedPrompt, 'host preface'] }
       await hooks['experimental.chat.system.transform']({ sessionID: session }, initial)
       assert.equal(initial.system.some(text => text.includes(draftPath)), true,
         'a fresh Plan must know its canonical draft path before its first review')
@@ -67,7 +72,7 @@ test('WHAT[work-031] the registered plan system transform appends each milestone
         const seen = surface.inspected(commonDir, session)
         assert.equal(seen.Stage, milestone)
         assert.ok(seen.ActiveId, `${milestone} must have an active tenure`)
-        const output = { system: ['host preface'] }
+        const output = { system: [ownedPrompt, 'host preface'] }
         await hooks['experimental.chat.system.transform']({ sessionID: session }, output)
         const lines = output.system
         const expected = guidanceFor(milestone, draftPath)
@@ -91,7 +96,8 @@ test('WHAT[work-031] the registered plan system transform appends each milestone
       assert.equal(toPaths.milestone, '理解与路径')
       const second = await present('理解与路径')
       assert.equal(second.length, first.length)
-      assert.equal(second[0], 'host preface')
+      assert.equal(second[0], ownedPrompt)
+      assert.equal(second[1], 'host preface')
 
       const kept = review('r4', [{ key: 'item', value: 'path' }])
       assert.equal(kept.kind, 'Reviewed', JSON.stringify(kept))
@@ -102,9 +108,13 @@ test('WHAT[work-031] the registered plan system transform appends each milestone
       assert.equal(toProcess.milestone, '流程与伪代码')
       const third = await present('流程与伪代码')
       assert.equal(third.length, second.length)
-      assert.equal(third[0], 'host preface')
+      assert.equal(third[0], ownedPrompt)
+      assert.equal(third[1], 'host preface')
 
-      const stranger = { system: ['host preface'] }
+      const foreignPrompt = { system: ['host preface'] }
+      await hooks['experimental.chat.system.transform']({ sessionID: session }, foreignPrompt)
+      assert.deepEqual(foreignPrompt.system, ['host preface'])
+      const stranger = { system: [ownedPrompt, 'host preface'] }
       await hooks['experimental.chat.system.transform']({ sessionID: 'not-a-plan-031' }, stranger)
       assert.equal(stranger.system.includes(guidanceFor('事实与取舍', draftPath)), false)
       assert.equal(stranger.system.includes(guidanceFor('理解与路径', draftPath)), false)

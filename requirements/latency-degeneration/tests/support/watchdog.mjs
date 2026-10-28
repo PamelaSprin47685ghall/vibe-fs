@@ -73,6 +73,6 @@ export function wireHostEvents(watchdog, activeCompactingSessions = new Set()) {
       watchdog.Complete(terminal.sessionId, terminal.providerRun)
     }
     const signal = HostSignalSurface.tryDecode(raw)
-    if (signal?.case === 'SessionIdle') watchdog.OnIdle(signal.fields[0])
+    if (signal?.kind === 'SessionIdle') watchdog.OnIdle(signal.sessionId)
   }
 }

@@ -24,6 +24,9 @@ open Wanxiangshu.Repository.Programming.Js
 /// data; completion and error unions remain inside the renderer owner.
 [<RequireQualifiedAccess>]
 module JoinSurface =
+    [<Import("PendingRunStore", "wanxiangli/handle-lifecycle")>]
+    let private pendingRunStoreClass: obj = jsNative
+
     let private text (value: obj) =
         if isNull value then "" else string value
 
@@ -319,6 +322,7 @@ module JoinSurface =
     let createVisibleInputRegistry () : obj =
         let registry: obj = emitJsExpr joinAttemptRegistryClass "new $0()"
         let activeInterrupts = Dictionary<string, JoinInterrupt>()
+        // DSL-MUTABLE: algorithm-scratch — unique probe attempt identifiers
         let mutable attemptCounter = 0
 
         createObj
@@ -437,8 +441,8 @@ module JoinSurface =
                   Subscription = None
                   Finished = false }
 
-            let pending = Dictionary<string, PendingHostRun>()
-            pending.Add(run.AgentId, run)
+            let pending: obj = emitJsExpr pendingRunStoreClass "new $0()"
+            pending?register(run.AgentId, run.Token, SessionId.value childId, string run.Role, run) |> ignore
 
             JsDeliveredValues.recordFencedView (SessionId.value childId) providerRun toolCallId (Some carry)
 

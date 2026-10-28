@@ -5,28 +5,28 @@ import * as recovery from '../../../dist/OpenCode/Host/SessionRecoveryHostSurfac
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import { withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
-test('WHAT[managed-chat-execution-003] concurrent exact chat admissions and their replay project one committed target into every Host request', async () => {
+test('WHAT[managed-chat-execution-003] concurrent exact chat admissions and their replay retain the Host target with one committed lease', async () => {
   await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
     const input = { sessionID: 'ses-concurrent-admission', messageID: 'msg-concurrent-admission', agent: 'engineer' }
     const outputs = Array.from({ length: 2 }, () => ({
       message: {
         id: input.messageID, sessionID: input.sessionID, role: 'user', agent: input.agent,
-        model: { providerID: 'host', modelID: 'placeholder' },
+        model: { providerID: 'host', modelID: 'selected-model' },
       },
       parts: [],
     }))
     const admissions = await Promise.allSettled(outputs.map((output) => hooks['chat.message'](input, output)))
     assert.deepEqual(admissions.map((admission) => admission.status), ['fulfilled', 'fulfilled'])
     for (const output of outputs) {
-      assert.deepEqual({ ...output.message.model }, { providerID: 'provider', modelID: 'engineer-model', variant: 'none' })
+      assert.deepEqual({ ...output.message.model }, { providerID: 'host', modelID: 'selected-model' })
     }
     const capacity = routing.sharedCapacitySnapshot()
     assert.equal(capacity.executions.filter((execution) => execution.sessionId === input.sessionID).length, 1)
     assert.equal(capacity.tokens.filter((token) => token.owner.sessionId === input.sessionID).length, 1)
     const replay = { message: { id: input.messageID, sessionID: input.sessionID, role: 'user', agent: input.agent,
-      model: { providerID: 'host', modelID: 'replay-placeholder' } }, parts: [] }
+      model: { providerID: 'host', modelID: 'selected-model' } }, parts: [] }
     await hooks['chat.message'](input, replay)
-    assert.deepEqual({ ...replay.message.model }, { providerID: 'provider', modelID: 'engineer-model', variant: 'none' })
+    assert.deepEqual({ ...replay.message.model }, { providerID: 'host', modelID: 'selected-model' })
     const replayCapacity = routing.sharedCapacitySnapshot()
     assert.equal(replayCapacity.executions.filter((execution) => execution.sessionId === input.sessionID).length, 1)
     assert.equal(replayCapacity.tokens.filter((token) => token.owner.sessionId === input.sessionID).length, 1)
@@ -47,9 +47,10 @@ test('WHAT[managed-chat-execution-003] concurrent exact chat admissions and thei
       model: { providerID: 'host', modelID: 'foreign-placeholder' } }, parts: [] }
     await assert.rejects(hooks['chat.message'](input, foreignCarrier), /IntentRejected.*MalformedIdentityCarrier/)
     assert.deepEqual(foreignCarrier.message.model, { providerID: 'host', modelID: 'foreign-placeholder' })
-    const fresh = { message: { id: 'msg-fresh-human', sessionID: input.sessionID, role: 'user', agent: input.agent, model: {} }, parts: [] }
+    const fresh = { message: { id: 'msg-fresh-human', sessionID: input.sessionID, role: 'user', agent: input.agent,
+      model: { providerID: 'host', modelID: 'selected-model' } }, parts: [] }
     await hooks['chat.message']({ ...input, messageID: fresh.message.id }, fresh)
-    assert.deepEqual({ ...fresh.message.model }, { providerID: 'provider', modelID: 'engineer-model', variant: 'none' })
+    assert.deepEqual({ ...fresh.message.model }, { providerID: 'host', modelID: 'selected-model' })
     assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, input.sessionID, input.messageID), {
       phase: 'Accepted', disposition: null,
     })
@@ -58,7 +59,7 @@ test('WHAT[managed-chat-execution-003] concurrent exact chat admissions and thei
     runtime.pushHostMessage(input.sessionID, {
       info: {
         id: 'assistant-fresh-human', sessionID: input.sessionID, parentID: fresh.message.id,
-        role: 'assistant', agent: input.agent, providerID: 'provider', modelID: 'engineer-model',
+        role: 'assistant', agent: input.agent, providerID: 'host', modelID: 'selected-model',
         time: { created: 2 },
       },
       parts: [],
@@ -93,42 +94,36 @@ test('WHAT[managed-chat-execution-003] concurrent exact chat admissions and thei
   })
 })
 
-test('WHAT[managed-chat-execution-003] an exact admission joining after committed Host projection receives its own complete model', async () => {
+test('WHAT[managed-chat-execution-003] an exact admission after concurrent admissions preserves the Host model and reuses capacity', async () => {
   await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
     const get = runtime.client.session.get
     runtime.client.session.get = async (args) => args.path.id === 'ses-late-admission'
       ? { data: { id: args.path.id, parentID: 'ses-physical-parent' } }
       : get(args)
     await hooks['chat.message']({ sessionID: 'ses-late-admission', messageID: 'msg-late-root', agent: 'engineer' }, {
-      message: { id: 'msg-late-root', sessionID: 'ses-late-admission', role: 'user', agent: 'engineer', model: {} }, parts: [],
+      message: { id: 'msg-late-root', sessionID: 'ses-late-admission', role: 'user', agent: 'engineer',
+        model: { providerID: 'host', modelID: 'selected-model' } }, parts: [],
     })
     const input = { sessionID: 'ses-late-admission', messageID: 'msg-late-admission', agent: 'engineer' }
     const output = () => ({
       message: { id: input.messageID, sessionID: input.sessionID, role: 'user', agent: input.agent,
-        model: { providerID: 'host', modelID: 'placeholder' } },
+        model: { providerID: 'host', modelID: 'selected-model' } },
       parts: [],
     })
     const first = output()
     const second = output()
     const late = output()
-    let secondModel = second.message.model
-    let lateAdmission
-    Object.defineProperty(second.message, 'model', {
-      enumerable: true,
-      get: () => secondModel,
-      set: (model) => {
-        secondModel = model
-        queueMicrotask(() => { lateAdmission = hooks['chat.message'](input, late) })
-      },
-    })
+    const models = [first, second, late].map(output => output.message.model)
     const initial = await Promise.allSettled([hooks['chat.message'](input, first), hooks['chat.message'](input, second)])
     assert.deepEqual(initial.map((admission) => admission.status), ['fulfilled', 'fulfilled'])
-    assert.ok(lateAdmission, 'the second committed Host projection schedules the late public hook')
-    await lateAdmission
-    for (const projected of [first, second, late]) {
-      assert.deepEqual({ ...projected.message.model }, { providerID: 'provider', modelID: 'engineer-model', variant: 'none' })
+    const beforeReplay = routing.sharedCapacitySnapshot()
+    await hooks['chat.message'](input, late)
+    for (const [index, projected] of [first, second, late].entries()) {
+      assert.equal(projected.message.model, models[index], 'admission must not replace the Host model object')
+      assert.deepEqual(projected.message.model, { providerID: 'host', modelID: 'selected-model' })
     }
     const capacity = routing.sharedCapacitySnapshot()
+    assert.deepEqual(capacity, beforeReplay)
     assert.equal(capacity.executions.filter((execution) => execution.sessionId === input.sessionID).length, 1)
     assert.equal(capacity.tokens.filter((token) => token.owner.sessionId === input.sessionID).length, 1)
   })

@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { SqliteJournal } from 'wanxiangli/eventstore'
 import { scopeProgress } from 'wanxiangli/scope-progress'
-import { stateRoot } from '../../../../dist/Persistence/Journal/RuntimePath.js'
+import { JournalSurface_initializeStateRoot as stateRoot } from '../../../../dist/Persistence/Journal/Surface.js'
 import { withExecutablePlugin, acceptAuthorityRoot } from '../../../verification-system/tests/support/plugin-fixture.mjs'
 
 const code = 'class Js extends JsProgram { async run() { return {ok: true}; } }'

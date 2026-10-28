@@ -55,11 +55,12 @@ try {
   assert.equal(sync.promptOrigin(runtime, owner, 'Engineer', 1), 'InteractionRepair')
   const duplicate = observe(true)
   assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 1, dispatch.admittedWithReceipt('actual-repair-receipt')), true)
-  await Promise.all([repair, duplicate])
+  assert.equal(await pendingAfterTurn(repair), 'pending', 'repair waits for physical acceptance, not its transport receipt')
   assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 2)
   assert.equal(sync.promptClaimState(runtime, owner, 'Engineer', 1).kind, 'Pending')
   assert.equal(await pendingAfterTurn(completion), 'pending')
-  await observe(true)
+  const repeated = observe(true)
+  await pendingAfterTurn(repeated)
   assert.deepEqual(sync.promptIdentity(runtime, owner, 'Engineer', 1), repairPrompt)
   assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 2)
   let successor
@@ -75,6 +76,7 @@ try {
     assert.equal(successor.ok, true, JSON.stringify(successor))
     assert.equal(successor.origin, 'InteractionRepair')
     assert.equal(successor.authorityRootUserMessageId, initial.authorityRootUserMessageId)
+    await Promise.all([repair, duplicate, repeated])
     assert.equal(sync.promptClaimState(runtime, owner, 'Engineer', 1).kind, 'Accepted')
     await observe(true)
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 2)
@@ -106,6 +108,7 @@ try {
       successor = await sync.confirmManagedPromptPhysical(runtime, owner, 'Engineer', 1, 'late-repair-physical')
       assert.equal(successor.ok, true, JSON.stringify(successor))
       assert.equal(successor.origin, 'InteractionRepair')
+      await Promise.all([repair, duplicate, repeated])
     }
     const staleText = lateAcceptance ? 'LATE-REPAIR-ANSWER' : 'REPAIR-FORMAL-ANSWER'
     const staleAccepted = fallback
@@ -119,8 +122,8 @@ try {
       secondAccepted.authorityRootUserMessageId, 'second-incomplete-provider-run', finish, delivery, true)
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 4)
     assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 3, dispatch.admittedWithReceipt('second-actual-repair-receipt')), true)
-    await secondRepair
     const secondSuccessor = await sync.confirmManagedPromptPhysical(runtime, owner, 'Engineer', 3, 'second-repair-physical')
+    await secondRepair
     assert.equal(secondSuccessor.ok, true, JSON.stringify(secondSuccessor))
     assert.equal(secondSuccessor.origin, 'InteractionRepair')
     deliverTo(secondSuccessor.sessionId, 'second-formal-provider-run', 'SECOND-REPAIR-FORMAL-ANSWER')

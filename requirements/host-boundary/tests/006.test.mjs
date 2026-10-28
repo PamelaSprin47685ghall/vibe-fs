@@ -42,6 +42,8 @@ const modelFromLease = async (sessionId, physicalUserMessageId, role, participan
     role,
     participant,
     lenderSessionId,
+    'normal',
+    { model: 'test/system', reasoning: 'none' },
   )
   assert.equal(outcome.kind, 'Acquired')
   const target = routing.sharedExecutionAdmissionTarget(outcome.lease)

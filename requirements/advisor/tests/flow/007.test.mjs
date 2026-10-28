@@ -6,8 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SqliteJournal } from 'wanxiangli/eventstore'
 import { AdvisorFlow, AdvisorProcessQueue, advisorClaim, advisorFinish, advisorPending, advisorStageBegin, advisorStageConfirm } from 'wanxiangli/scope-progress'
-import { ToolRuntimeScope, ToolRuntimeScope__SendAdvisorSteer_17BF5BBB } from '../../../../dist/OpenCode/Tools/ToolRuntimeScope.js'
-import { JournalHandle__get_Journal } from '../../../../dist/Persistence/Journal/Surface.js'
+import { ToolRuntimeScopeSurface } from '../../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js'
 import * as dispatcher from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import {
   withJournal, hostPort, prepareAcceptanceObserver, acceptObservedPhysical,
@@ -21,11 +20,7 @@ const waitFor = async predicate => {
   }
   assert.fail('expected durable Advisor transition was not observed')
 }
-const makeRuntime = (handle, sessionPort) => new ToolRuntimeScope(
-  sessionPort, {}, {}, JournalHandle__get_Journal(handle), undefined,
-  new Map(), () => undefined, new Map(),
-  undefined, undefined, undefined, undefined, undefined, undefined, undefined,
-)
+const makeRuntime = ToolRuntimeScopeSurface.createAdvisorSender
 
 const withDatabase = async action => {
   const dir = mkdtempSync(join(tmpdir(), 'advisor-flow-physical-'))
@@ -38,7 +33,7 @@ const withDatabase = async action => {
 }
 
 for (const advanceDuringDelivery of [false, true]) {
-  test(`WHAT[advisor-007] actual four-step Flow ${advanceDuringDelivery ? 'cannot complete stale Scope' : 'only completes after physical acceptance'}`, async () => {
+  test(`WHAT[advisor-007] actual four-step Flow ${advanceDuringDelivery ? 'cannot complete stale Scope' : 'only completes after physical acceptance'}`, async t => {
     await withDatabase(async persist => withJournal('advisor-end-to-end-' + advanceDuringDelivery, async handle => {
       const context = await prepareAcceptanceObserver(handle, 'continuation', 'advisor-complete-' + advanceDuringDelivery)
       let epoch = 'scope-5'
@@ -50,6 +45,7 @@ for (const advanceDuringDelivery of [false, true]) {
         signalSent()
         return dispatcher.admittedWithReceipt('sdk-submitted-not-physical')
       }))
+      t.after(() => runtime.dispose())
       const snapshot = () => persist(journal => journal.read('advisor-process:' + context.session).map(JSON.parse))
       const queue = AdvisorProcessQueue()
       let modelCalls = 0
@@ -64,8 +60,8 @@ for (const advanceDuringDelivery of [false, true]) {
         AskWorker: async () => { modelCalls++; return ok('worker evidence') },
         AskSeat: async () => { modelCalls++; return ok('advisor recommendation') },
         SendSteer: async (sid, scope, id, prose) => {
-          const result = await ToolRuntimeScope__SendAdvisorSteer_17BF5BBB(runtime, sid, prose, id, () => epoch === scope)
-          return result.tag === 0 ? ok('') : { Ok: false, Prose: '', Reason: result.fields[0] }
+          const result = await runtime.send(sid, prose, id, () => epoch === scope)
+          return result.ok ? ok('') : { Ok: false, Prose: '', Reason: result.error }
         },
       })
       const admitted = await flow.trigger(context.session, epoch, 'actual-run', 'why was estimate unchanged?')

@@ -1146,7 +1146,7 @@ test('WHAT[host-boundary-011] physically registered Advisor provider hook exclud
     const onlyReasoning=assistant('a-thought-011',{type:'reasoning',text:'No final prose in this run'})
     const u2=user('a-user-012','Please provide the missing observation.',102)
     await hooks['chat.message']({sessionID:sid,agent:'advisor',messageID:'a-user-012'},
-      {message:{...u2.info,sessionID:sid},parts:u2.parts})
+      {message:{...u2.info,sessionID:sid,model:{providerID:'fixture',modelID:'advisor-model'}},parts:u2.parts})
     const providerAssistant={info:{id:'assistant-provider-011',sessionID:sid,parentID:'a-user-012',
       role:'assistant',agent:'advisor',providerID:'fixture',modelID:'advisor-model',time:{created:103}},parts:[]}
     runtime.pushHostMessage(sid,providerAssistant)
