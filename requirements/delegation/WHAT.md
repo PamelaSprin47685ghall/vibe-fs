@@ -201,3 +201,11 @@ Manager 对仍活跃的 Engineer／DevOps 执行 `resume` 时，已有子会话�
 
 现场依据：2026-10-28 00:11:47 UTC，Engineer `ses_e80299a17ffe…` 接到前一 Scope 答复后继续工作并调用 `resetScope`；下一步开始 48 ms 后被插件 `session.abort`（opencode.log `message=cancel`），此后再无消息，Manager join 一直等待。opencode.log 在 2026-10-27/28 共 11 例相同形态（紧接 `resetScope`、最后一条 user 为 `wanxiangshu_consultation_steer` 答复、之后零消息）。旧实现在各阶段之后对投影副本第二次调用 `StopCompletedContinuation`，且只看答复之前的 assistant：该会话原始尾部为 `askPreviousScope` → `todowrite` → 答复 → `todowrite` → `resetScope`，原始历史判定看到 `todowrite` 不停；投影后同一回合只剩空壳，第二次判定命中“已完成且无工具”而停机。验收：`requirements/delegation/tests/037.test.mjs`——答复后已有回合（含随后 `resetScope`）不发 AbortSession；完成且无工具的回合之后才落地的答复仍停机。
 
+
+## [038] prose 收尾报告之后不得再调用 resetScope
+
+`resetScope` 只用于结束当前 Scope 并开启带新目标（`newScopeObjective`）的下一个 Scope。子代理用 prose 写完收尾报告即任务结束，没有下一个目标；委派人经 join 收到的是子代理**最后一个回合**的正文（`JoinResultRenderer`：final-turn prose）。收尾后再调 `resetScope` 是一次工具调用，运行因此不结束，而是在一个虚构的新 Scope 里继续，收尾报告被挤出最后一个回合。
+
+模型侧必须明说，三处中英文一致：`delegation/fork-child-base`（收尾报告是最后一个动作，之后即使有 steer 要求也不调 `resetScope`）；`host/scope-steer/reset-due`（估计为 0 的强 steer 在 ResetDue 存续期间每次出站请求都会追加，收尾后到达的续跑请求——如迟到咨询答复——同样带上它，硬规则写明收尾后不调、直接自然结束）；`resetScope` 工具描述。
+
+现场关联：[037] 的 11 例都是答复落地后紧接 `resetScope` 再被误停；判停已改为只读原始历史，本条从源头不再诱导收尾后的重置。验收：`requirements/delegation/tests/038.test.mjs`。
