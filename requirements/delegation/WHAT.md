@@ -82,7 +82,7 @@ fork 首 prompt typed 渲染的正文**只有本次 Assignment 指令**，不再
 
 父到子、同步委托、dag、DevOps 与 Advisor 请求只发送本次 charge / intent，**不传任何调用方历史、完整 post-scope 视图、`[[context]]`、筛选数组或附件 view**，也不附加父方未完成的活跃回合。子方只能从收到的当前指令开始，缺少必要事实时用 `negotiate(questions: string)` 向委托者提问；不得擅自推定未提供的上下文。charge 是任务本身（以 `# ...` 注释头呈现），协商返回的事实只是新的 steer，并不克隆 authority。
 
-`askPreviousScope`、`negotiate` 和 Advisor 的异步答复只在实际发往 provider 的 transform 边界裁决：以真实物理消息标识咨询答复，查其之前最近一条已完成 assistant 回合；该回合没有工具调用时中断本次续跑，不依赖可能被排队消息拖住的 work 或 session 终态。有工具调用、没有可确认的前一回合，以及当前输入是操作员消息或新 assignment 时不得据此中断。此判断只决定本次咨询续跑，不把自然 stop 写成 Work 完成事实。拦截只作用于出站请求副本；已落地的答复保留在会话历史中，后续真正续上的任务仍可使用，不设会话级永久禁令。
+`askPreviousScope`、`negotiate` 和 Advisor 的异步答复只在实际发往 provider 的 transform 边界裁决：以真实物理消息标识咨询答复，查其之前最近一条已完成 assistant 回合；该回合没有工具调用时中断本次续跑，不依赖可能被排队消息拖住的 work 或 session 终态。有工具调用、没有可确认的前一回合、答复之后已有 assistant 回合（答复已在活循环中被消费），以及当前输入是操作员消息或新 assignment 时不得据此中断。该判断只读未投影的 Host 历史，且每次出站请求只裁决一次（见 [037]）。此判断只决定本次咨询续跑，不把自然 stop 写成 Work 完成事实。拦截只作用于出站请求副本；已落地的答复保留在会话历史中，后续真正续上的任务仍可使用，不设会话级永久禁令。
 
 ## [022] 建议性工具次数
 
@@ -194,3 +194,10 @@ Manager 对仍活跃的 Engineer／DevOps 执行 `resume` 时，已有子会话�
 普通 Busy steer 不伪装成 `wanxiangshu_consultation_steer=true`，咨询消息仍单独按最近一轮 assistant 已完成且无工具调用的判据裁决，不限定为咨询发起回合；degeneration 的 `ProviderRetryAttempt` 也不改变。SDK 入队确认不等于模型消费，物理接纳与 PromptKey 恢复仍按原合同处理。
 
 现场依据：2026-10-27 09:54–09:55 UTC 的 `.Herdchestra/wanxiangshu/events/4e175784b9dc41548b338edc175b87bf-0000.ndjson` 显示重锚前后有 BusyAgentNudge 与 Terminal(Cancelled)，但单凭这些事件不能证明是谁调用了中断，也不能反推出应该排队。用户明确要求父方指导及时纠偏。验收：`requirements/execution-model-routing/tests/009.test.mjs` 检验 SDK Busy 的 body／顶层都明确 steer，咨询与 ProviderRetry 独立；`requirements/delegation/tests/036.test.mjs` 经真实 Manager `fork`／`resume` 验证原会话 PromptKey、立即 steer 且发送端未另调 AbortSession。
+
+## [037] 咨询停机只读原始历史，不得误停已消费答复的活循环
+
+`askPreviousScope`／`negotiate`／Advisor 答复的迟到停机（[021]）只在进入普通 transform 各阶段之前、对 Host 交来的未投影消息历史裁决一次。投影之后的出站副本不得再拿来裁决：已提交的 `resetScope` 会退休旧 Scope 的普通工具调用与思考，仅含工具的 assistant 回合整条消失，于是一个刚调过工具的忙碌回合在投影里看起来像“已完成且无工具调用”。答复之后已有 assistant 回合时，答复已在活循环里被消费，本次请求是普通续跑，同样不得中断。
+
+现场依据：2026-10-28 00:11:47 UTC，Engineer `ses_e80299a17ffe…` 接到前一 Scope 答复后继续工作并调用 `resetScope`；下一步开始 48 ms 后被插件 `session.abort`（opencode.log `message=cancel`），此后再无消息，Manager join 一直等待。opencode.log 在 2026-10-27/28 共 11 例相同形态（紧接 `resetScope`、最后一条 user 为 `wanxiangshu_consultation_steer` 答复、之后零消息）。旧实现在各阶段之后对投影副本第二次调用 `StopCompletedContinuation`，且只看答复之前的 assistant。验收：`requirements/delegation/tests/037.test.mjs`——答复后已有回合（含随后 `resetScope`）不发 AbortSession；完成且无工具的回合之后才落地的答复仍停机。
+
