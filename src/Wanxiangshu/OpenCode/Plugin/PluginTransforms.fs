@@ -1846,9 +1846,12 @@ module PluginTransforms =
 
             // The late-consultation stop reads the unprojected Host history only.
             // After the ordinary stages the wire is a projection: a committed
-            // resetScope retires the old Scope's ordinary tool parts and drops
-            // tool-only assistant turns, so a busy turn that called tools looks
-            // like a finished tool-free turn. Re-judging that projection aborted
+            // resetScope retires the ordinary tool parts (and thinking) before the
+            // latest reset while keeping resetScope/askPreviousScope/... calls, so
+            // the assistant turn just before the answer (e.g. a todowrite-only
+            // step) survives as a completed step-start/step-finish shell and looks
+            // like a finished tool-free turn. The predicate only inspects the turn
+            // before the answer, so the retained resetScope after it never helps. Re-judging that projection aborted
             // live children right after resetScope with nothing left to resume
             // them (2026-10-27/28 field incidents), so it is judged exactly once.
             let! stopped = caps.StopCompletedContinuation projectionSessionIdOpt physicalUserMessageId outObj

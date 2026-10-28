@@ -197,7 +197,7 @@ Manager 对仍活跃的 Engineer／DevOps 执行 `resume` 时，已有子会话�
 
 ## [037] 咨询停机只读原始历史，不得误停已消费答复的活循环
 
-`askPreviousScope`／`negotiate`／Advisor 答复的迟到停机（[021]）只在进入普通 transform 各阶段之前、对 Host 交来的未投影消息历史裁决一次。投影之后的出站副本不得再拿来裁决：已提交的 `resetScope` 会退休旧 Scope 的普通工具调用与思考，仅含工具的 assistant 回合整条消失，于是一个刚调过工具的忙碌回合在投影里看起来像“已完成且无工具调用”。答复之后已有 assistant 回合时，答复已在活循环里被消费，本次请求是普通续跑，同样不得中断。
+`askPreviousScope`／`negotiate`／Advisor 答复的迟到停机（[021]）只在进入普通 transform 各阶段之前、对 Host 交来的未投影消息历史裁决一次。投影之后的出站副本不得再拿来裁决：已提交的 `resetScope` 会退休最新 reset 之前的普通工具 part 与思考；`resetScope` 自身及 `assume`／`negotiate`／`askPreviousScope`／`advisor` 的调用照常保留，但答复之前那条只调普通工具（如 `todowrite`）的 assistant 回合在 OpenCode 副本里只剩 `step-start`／`step-finish` 空壳，仍带 `time.completed`，于是看起来像“已完成且无工具调用”。旧判据只看答复**之前**最近的 assistant，从不看答复之后的回合，所以随后那条保留下来的 `resetScope` 也救不了它。答复之后已有 assistant 回合时，答复已在活循环里被消费，本次请求是普通续跑，同样不得中断。
 
-现场依据：2026-10-28 00:11:47 UTC，Engineer `ses_e80299a17ffe…` 接到前一 Scope 答复后继续工作并调用 `resetScope`；下一步开始 48 ms 后被插件 `session.abort`（opencode.log `message=cancel`），此后再无消息，Manager join 一直等待。opencode.log 在 2026-10-27/28 共 11 例相同形态（紧接 `resetScope`、最后一条 user 为 `wanxiangshu_consultation_steer` 答复、之后零消息）。旧实现在各阶段之后对投影副本第二次调用 `StopCompletedContinuation`，且只看答复之前的 assistant。验收：`requirements/delegation/tests/037.test.mjs`——答复后已有回合（含随后 `resetScope`）不发 AbortSession；完成且无工具的回合之后才落地的答复仍停机。
+现场依据：2026-10-28 00:11:47 UTC，Engineer `ses_e80299a17ffe…` 接到前一 Scope 答复后继续工作并调用 `resetScope`；下一步开始 48 ms 后被插件 `session.abort`（opencode.log `message=cancel`），此后再无消息，Manager join 一直等待。opencode.log 在 2026-10-27/28 共 11 例相同形态（紧接 `resetScope`、最后一条 user 为 `wanxiangshu_consultation_steer` 答复、之后零消息）。旧实现在各阶段之后对投影副本第二次调用 `StopCompletedContinuation`，且只看答复之前的 assistant：该会话原始尾部为 `askPreviousScope` → `todowrite` → 答复 → `todowrite` → `resetScope`，原始历史判定看到 `todowrite` 不停；投影后同一回合只剩空壳，第二次判定命中“已完成且无工具”而停机。验收：`requirements/delegation/tests/037.test.mjs`——答复后已有回合（含随后 `resetScope`）不发 AbortSession；完成且无工具的回合之后才落地的答复仍停机。
 

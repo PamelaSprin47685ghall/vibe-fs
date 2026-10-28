@@ -59,3 +59,47 @@ test('WHAT[delegation-037] a consultation answer the agent already worked past n
     assert.deepEqual(runtime.abortedIds.slice(before), [sid])
   })
 })
+
+// Seam proof on the production transform: the stop is judged once, on the raw
+// history, and the projected copy (which hollows out the pre-answer todowrite
+// turn after a later resetScope) is never re-judged.
+test('WHAT[delegation-037] the late-consultation stop sees raw history once, never the reset projection', async () => {
+  const { normalTransform, DeliveryAdjudication } = await import('../../../dist/OpenCode/Plugin/PluginTransforms.js')
+  const { clearSessionState } = await import('../../../dist/Context/Scope/Surface.js')
+  const sid = 'ses_consult_037_projection'
+  clearSessionState(sid)
+  const step = (id, name, callID) => ({ info: { id, role: 'assistant', sessionID: sid, time: { created: 2, completed: 5 }, finish: 'tool-calls' },
+    parts: [{ type: 'step-start' }, { type: 'reasoning', text: 'think' }, tool(name, callID), { type: 'step-finish' }] })
+  // Tail of ses_e80299a17ffe… (2026-10-28 00:11): askPreviousScope → todowrite → answer → todowrite → resetScope.
+  const messages = [
+    user(sid, 'u0', [{ type: 'text', text: 'assignment' }]),
+    step('a-rs1', 'resetScope', 'c1'),
+    step('a-aps', 'askPreviousScope', 'c2'),
+    step('a-tw2', 'todowrite', 'c3'),
+    user(sid, 'answer', [steerPart]),
+    step('a-tw3', 'todowrite', 'c4'),
+    step('a-rs2', 'resetScope', 'c5'),
+  ]
+  const seen = []
+  const yes = async () => {}
+  const caps = {
+    BeginPhysicalProviderAttempt: yes, BindSessionStartedAt: async () => null, ApplyRelayProjection: async () => null,
+    ApplyTenureIsolation: yes, CaptureXTraceMessages: async () => ({ Current: null, RawMessages: [], Receipt: null }),
+    RefreshCompanionXTrace: () => {}, ApplyCompanion: yes, ApplyXWire: yes, FreezeProviderAttemptPlan: yes,
+    InjectPairGuideline: yes, SettleAndReplaceDeferredInspections: yes, SanitizeMessages: () => {},
+    IsPureChatSession: () => false, AdjudicateDelivery: async () => new DeliveryAdjudication(0, []), StopAfterDelivery: yes,
+    StopCompletedContinuation: async (_sid, _physical, out) => {
+      const before = out.messages.find(m => m.info?.id === 'a-tw2')
+      seen.push(before.parts.some(p => p.type === 'tool'))
+      return false
+    },
+  }
+  const out = { messages: [...messages] }
+  await normalTransform(caps, sid, {}, out)
+  assert.deepEqual(seen, [true], 'judged exactly once, while the pre-answer todowrite part is still present')
+  // The hazard the single raw judgment avoids: the projection keeps resetScope but hollows the pre-answer turn.
+  const hollow = out.messages.find(m => m.info?.id === 'a-tw2')
+  assert.ok(hollow && !hollow.parts.some(p => p.type === 'tool'), 'projection retires the pre-answer todowrite part')
+  assert.ok(out.messages.some(m => m.info?.id === 'a-rs2' && m.parts.some(p => p.tool === 'resetScope')), 'resetScope itself is retained')
+  clearSessionState(sid)
+})
