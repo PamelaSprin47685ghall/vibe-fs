@@ -39,3 +39,10 @@ HostJoinAttemptFactory 的工程引用，收窄旧反向依赖。独立 CLI 的�
 
 [完成] CI / review 复查：同步主仓 38867da64、库 359a1ec，解开子模块冲突；
 主仓 11 项、库 21 项相关回归通过。107 项格式失败与 upstream 相同，单列。
+
+[完成] 可选并行构建：主仓 --parallel / --jobs 入口转交独立库模块。
+实施计划见 wanxiangli/scripts/PARALLEL-PLAN.txt；主项目 F# 保持一次完整闭包编译。
+主仓 13 项相关回归无跳过通过；真实入口的两种并行度、产物一致和无改动已验证。
+库：https://github.com/PamelaSprin47685ghall/wanxiangli/pull/7
+主仓：https://github.com/PamelaSprin47685ghall/vibe-fs/pull/69
+两工作目录测试服务已停止；原仓和运行版本未动，无合并或部署。

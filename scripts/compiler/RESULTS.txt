@@ -143,3 +143,26 @@ PR #67 的 0077d5749 CI（run 40631698152）在 format:check 失败，未进入�
 本地同款 Fantomas 检查有 107 项失败，与未修改 upstream 副本清单完全相同；
 最新 upstream 与基准副本的 F# 源码和格式配置也相同。未修改无关业务格式。
 复查时两个 PR 均无 review 或行内意见。CI 既有失败不能算作完整套件通过。
+
+2026-10-28 可选并行构建
+
+主仓基于 upstream/master 89ab1f399，库基于 upstream/main 87de56a。
+主仓 --parallel / --jobs 1–4 转发到源码库；主项目 F# 仍为一次影响范围闭包编译。
+库并行实现、边界与性能表见 wanxiangli/scripts/BUILDING.txt。
+
+主仓实际 npm run build -- --parallel 编译了全部 49 个库模块，记录 jobs=2。
+主仓 753 个 JS 与此前 fission-baseline-hashes.json 完全相同。
+最新库源码的串行全量与主仓嵌套库的并行全量，49 个 JS 逐字节一致。
+让四个指定库模块的缓存失效后，从主入口 --jobs 4 重编，记录 jobs=4 / projects=4；
+额外进程均已退出，主仓和库产物仍一致。之后 --parallel 无改动构建保留
+753 + 49 个 JS 和两份 usage.json 的字节及 mtime（共 804 个文件）。
+
+WXS_TIER_INTEGRATION=1 下，structured-workflow/tests/020.test.mjs、
+impact/012.test.mjs、parallel/012.test.mjs 共 13 项通过，无跳过。
+三个实际增量范围分别有 537、342、712 个 JS 与全量逐字节相同。
+日志在 .fable-build/parallel-main-regression.log、parallel-main-build.log、
+parallel-main-jobs4.log、parallel-main-noop.log；未更改业务源码。
+
+库 scripts/tests/012–017 共 27 项通过；补充双模块实际改动后，017 的 6 项复跑通过。
+同步最新 upstream 后另通过 projection 的 8 项测试。未据此声称整个仓库测试全绿；
+先前记录的 upstream 格式与无关测试问题仍单列，不扩大此次修改范围。

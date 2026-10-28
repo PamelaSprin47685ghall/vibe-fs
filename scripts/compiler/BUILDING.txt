@@ -57,3 +57,16 @@ workerMemory.rss 和 managedHeapBytes 分别为返回时 RSS 与未经强制 GC 
 没有收到复用报告时累计 missingReuseReports，不推测丢失数据。
 记录损坏或不可写时保留现有文件，在服务日志报告并停用本服务的记录，
 不改变编译结果。修复文件后重启服务可恢复；清空记录应先停止服务再删除文件。
+
+可选并行构建
+
+npm run build -- --parallel 将 wanxiangli 的失效模块交给 2 个编译进程。
+npm run build -- --jobs 4 可指定 1–4 个；不传参数仍为串行。
+主仓入口自动向源码库传参，不需要 agent 手工启动服务或拆分构建命令。
+选项不能与 --plan、--checker-status、--checker-stop 混用。
+
+并行只用于独立库模块。主项目仍按完整的影响范围闭包执行一次 .NET Fable 编译，
+保持 canonical order 和名称绑定。主仓和库的发布锁继续串行化多个 agent 的请求。
+库中只保留第一个 checker 常驻；额外进程构建结束即退出，十分钟空闲规则不变。
+少量改动可能因初始化额外进程而变慢，默认串行更合适；全量可选 --parallel。
+测量和具体回收边界见 wanxiangli/scripts/BUILDING.txt。
