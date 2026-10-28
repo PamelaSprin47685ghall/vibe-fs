@@ -1,5 +1,7 @@
 # 测试规则适用范围复核
 
+本文件及所附日志记录原优化分支的内容审阅，测试结果不适用于变基后的上游代码。当前变基范围与验证见[上游适配记录](../test-rules-upstream-20261028/README.md)。
+
 日期：2026-10-28。工作分支：`codex/test-optimization-20261024`。本轮起点：`fbed0b763`。
 
 本文记录条款比较、修订理由与验证结果，不定义另一套测试规则。唯一正文仍是 [AXIOMS.md](../../requirements/verification-system/AXIOMS.md)。
@@ -8,7 +10,7 @@
 
 - 迁移前 WHAT：`fcae7e1d7:requirements/verification-system/WHAT.md`。
 - 上次精炼后的 AXIOMS：`a769e34d9`；本轮起点 `fbed0b763` 中该文件内容相同。
-- 格式依据：[requirement-system](../../requirements/requirement-system/WHAT.md) 的唯一正文、SPEC 编号与证据范围约定，以及当前依赖版本的[规则写法](../../wanxiangli/AGENTS.md)。
+- 格式依据：[requirement-system](../../requirements/requirement-system/WHAT.md) 的唯一正文、SPEC 编号与证据范围约定，以及当时依赖版本的[规则写法](https://github.com/dyx13/wanxiangli/blob/3bcb47be43c4ba1225c5a1928e2f7b974e9aad74/AGENTS.md)。
 
 先逐条比较约束对象、触发条件、量词、验证范围和结论范围，再用合法的替代做法检验改写是否误伤，最后检查是否仍能拒绝原来要防止的违规。下面的反例是内容审阅中的推理，并非本轮执行的业务实验。
 
@@ -131,6 +133,6 @@ TESTS_MJS_FILES='requirements/requirement-system/tests/001.test.mjs,requirements
 
 归档后另核对两份审阅记录的 21 个本地链接；保存的两份日志与原始输出逐字节一致，`git diff --check` 通过。
 
-同步调整了[测试 prompt 附加段落](../../proposals/高效测试Prompt.md)，让资源回归的在途保护条件和准备复用范围与正文一致。[规范施工 prompt](../../proposals/规范施工Prompt.md) 原有引用继续生效，未改成另一份规则。根 `AGENTS.md`、生产代码、运行器、检查器、测试断言及依赖均未修改。
+同步调整了[测试 prompt 附加段落](../../proposals/高效测试Prompt.md)，让资源回归的在途保护条件和准备复用范围与正文一致。[当时的规范施工 prompt](https://github.com/dyx13/vibe-fs/blob/a979a3f7707b30f5ac96d6f96c7f6a4b7ced8b45/proposals/规范施工Prompt.md) 原有引用继续生效，未改成另一份规则。根 `AGENTS.md`、生产代码、运行器、检查器、测试断言及依赖均未修改。
 
-未重跑完整 unit、integration、真实宿主或发布流水线，未新增性能测量。006、016、021 的实现与证据 TODO 保留；19 项规范测试通过不代表这些行为已在全仓完成验收。此前归属修复的经过仍见[原记录](../spec-test-ownership-20261028/README.md)，不改写历史结果。
+未重跑完整 unit、integration、真实宿主或发布流水线，未新增性能测量。006、016、021 的实现与证据 TODO 保留；19 项规范测试通过不代表这些行为已在全仓完成验收。此前归属修复的经过仍见[原记录](https://github.com/dyx13/vibe-fs/blob/fbed0b763fd7691bcb9b2e833e84141ae26dabf3/evidence/spec-test-ownership-20261028/README.md)，不改写历史结果。
