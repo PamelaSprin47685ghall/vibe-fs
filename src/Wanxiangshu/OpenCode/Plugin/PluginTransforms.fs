@@ -1132,6 +1132,12 @@ module PluginTransforms =
                     if sidOpt.IsSome && physical.IsSome && finishedConsultationTurn physical outObj then
                         let sid = SessionId.create (Option.get sidOpt)
                         ModelRouting.suppressProviderStep sid (Option.get physical)
+                        // WHAT[delegation-039]: the abort below leaves only an empty
+                        // aborted turn after this answer. Record the stop first so the
+                        // idle reconcile settles the run on the finished report.
+                        Wanxiangshu.Foundation.TerminalSignal.CompletedContinuationStops.record
+                            sid
+                            (PhysicalUserMessageId.value (Option.get physical))
                         RelayNarrativeTransform.clearRequestMessages outObj
                         let! outcome =
                             match boot.PortOpt with
