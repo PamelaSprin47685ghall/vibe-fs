@@ -61,36 +61,68 @@ type ToolRuntimeScopeSurface =
             new ToolRuntimeScope(
                 unbox<ISessionHostPort> sessionPort,
                 DummyObserver(),
-                { new IRootWorkspaceReader with member _.TryRead() = None },
+                { new IRootWorkspaceReader with
+                    member _.TryRead() = None },
                 Some journal.Journal,
                 None,
                 Dictionary<string, string>(),
                 (fun _ -> None),
                 Dictionary<string, string>(),
-                None, None, None, None
+                None,
+                None,
+                None,
+                None
             )
+
         let send session prose processId isCurrent =
             task {
                 let! result = scope.SendAdvisorSteer(session, prose, processId, isCurrent)
                 return ToolRuntimeScopeSurface.steerResult result
             }
-        box {| send = send; dispose = fun () -> scope.DisposeAsync() |}
+
+        box
+            {| send = send
+               dispose = fun () -> scope.DisposeAsync() |}
 
     static member sendBusyNudgeAwait
-        (journal: JournalHandle, sessionPort: obj, session: string, prose: string, observation: obj) : Task<obj> =
+        (journal: JournalHandle, sessionPort: obj, session: string, prose: string, observation: obj)
+        : Task<obj> =
         task {
             let sessionId = SessionId.create session
+
             let profile =
-                PromptAuthorityProjectionQueries.activeProfile sessionId (AgentJournal.snapshot journal.Journal).AgentProjections
+                PromptAuthorityProjectionQueries.activeProfile
+                    sessionId
+                    (AgentJournal.snapshot journal.Journal).AgentProjections
+
             match profile with
-            | None -> return box {| ok = false; error = "No active authority profile" |}
+            | None ->
+                return
+                    box
+                        {| ok = false
+                           error = "No active authority profile" |}
             | Some active ->
                 let observer: ContinuationAcceptanceObserver =
-                    { Notify = fun message -> emitJsExpr (observation, PhysicalUserMessageId.value message) "$0.Notify($1)"
-                      AttachDisposable = fun registration -> emitJsExpr (observation, registration) "$0.AttachDisposable($1)"
-                      Budget = if isNull observation?Budget then None else Some(unbox observation?Budget) }
+                    { Notify =
+                        fun message -> emitJsExpr (observation, PhysicalUserMessageId.value message) "$0.Notify($1)"
+                      AttachDisposable =
+                        fun registration -> emitJsExpr (observation, registration) "$0.AttachDisposable($1)"
+                      Budget =
+                        if isNull observation?Budget then
+                            None
+                        else
+                            Some(unbox observation?Budget) }
+
                 let! result =
-                    HostForkBusyNudge.sendObservedAwait (unbox sessionPort) (Some journal.Journal) sessionId active None prose observer
+                    HostForkBusyNudge.sendObservedAwait
+                        (unbox sessionPort)
+                        (Some journal.Journal)
+                        sessionId
+                        active
+                        None
+                        prose
+                        observer
+
                 return ToolRuntimeScopeSurface.steerResult result
         }
 

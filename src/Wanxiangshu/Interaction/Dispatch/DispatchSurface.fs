@@ -637,21 +637,43 @@ module DispatchSurface =
         : Task<obj> =
         task {
             match PromptAuthority.tryParseContinuationKind continuation with
-            | None -> return box {| ok = false; key = null; error = "Unknown continuation kind" |}
+            | None ->
+                return
+                    box
+                        {| ok = false
+                           key = null
+                           error = "Unknown continuation kind" |}
             | Some kind ->
                 let observer: ContinuationAcceptanceObserver =
                     { Notify = PhysicalUserMessageId.value >> onAccepted
                       AttachDisposable = box >> attachRegistration
                       Budget = None }
+
                 let! result =
                     HostSessionNudge.sendContinuationDetachedObservedResult
                         (PlainSessionPort(port))
-                        { new IRootWorkspaceReader with member _.TryRead() = None }
-                        (SessionId.create session) prompt kind None (Some handle.Journal) observer onRefused
+                        { new IRootWorkspaceReader with
+                            member _.TryRead() = None }
+                        (SessionId.create session)
+                        prompt
+                        kind
+                        None
+                        (Some handle.Journal)
+                        observer
+                        onRefused
+
                 return
                     match result with
-                    | Ok key -> box {| ok = true; key = PromptKey.value key; error = null |}
-                    | Error error -> box {| ok = false; key = null; error = error |}
+                    | Ok key ->
+                        box
+                            {| ok = true
+                               key = PromptKey.value key
+                               error = null |}
+                    | Error error ->
+                        box
+                            {| ok = false
+                               key = null
+                               error = error |}
         }
 
     let sendGateNudgesConcurrently

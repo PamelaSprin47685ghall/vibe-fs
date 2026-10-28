@@ -15,8 +15,8 @@
 ## 工作项
 
 1. 已完成：按真实行为修复包登记、编号与归属，保留有效断言；替换无合同依据的源码词形断言。
-2. 局部验证已完成，等待完整复测：修复新版宿主输入、已退出接口等导致的失效测试；真实产品问题独立记录，不以改期望掩盖。
-3. 待做：从完整文件生命周期定位主要成本，完成等覆盖的优化前后对照。
+2. 已完成 unit 范围：修复新版宿主输入、已退出接口等导致的失效测试；修复真实 UTF-8 栈溢出。固定基线与优化后完整 unit 均为 4167 pass、0 fail；原有 skip/TODO 保留，未算通过。
+3. 已完成一组等覆盖对照：拆开主要长尾文件中的九个独立注册组，完整 unit 从 343.35 秒降至 294.68 秒。格式、静态检查和真实宿主验收的剩余边界见下文。
 
 ## 第一批：归属与有效证据
 
@@ -53,6 +53,61 @@
 局部验证：公开接口与调用方 87/87 通过；检查器最后一轮 23/23 通过；durable-events 019 的 18 项通过。前面的试跑失败和修正分别保留在 `/private/tmp/vibe-fs-test-updates-*.log`。完整套件状态以随后固定输入的运行记录为准，这些局部通过不代替整套结果。
 
 完整试跑 `contracts-20261028-before-split`（`c589d8223`）：341.540 秒，800/800 文件完成，4166 pass、1 fail、110 skip、261 TODO，输入前后稳定。唯一失败是 host-boundary 021 仍要求调用已退出的模型改写端口；改为检查现行目标比较与事务接线，并拒绝旧改写端口。对应结构测试和真实宿主模型测试 21/21 通过。此轮保留为失败记录；随后重建固定基线，不将它与原 81 项失败基线的差值算作等覆盖收益。
+
+## 第四批：缩短整套 unit 的调度长尾
+
+### 改动和因果依据
+
+固定基线中，`verification-system/tests/016.test.mjs` 从文件启动到结果流排空用时 152.26 秒，是最后完成的文件。九组彼此独立的工具与输入测试都在该文件串行注册，其他文件完成后，两个 worker 不能共同推进这个长尾。
+
+提交 `b455d8eea` 只把九个既有注册调用移到各自的 `016.test.mjs`：readonly-inputs、archive-namespace、node-tool-candidate、npm-tool-archive、npm-install-setup、dotnet-sdk、dotnet-tool-restore、nuget-project、fable-project。原文件保留其直接定义的测试和六项 integration 场景。没有改运行器、增加并发或添加缓存。
+
+对应九个 support 模块在前后提交中字节完全一致；其测试正文、断言、样本、seed、超时、清理及组内共享准备均未改变。NuGet 的共享只读夹具及 before/after 仍属于原来的 describe，没有拆散依赖同一生命周期的场景。新入口沿用原诊断设置与层级门禁。
+
+### 有效对照
+
+| 项目 | 修复后基线 | 拆分后 |
+| --- | --- | --- |
+| 提交 | `8e80217cf76f3f1be621013898d11f65223a1e55` | `b455d8eea0111e8554a637b0cc681816843933ca` |
+| 记录 ID | `contracts-20261028-fixed-baseline` | `contracts-20261028-after-split` |
+| 完整进程 wall time | 343.353 秒 | 294.682 秒 |
+| 文件完成数 | 800/800 | 809/809 |
+| pass / fail | 4167 / 0 | 4167 / 0 |
+| skip / TODO | 110 / 261 | 110 / 261 |
+| 已启动用例身份多重集 | 4428 项 | 完全一致 |
+| skip/TODO 身份与原因多重集 | 371 项 | 完全一致 |
+| 测试正文耗时总和 | 521.07 秒 | 532.09 秒 |
+| 每轮输入前后摘要 | 相同 | 相同 |
+| 退出码 | 0 | 0 |
+
+整套 unit 等待减少 **48.671 秒，14.18%**。4428 个启动身份包含 261 个以 TODO 标记执行的用例；这些 TODO 没有计入 4167 个通过项。九个新增文件仅改变调度单位，没有新增或移除场景。
+
+前后均使用 Node 22.23.4、npm 11.12.1、Bun 1.3.14、dotnet 10.0.302、rg 15.2.0，worker 并发 2，静默预算 30000 ms、整套后备预算 900000 ms。同样关闭 integration/release 层，同样保留 `WXS_ACCEPT_TODO=1`；产物新鲜度检查正常执行。工具版本及所有已记录的运行器环境变量逐项相同。
+
+这是同一机器上的一组有效对照。1 分钟负载采样范围前为 2.515–3.616，后为 2.062–12.232，不能据此承诺其他环境的固定收益。正文耗时总和未减少，因此本次证据支持“调度长尾缩短”，不支持“计算总量下降”或“完整发布流水线提速 14.18%”。
+
+### 可复核记录和后续方向
+
+- [comparison.json](comparison.json) 保存版本、环境、输入摘要、原始日志校验和、启动身份摘要、完整耗时和前后最慢的 15 个文件。
+- [compare-runs.py](compare-runs.py) 校验原始日志 SHA-256，按主运行器的文件生命周期和 worker 启动记录比较身份多重集；过滤嵌套测试运行器的诊断。用例移动时不把文件路径当成用例身份，重复标题仍按出现次数比较。
+- 原始 `.json` 和 `.log` 保留在 `/Users/yuanxi/Workwork/vibe-fs/.Herdchestra/test-optimization/20261027/`，记录 ID 见上表。复核命令：`python3 evidence/test-updates-20261028/compare-runs.py DATA_DIRECTORY contracts-20261028-fixed-baseline contracts-20261028-after-split OUTPUT_JSON`。
+- 前后九个 support 文件可直接用 `git diff 8e80217cf b455d8eea -- requirements/verification-system/tests/support` 复核，输出为空；该性能提交的完整 diff 只包含注册入口调整。
+
+优化后最慢文件为 NuGet project 38.15 秒、npm tool archive 36.14 秒、verification 006 28.40 秒、Node tool candidate 23.75 秒、Fable project 19.60 秒、dotnet tool restore 17.60 秒。后续应先测这些组的准备与正文成本，区分可复用的只读准备、真实进程开销和合同要求的等待；不要仅为继续拆文件而重复昂贵准备。若调整资源共享，须另证隔离与失效条件，再做同范围完整对照。本轮没有实施这些后续策略。
+
+## 交付复核与未闭合边界
+
+性能对照后，补齐 `latency-degeneration` 的 53 个消融配置项：station-05 至 station-56 为 ablated，production 为 active，与 station-60 引入该节点的登记一致。修正本次新增接口的格式，不改变接口或执行逻辑。这些收尾改动不混入上表的性能提交。
+
+最终状态、相关原始日志的路径与校验和见 [delivery-validation.json](delivery-validation.json)。
+
+- 最终官方 Fable 构建 generation 11 成功；151 个公开 JS surface 和 753 个产物模块链接检查通过。
+- 收尾后按影响范围复测 11 个文件：42 pass、0 fail、1 个原有 skip、0 TODO，输入摘要前后相同。记录 ID 为 `contracts-20261028-delivery-targeted`。没有因纯格式及配置补全再重复整套性能实验。
+- 消融配置门禁通过。先前的 53 项缺失确为本次登记遗漏，已修复；没有修改门禁来豁免它们。
+- 官方完整入口 `node scripts/verify.mjs` 在 format:check 阶段失败，后续阶段在该次流水线中未运行。最终仍有 107 个文件需要格式调整：99 个文件与上游相同；另外 8 个本轮触及的文件，其上游原文在相同配置下也未通过。新引入的 5 个文件格式问题已逐个手工修正并通过检查。完整格式日志为 `.fable-build/verify-logs/2026-10-28T10-41-14-226Z/format-check.log`。
+- 独立静态检查仍有 118 项控制结构嵌套问题，集中于 `fsharp-control-pyramid`。忽略行号移动后，与上游逐项相同；检查实现未改动。详见 [control-pyramid-comparison.json](control-pyramid-comparison.json)。这属于未修复的上游问题，不能写成检查通过。
+
+本轮没有重新执行 integration/release 或连续真实宿主验收，也没有清偿既有 110 skip、261 TODO。原失败基线的 81 项失败已不再出现，但 423.10 秒到 294.68 秒之间包含合同迁移、回归修复和执行范围变化，不能整体算作等覆盖收益。
 
 ## 边界
 

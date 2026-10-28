@@ -7,11 +7,15 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.TerminalSignal
 
 module HostSignalSubscribeSurface =
-    let recordInterrupt (sessionId: string) = DegenerationInterrupts.record (SessionId.create sessionId)
 
-    let refuseInterrupt (sessionId: string) = DegenerationInterrupts.unrecord (SessionId.create sessionId)
+    let recordInterrupt (sessionId: string) =
+        DegenerationInterrupts.record (SessionId.create sessionId)
 
-    let forgetInterrupts (sessionId: string) = DegenerationInterrupts.forget (SessionId.create sessionId)
+    let refuseInterrupt (sessionId: string) =
+        DegenerationInterrupts.unrecord (SessionId.create sessionId)
+
+    let forgetInterrupts (sessionId: string) =
+        DegenerationInterrupts.forget (SessionId.create sessionId)
 
     let interruptCursor (sessionId: string) : unit -> bool =
         let cursor = DegenerationInterrupts.Cursor(SessionId.create sessionId)
