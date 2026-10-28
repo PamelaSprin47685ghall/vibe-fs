@@ -209,3 +209,11 @@ Manager 对仍活跃的 Engineer／DevOps 执行 `resume` 时，已有子会话�
 模型侧必须明说，三处中英文一致：`delegation/fork-child-base`（收尾报告是最后一个动作，之后即使有 steer 要求也不调 `resetScope`）；`host/scope-steer/reset-due`（估计为 0 的强 steer 在 ResetDue 存续期间每次出站请求都会追加，收尾后到达的续跑请求——如迟到咨询答复——同样带上它，硬规则写明收尾后不调、直接自然结束）；`resetScope` 工具描述。
 
 现场关联：[037] 的 11 例都是答复落地后紧接 `resetScope` 再被误停；判停已改为只读原始历史，本条从源头不再诱导收尾后的重置。验收：`requirements/delegation/tests/038.test.mjs`。
+
+## [039] 迟到咨询停机后，本次运行以被保留的收尾报告结算
+
+[021]／[037] 的迟到咨询停机只决定“这一次被答复唤醒的续跑不发”，不得吞掉它所保留的那条收尾报告。答复在子代理**还在写收尾 prose 时**就被排队（BusyAgentNudge）：Host 循环写完报告后不经 `session.idle` 直接跑向排队的答复，停机在普通阶段之前 `AbortSession`，答复之后只剩停机自己造成的空 `MessageAbortedError` 回合；而且 Host 先落这条 abort、后把报告的 `message.updated` 交给插件，所以插件看到的每个快照都以这条 abort 结尾。停机发生在普通阶段之前，答复也从未成为绑定的物理输入，于是 reconcile 取“本运行物理输入之后最新的 assistant”= 这条 abort，判 `TurnAborted`（仅观察），报告的终态从不发布，`HandleWorkCompleted` 从不写入，父方 join 永远等待。
+
+规则：停机在中断前登记被停的答复（`CompletedContinuationStops`）。reconcile 遇到“最新 assistant 是 abort、其 parent 是已登记的被停答复”时，本次运行的结算对象是该答复之前、本运行物理输入之后那条已完成的收尾回合（按它自己的物理输入构造），走普通完成路径（交付见证、XTrace 捕获、终态发布）。这不是回退到历史 assistant：停机本身就是“报告之后的一切不属于本运行”的登记事实；未登记的 abort（操作员取消、退化打断等）照旧是观察。
+
+现场依据：2026-10-28 Manager `ses_e7fff8f2fffe…`（“大重构指南实施”），join 自 01:11:09 UTC 起挂住。Engineer `review-admission`（`ses_e7fff5477ffe…`）收尾报告 01:08:44–01:10:54，答复 01:09:58 排队，01:10:54 `loop step=21` 后 7 ms `cancel`；DevOps `devops`（`ses_e7fff48b5ffe…`）收尾报告 01:16:27–01:17:09，答复 01:16:50 排队，01:17:09.537 `loop step=20`、.544 `cancel`、.570 才记到报告的 ChatExecution Completed。两者都无 `TerminalOutputCaptured`、无 `HandleWorkCompleted`；同一会话里没有排队答复的 `review-continuation` 正常结算。验收：`requirements/delegation/tests/039.test.mjs`（未修复时 report 终态永不发布，修复后 `CompletedAwaitingJoin` 且 join 拿到报告正文）。
