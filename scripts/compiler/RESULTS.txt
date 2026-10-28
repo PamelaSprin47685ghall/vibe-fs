@@ -131,3 +131,15 @@ WXS_TIER_INTEGRATION=1 node --test requirements/structured-workflow/tests/impact
 及两仓使用记录不变。日志在 .fable-build/performance/fission-*.log。
 旧 tests/012.test.mjs 引用了 upstream 已删除的 scripts/owner-impact-report.mjs，
 整文件执行会中断；在未修改的 upstream 06c10f8cd 副本复现，未恢复旧报告工具。
+
+2026-10-28：CI / review 复查与 upstream 同步
+
+PR #67 的 0077d5749 CI（run 40631698152）在 format:check 失败，未进入构建。
+同期 upstream 前进至主仓 38867da64、库 359a1ec，造成子模块引用冲突。
+现有分支已同步，库使用 5daad07；冲突仅涉及库说明文档和主仓 gitlink，
+保留 upstream 文档内容及本功能说明，服务实现和增量依赖修复未变。
+同步后主仓 020 与 impact/012 共 11 项、库 012–016 共 21 项回归全部通过；
+三个真实增量闭包的 537 / 342 / 712 个 JS 仍与全量逐字节一致。
+本地同款 Fantomas 检查有 107 项失败，与未修改 upstream 副本清单完全相同；
+最新 upstream 与基准副本的 F# 源码和格式配置也相同。未修改无关业务格式。
+复查时两个 PR 均无 review 或行内意见。CI 既有失败不能算作完整套件通过。

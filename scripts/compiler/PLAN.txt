@@ -36,3 +36,6 @@ HostJoinAttemptFactory 的工程引用，收窄旧反向依赖。独立 CLI 的�
 库：https://github.com/PamelaSprin47685ghall/wanxiangli/pull/6
 主仓：https://github.com/PamelaSprin47685ghall/vibe-fs/pull/67
 原仓和运行版本未动；本轮测试服务已停止。
+
+[完成] CI / review 复查：同步主仓 38867da64、库 359a1ec，解开子模块冲突；
+主仓 11 项、库 21 项相关回归通过。107 项格式失败与 upstream 相同，单列。
