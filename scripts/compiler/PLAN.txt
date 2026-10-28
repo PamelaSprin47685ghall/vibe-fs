@@ -28,8 +28,10 @@
 2026-10-28 后续：保留十分钟，取消状态查询续期。
 [完成] 两仓本地编译间隔、真实复用与内存记录；轮询退出、跨重启统计、
 失败、并发、历史上限及不可写记录隔离已验证。原 PR 已合并，改走后续 PR。
-[单列] 最新 upstream 的增量工程存在同名模块解析差异，独立 CLI 复现，
-不扩入此次改动；详情见 RESULTS.txt。
+[完成] 按用户后续要求修复 upstream 增量漏选：补齐 ToolResultText、
+HostJoinAttemptFactory 的工程引用，收窄旧反向依赖。独立 CLI 的三个闭包
+与全量一致；正常入口单模块、多模块修改的全部 753 个 JS 与全量一致。
+实验改动已还原，无改动构建不重写产物或使用记录；详情见 RESULTS.txt。
 [完成] 后续 PR 已提交与关联，仍在同名分支；先合库，再合主仓。
 库：https://github.com/PamelaSprin47685ghall/wanxiangli/pull/6
 主仓：https://github.com/PamelaSprin47685ghall/vibe-fs/pull/67
