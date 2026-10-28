@@ -1005,7 +1005,6 @@ module DispatchSurface =
             handle
             { SessionId = Some(SessionId.create session)
               PhysicalUserMessageId = Some(PhysicalUserMessageId.create physicalMessageId)
-              InvalidIdentityCarrier = None
               ExplicitAgent = Some agent
               PromptKey = None
               IsHostCompaction = false
@@ -1020,7 +1019,6 @@ module DispatchSurface =
         : ChatAdmissionIntent.DecodedMessage =
         { SessionId = Some(SessionId.create session)
           PhysicalUserMessageId = Some(PhysicalUserMessageId.create physicalMessageId)
-          InvalidIdentityCarrier = None
           ExplicitAgent = Some agent
           PromptKey = Some(PromptKey.create promptKey)
           IsHostCompaction = false

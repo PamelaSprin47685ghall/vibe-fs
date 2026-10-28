@@ -1494,7 +1494,6 @@ module SyncDelegateSurface =
                 let message: ChatAdmissionIntent.DecodedMessage =
                     { SessionId = Some child
                       PhysicalUserMessageId = Some physicalId
-                      InvalidIdentityCarrier = None
                       ExplicitAgent = None
                       PromptKey = Some key
                       IsHostCompaction = false
