@@ -327,7 +327,21 @@ module HostSignalBootstrap =
                 match observation.Outcome, ModelRouting.tryReadExecution key with
                 | HostProviderTerminalOutcome.Cancelled _, Some _ ->
                     providerAttemptStopFence?SignalStop(SessionId.value observation.SessionId, ProviderRunIdentity.value observation.ProviderRun) |> ignore
-                    scope.Sessions.Quiescence.RevokeCurrentAttempt(observation.SessionId)
+
+                    // WHAT[delegation-040]: the late-consultation stop's own abort is
+                    // not an operator cancel. Revoking here left the session Revoked
+                    // forever: every later idle minted a permit TryConsume refused,
+                    // so the missing-final-report repair of the turn the stop
+                    // preserved was abandoned (SupersededBeforePhysicalSend) and the
+                    // parent join waited on a child nobody would wake again.
+                    if
+                        not (
+                            CompletedContinuationStops.contains
+                                observation.SessionId
+                                (PhysicalUserMessageId.value observation.PhysicalUserMessageId)
+                        )
+                    then
+                        scope.Sessions.Quiescence.RevokeCurrentAttempt(observation.SessionId)
 
                     FissionHost.routeAttemptAborted observation.SessionId ignore ignore
 

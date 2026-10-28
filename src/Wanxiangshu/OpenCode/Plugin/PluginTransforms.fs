@@ -836,7 +836,17 @@ module PluginTransforms =
                     let info = ProviderWireDecode.infoObject assistant
                     let finished = not (isNull info?time) && not (isNull info?time?completed)
                     let calls = ProviderWireDecode.rawPartsOf assistant |> List.exists (fun part -> ProviderWireDecode.firstString part [ "type" ] = Some "tool")
-                    finished && not calls))
+                    // WHAT[delegation-040]: an empty finished turn (finish=length,
+                    // no prose) is no closing report. The answer is then the only
+                    // thing that keeps the run alive; stopping it left nothing to
+                    // settle and nothing to continue.
+                    let prose =
+                        ProviderWireDecode.rawPartsOf assistant
+                        |> List.exists (fun part ->
+                            ProviderWireDecode.firstString part [ "type" ] = Some "text"
+                            && (ProviderWireDecode.firstString part [ "text" ]
+                                |> Option.exists (fun text -> not (String.IsNullOrWhiteSpace text))))
+                    finished && not calls && prose))
 
         /// 条款 3：本次 attempt 是否存在一次已成立的交付。判据只认真实交付
         /// 事实——交付登记时的物理输入必须仍是当前请求的物理输入，物理输入
