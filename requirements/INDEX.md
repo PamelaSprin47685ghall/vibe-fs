@@ -7,7 +7,7 @@
 | Package | 说明 |
 |---|---|
 | `requirement-system` | 说明书组织规则与包结构约定。 |
-| `verification-system` | 测试分层与调度说明。 |
+| `verification-system` | [测试规则](verification-system/AXIOMS.md)：测试编写、优化与分层调度。 |
 | `feature-ablation` | 模块开关与消融机制。 |
 | `js-semantic-surface` | JS 语义入口契约。 |
 
