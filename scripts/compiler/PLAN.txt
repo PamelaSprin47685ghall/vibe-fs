@@ -30,4 +30,7 @@
 失败、并发、历史上限及不可写记录隔离已验证。原 PR 已合并，改走后续 PR。
 [单列] 最新 upstream 的增量工程存在同名模块解析差异，独立 CLI 复现，
 不扩入此次改动；详情见 RESULTS.txt。
-[进行中] 后续 PR 提交与关联；原仓和运行版本不动。
+[完成] 后续 PR 已提交与关联，仍在同名分支；先合库，再合主仓。
+库：https://github.com/PamelaSprin47685ghall/wanxiangli/pull/6
+主仓：https://github.com/PamelaSprin47685ghall/vibe-fs/pull/67
+原仓和运行版本未动；本轮测试服务已停止。
