@@ -4,8 +4,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { SqliteJournal } from 'wanxiangli/eventstore'
 import { scopeProgress } from 'wanxiangli/scope-progress'
-import { stateRoot } from '../../../dist/Persistence/Journal/RuntimePath.js'
-import { withExecutablePlugin, acceptAuthorityRoot } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { stateRoot } from '../../../../dist/Persistence/Journal/RuntimePath.js'
+import { withExecutablePlugin, acceptAuthorityRoot } from '../../../verification-system/tests/support/plugin-fixture.mjs'
 
 const code = 'class Js extends JsProgram { async run() { return {ok: true}; } }'
 const args = (id, estimate) => ({
@@ -14,7 +14,7 @@ const args = (id, estimate) => ({
   remainingScopeTurnsEstimate: estimate,
 })
 
-test('WHAT[advisor-014] real OpenCode todowrite restores its charged estimate and ResetDue from the SQLite ledger after memory loss', async () => {
+test('WHAT[advisor-007] real OpenCode todowrite restores its charged estimate and ResetDue from the SQLite ledger after memory loss', async () => {
   await withExecutablePlugin(async (hooks, workspace, _created, runtime) => {
     const session = 'ses-progress-journal-014'
     const epoch = '0'
@@ -65,7 +65,7 @@ test('WHAT[advisor-014] real OpenCode todowrite restores its charged estimate an
   })
 })
 
-test('WHAT[advisor-014] malformed program admission does not charge progress or start Advisor', async () => {
+test('WHAT[advisor-007] malformed program admission does not charge progress or start Advisor', async () => {
   await withExecutablePlugin(async (hooks, _workspace, created, runtime) => {
     const session = 'ses-invalid-progress-014'
     await acceptAuthorityRoot(runtime, session, 'devops')

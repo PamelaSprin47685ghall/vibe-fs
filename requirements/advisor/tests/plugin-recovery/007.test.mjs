@@ -5,8 +5,8 @@ import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { SqliteJournal } from 'wanxiangli/eventstore'
 import { scopeProgress, advisorProcessQueue, AdvisorProcessQueue, advisorClaim, advisorStageBegin, advisorPending } from 'wanxiangli/scope-progress'
-import { stateRoot } from '../../../dist/Persistence/Journal/RuntimePath.js'
-import { withExecutablePlugin, acceptAuthorityRoot } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { stateRoot } from '../../../../dist/Persistence/Journal/RuntimePath.js'
+import { withExecutablePlugin, acceptAuthorityRoot } from '../../../verification-system/tests/support/plugin-fixture.mjs'
 
 const until = async predicate => {
   for (let attempt = 0; attempt < 80; attempt++) {
@@ -16,7 +16,7 @@ const until = async predicate => {
   assert.fail('OpenCode did not observe the proven pending Advisor process')
 }
 
-test('WHAT[advisor-012] OpenCode resumes only the proven current Scope and refuses an uncertain model-request replay', async () => {
+test('WHAT[advisor-007] OpenCode resumes only the proven current Scope and refuses an uncertain model-request replay', async () => {
   await withExecutablePlugin(async (hooks, workspace, _created, runtime) => {
     const sid = 'ses-advisor-cold-012', epoch = '0', report = '0:run-advisor-cold-012'
     const issue = 'What stopped your progress?'

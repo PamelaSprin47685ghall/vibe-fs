@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { FissionGroupLaw, FissionLaneRegistry, fissionLaneRegistry } from 'wanxiangli/fission-group'
 
-test('WHAT[intra-participant-parallelism-019] late physical completion after FissionConverged and clearOwner is safely rejected without mutating terminal', () => {
+test('WHAT[intra-participant-parallelism-009] late physical completion after FissionConverged and clearOwner is safely rejected without mutating terminal', () => {
   const law = new FissionGroupLaw()
   const registry = new FissionLaneRegistry()
 
@@ -110,7 +110,7 @@ test('WHAT[intra-participant-parallelism-019] late physical completion after Fis
   assert.equal(settleDecision.decision, 'complete')
 })
 
-test('WHAT[intra-participant-parallelism-019] failed terminal similarly locks group against late physical callback revival', () => {
+test('WHAT[intra-participant-parallelism-009] failed terminal similarly locks group against late physical callback revival', () => {
   const law = new FissionGroupLaw()
   const registry = new FissionLaneRegistry()
 

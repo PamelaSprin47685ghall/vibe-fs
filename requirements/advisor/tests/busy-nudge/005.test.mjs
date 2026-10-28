@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { sendObservedAwait } from '../../../dist/Execution/Delegation/Fork/Host/BusyNudge.js'
-import { JournalHandle__get_Journal } from '../../../dist/Persistence/Journal/Surface.js'
-import { AgentJournalModule_snapshot } from '../../../dist/Persistence/Journal/AgentJournal.js'
-import { activeProfile } from '../../../dist/Interaction/Authority/ProjectionQueries.js'
-import { SessionIdModule_create } from '../../../dist/Foundation/Identity.js'
-import * as dispatcher from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { sendObservedAwait } from '../../../../dist/Execution/Delegation/Fork/Host/BusyNudge.js'
+import { JournalHandle__get_Journal } from '../../../../dist/Persistence/Journal/Surface.js'
+import { AgentJournalModule_snapshot } from '../../../../dist/Persistence/Journal/AgentJournal.js'
+import { activeProfile } from '../../../../dist/Interaction/Authority/ProjectionQueries.js'
+import { SessionIdModule_create } from '../../../../dist/Foundation/Identity.js'
+import * as dispatcher from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import {
   withJournal, hostPort, prepareAcceptanceObserver, acceptObservedPhysical,
-} from '../../dispatch-protocol/tests/support/authority.mjs'
+} from '../../../dispatch-protocol/tests/support/authority.mjs'
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
 const setup = async (handle, suffix) => {
@@ -20,7 +20,7 @@ const setup = async (handle, suffix) => {
   return { context, session, journal, profile }
 }
 
-test('WHAT[advisor-009] actual BusyNudge Await wrapper waits for durable PhysicalAccepted', async () => {
+test('WHAT[advisor-005] actual BusyNudge Await wrapper waits for durable PhysicalAccepted', async () => {
   await withJournal('advisor-host-awaiter', async handle => {
     const { context, session, journal, profile } = await setup(handle, 'advisor-host-await')
     let promptKey
@@ -94,7 +94,7 @@ test('WHAT[advisor-005] accepted observation budget is honored instead of the 10
   })
 })
 
-test('WHAT[advisor-009] actual BusyNudge Await wrapper preserves unknown landing and no fabricated confirmation', async () => {
+test('WHAT[advisor-005] actual BusyNudge Await wrapper preserves unknown landing and no fabricated confirmation', async () => {
   await withJournal('advisor-host-unknown', async handle => {
     const { context, session, journal, profile } = await setup(handle, 'advisor-host-unknown')
     let notified = false

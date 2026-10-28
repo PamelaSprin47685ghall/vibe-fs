@@ -9,8 +9,8 @@ import {
   advisorClaim, advisorStageBegin, advisorPending,
 } from 'wanxiangli/scope-progress'
 import { outboundViewStore } from 'wanxiangli/pair-hint'
-import { stateRoot } from '../../../dist/Persistence/Journal/RuntimePath.js'
-import { withExecutablePlugin, acceptAuthorityRoot } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { stateRoot } from '../../../../dist/Persistence/Journal/RuntimePath.js'
+import { withExecutablePlugin, acceptAuthorityRoot } from '../../../verification-system/tests/support/plugin-fixture.mjs'
 
 const until = async predicate => {
   for (let n = 0; n < 100; n++) {
@@ -20,7 +20,7 @@ const until = async predicate => {
   assert.fail('durable ScopeReanchored was not used to recover the old Advisor process')
 }
 
-test('WHAT[advisor-013] real ScopeReanchored journal identifies a cold Scope even when all ScopeProgress memory is gone', async () => {
+test('WHAT[advisor-007] real ScopeReanchored journal identifies a cold Scope even when all ScopeProgress memory is gone', async () => {
   await withExecutablePlugin(async (hooks, workspace, _children, runtime) => {
     const session = 'ses-durable-scope-advisor-013'
     const scope = '1'

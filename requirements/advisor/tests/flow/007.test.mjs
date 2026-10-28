@@ -6,12 +6,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SqliteJournal } from 'wanxiangli/eventstore'
 import { AdvisorFlow, AdvisorProcessQueue, advisorClaim, advisorFinish, advisorPending, advisorStageBegin, advisorStageConfirm } from 'wanxiangli/scope-progress'
-import { ToolRuntimeScope, ToolRuntimeScope__SendAdvisorSteer_17BF5BBB } from '../../../dist/OpenCode/Tools/ToolRuntimeScope.js'
-import { JournalHandle__get_Journal } from '../../../dist/Persistence/Journal/Surface.js'
-import * as dispatcher from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { ToolRuntimeScope, ToolRuntimeScope__SendAdvisorSteer_17BF5BBB } from '../../../../dist/OpenCode/Tools/ToolRuntimeScope.js'
+import { JournalHandle__get_Journal } from '../../../../dist/Persistence/Journal/Surface.js'
+import * as dispatcher from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import {
   withJournal, hostPort, prepareAcceptanceObserver, acceptObservedPhysical,
-} from '../../dispatch-protocol/tests/support/authority.mjs'
+} from '../../../dispatch-protocol/tests/support/authority.mjs'
 
 const ok = Prose => ({ Ok: true, Prose, Reason: '' })
 const waitFor = async predicate => {
@@ -38,7 +38,7 @@ const withDatabase = async action => {
 }
 
 for (const advanceDuringDelivery of [false, true]) {
-  test(`WHAT[advisor-011] actual four-step Flow ${advanceDuringDelivery ? 'cannot complete stale Scope' : 'only completes after physical acceptance'}`, async () => {
+  test(`WHAT[advisor-007] actual four-step Flow ${advanceDuringDelivery ? 'cannot complete stale Scope' : 'only completes after physical acceptance'}`, async () => {
     await withDatabase(async persist => withJournal('advisor-end-to-end-' + advanceDuringDelivery, async handle => {
       const context = await prepareAcceptanceObserver(handle, 'continuation', 'advisor-complete-' + advanceDuringDelivery)
       let epoch = 'scope-5'

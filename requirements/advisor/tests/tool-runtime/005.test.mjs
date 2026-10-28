@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ToolRuntimeScope, ToolRuntimeScope__SendAdvisorSteer_17BF5BBB } from '../../../dist/OpenCode/Tools/ToolRuntimeScope.js'
-import { JournalHandle__get_Journal } from '../../../dist/Persistence/Journal/Surface.js'
-import * as dispatcher from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { ToolRuntimeScope, ToolRuntimeScope__SendAdvisorSteer_17BF5BBB } from '../../../../dist/OpenCode/Tools/ToolRuntimeScope.js'
+import { JournalHandle__get_Journal } from '../../../../dist/Persistence/Journal/Surface.js'
+import * as dispatcher from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import {
   withJournal, hostPort, prepareAcceptanceObserver, acceptObservedPhysical,
-} from '../../dispatch-protocol/tests/support/authority.mjs'
+} from '../../../dispatch-protocol/tests/support/authority.mjs'
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
 const makeScope = (handle, sessionPort) => new ToolRuntimeScope(
@@ -14,7 +14,7 @@ const makeScope = (handle, sessionPort) => new ToolRuntimeScope(
   undefined, undefined, undefined, undefined, undefined, undefined, undefined,
 )
 
-test('WHAT[advisor-010] real ToolRuntimeScope cannot settle final steer before PhysicalAccepted', async () => {
+test('WHAT[advisor-005] real ToolRuntimeScope cannot settle final steer before PhysicalAccepted', async () => {
   await withJournal('advisor-runtime-physical', async handle => {
     const context = await prepareAcceptanceObserver(handle, 'continuation', 'advisor-runtime-physical')
     let resolveDispatched
@@ -47,7 +47,7 @@ test('WHAT[advisor-010] real ToolRuntimeScope cannot settle final steer before P
   })
 })
 
-test('WHAT[advisor-010] Source Scope retiring during pending send refuses success even after physical acceptance', async () => {
+test('WHAT[advisor-005] Source Scope retiring during pending send refuses success even after physical acceptance', async () => {
   await withJournal('advisor-runtime-epoch', async handle => {
     const context = await prepareAcceptanceObserver(handle, 'continuation', 'advisor-runtime-epoch')
     let key
@@ -73,7 +73,7 @@ test('WHAT[advisor-010] Source Scope retiring during pending send refuses succes
   })
 })
 
-test('WHAT[advisor-010] unknown physical delivery from product runtime is not a successful steer', async () => {
+test('WHAT[advisor-005] unknown physical delivery from product runtime is not a successful steer', async () => {
   await withJournal('advisor-runtime-unknown', async handle => {
     const context = await prepareAcceptanceObserver(handle, 'continuation', 'advisor-runtime-unknown')
     let calls = 0

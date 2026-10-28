@@ -1,17 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { isEligible, isReviewFinished } from '../../../dist/Mission/Planning/PlanKernelSeam.js'
-import * as hostModule from '../../../dist/Mission/Lifecycle/DurableWorkHost.js'
+import { isEligible, isReviewFinished } from '../../../../dist/Mission/Planning/PlanKernelSeam.js'
+import * as hostModule from '../../../../dist/Mission/Lifecycle/DurableWorkHost.js'
 
 const host = hostModule.DurableWorkHost ?? hostModule
 const submitReview = host.submitReview
 const reviewEffects = host.reviewEffects
 const inspected = host.inspected
-
-const readDist = (path) => readFileSync(new URL('../../../' + path, import.meta.url), 'utf8')
 
 function countingEffects() {
   const counts = { park: 0, send: 0, open: 0, draft: 0, stop: 0 }
@@ -50,21 +48,7 @@ function review(root, effects, workId, id, office, updates) {
   return submitReview(root, workId, id, office, 'run', 'call-' + id, updates, null, '', effects)
 }
 
-test('WHAT[work-054] the review shell calls the host session, park, and stop ports', () => {
-  const shell = readDist('dist/Mission/Work/OpenCode/ReviewShell.js')
-  const scope = readDist('dist/OpenCode/Tools/ToolRuntimeScope.js')
-  assert.match(shell, /ReviewPorts/)
-  assert.match(scope, /ParkReviewQuestion/)
-  assert.match(scope, /SendPrompt/)
-  assert.match(scope, /CreateChildSession/)
-  assert.match(scope, /InterruptAttempt/)
-  assert.match(scope, /reviewEffects/)
-  assert.match(scope, /ask is allowed only while the work waits for review, an answer, or effect confirmation/)
-  assert.equal(scope.includes('current.Stage === "S1"'), false)
-  assert.match(scope, /Stage === "收尾"/)
-})
-
-test('WHAT[work-054] one empty review parks once, and the wait is the answer', async () => {
+test('WHAT[work-003] one empty review parks once, and the wait is the answer', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-review-054-ask-'))
   const gate = countingEffects()
   try {
@@ -95,7 +79,7 @@ test('WHAT[work-054] one empty review parks once, and the wait is the answer', a
   }
 })
 
-test('WHAT[work-054] a cleared ledger sends the successor prompt once', async () => {
+test('WHAT[work-003] a cleared ledger sends the successor prompt once', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-review-054-relay-'))
   const gate = countingEffects()
   try {
@@ -123,7 +107,7 @@ test('WHAT[work-054] a cleared ledger sends the successor prompt once', async ()
   }
 })
 
-test('WHAT[work-054] cleanup stops the provider attempt once', async () => {
+test('WHAT[work-003] cleanup stops the provider attempt once', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-review-054-stop-'))
   const gate = countingEffects()
   try {
@@ -154,7 +138,7 @@ test('WHAT[work-054] cleanup stops the provider attempt once', async () => {
   }
 })
 
-test('WHAT[work-054] the ready milestone opens one manager session and sends one draft', async () => {
+test('WHAT[work-003] the ready milestone opens one manager session and sends one draft', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-review-054-launch-'))
   const gate = countingEffects()
   try {

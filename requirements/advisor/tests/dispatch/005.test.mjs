@@ -3,16 +3,16 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
-import * as dispatcher from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as dispatcher from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import {
   withJournal, hostPort, prepareAcceptanceObserver,
   acceptObservedPhysical, ownAcceptanceRegistration,
-} from '../../dispatch-protocol/tests/support/authority.mjs'
+} from '../../../dispatch-protocol/tests/support/authority.mjs'
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
-const source = file => readFileSync(resolve(fileURLToPath(new URL('../../..', import.meta.url)), file), 'utf8')
+const source = file => readFileSync(resolve(fileURLToPath(new URL('../../../..', import.meta.url)), file), 'utf8')
 
-test('WHAT[advisor-008] the production Advisor steer selects Await while ordinary consultation remains Detached', () => {
+test('WHAT[advisor-005] the production Advisor steer selects Await while ordinary consultation remains Detached', () => {
   const runtime = source('src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs')
   const nudge = source('src/Wanxiangshu/Execution/Delegation/Fork/Host/BusyNudge.fs')
   assert.match(runtime, /SendAdvisorSteer\([\s\S]*?sendConsultationSteer recipient answer processId \(fun _ _ -> isCurrent \(\)\) true/)
@@ -24,7 +24,7 @@ test('WHAT[advisor-008] the production Advisor steer selects Await while ordinar
   assert.match(nudge, /let sendObserved[\s\S]*?PromptDispatcher\.AwaitMode\.Detached/)
 })
 
-test('WHAT[advisor-008] submitted SDK receipt does not finish Await until production dispatcher confirms PhysicalAccepted', async () => {
+test('WHAT[advisor-005] submitted SDK receipt does not finish Await until production dispatcher confirms PhysicalAccepted', async () => {
   await withJournal('advisor-physical-await', async handle => {
     const context = await prepareAcceptanceObserver(handle, 'continuation', 'advisor-physical-await')
     let resolveSubmitted
@@ -62,7 +62,7 @@ test('WHAT[advisor-008] submitted SDK receipt does not finish Await until produc
   })
 })
 
-test('WHAT[advisor-008] physical send outcome Unknown does not count as a successful acceptance', async () => {
+test('WHAT[advisor-005] physical send outcome Unknown does not count as a successful acceptance', async () => {
   await withJournal('advisor-physical-unknown', async handle => {
     const context = await prepareAcceptanceObserver(handle, 'continuation', 'advisor-physical-unknown')
     let calls = 0

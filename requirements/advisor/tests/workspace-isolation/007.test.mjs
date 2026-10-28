@@ -4,8 +4,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { SqliteJournal } from 'wanxiangli/eventstore'
 import { scopeProgress } from 'wanxiangli/scope-progress'
-import { stateRoot } from '../../../dist/Persistence/Journal/RuntimePath.js'
-import { withExecutablePlugin, acceptAuthorityRoot } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { stateRoot } from '../../../../dist/Persistence/Journal/RuntimePath.js'
+import { withExecutablePlugin, acceptAuthorityRoot } from '../../../verification-system/tests/support/plugin-fixture.mjs'
 
 const input = (call, estimate) => ({
   name: call,
@@ -14,7 +14,7 @@ const input = (call, estimate) => ({
   remainingScopeTurnsEstimate: estimate,
 })
 
-test('WHAT[advisor-015] two live OpenCode plugin workspaces cannot redirect another Session SQLite progress', async () => {
+test('WHAT[advisor-007] two live OpenCode plugin workspaces cannot redirect another Session SQLite progress', async () => {
   const first = 'ses-cross-workspace-a-015'
   const second = 'ses-cross-workspace-b-015'
   scopeProgress.clear(first)

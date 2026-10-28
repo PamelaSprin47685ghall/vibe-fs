@@ -3,16 +3,16 @@
 // OMP registers the context handler inside activateOnOmp.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { activateOnOmp } from '../../../dist/Omp/Adapter.js'
-import { AgentRole } from '../../../dist/Host/Ports/Vocabulary.js'
-import { AgentRoleSpec } from '../../../dist/Host/Ports/Lifecycle.js'
-import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
-import { stateRootSync } from '../../../dist/Persistence/Journal/RuntimePath.js'
-import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
-import { apply as applyRelay } from '../../../dist/Mission/Work/OpenCode/NarrativeTransform.js'
+import { activateOnOmp } from '../../../../dist/Omp/Adapter.js'
+import { AgentRole } from '../../../../dist/Host/Ports/Vocabulary.js'
+import { AgentRoleSpec } from '../../../../dist/Host/Ports/Lifecycle.js'
+import { ofArray } from '../../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { stateRootSync } from '../../../../dist/Persistence/Journal/RuntimePath.js'
+import * as lifecycle from '../../../../dist/Mission/Lifecycle/Surface.js'
+import { apply as applyRelay } from '../../../../dist/Mission/Work/OpenCode/NarrativeTransform.js'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 const PRE = 'operator before the relay'
@@ -132,7 +132,7 @@ function review(stateRoot, workId, id, updates) {
 }
 
 function prepare(prefix) {
-  const workspace = mkdtempSync(join(tmpdir(), prefix))
+  const workspace = realpathSync(mkdtempSync(join(tmpdir(), prefix)))
   mkdirSync(join(workspace, '.Herdchestra'))
   const stateRoot = stateRootSync(workspace)
   if (!stateRoot.startsWith(workspace) || !stateRoot.endsWith(`${join('', '.Herdchestra')}`) && !stateRoot.endsWith('.Herdchestra')) {
@@ -146,7 +146,7 @@ function prepare(prefix) {
   return { workspace, stateRoot }
 }
 
-test('provider barrier: OpenCode apply keeps user messages and the triggering review, hides the rest before it', async () => {
+test('WHAT[work-008] provider barrier: OpenCode apply keeps user messages and the triggering review, hides the rest before it', async () => {
   const { workspace, stateRoot } = prepare('wxs-oc-barrier-')
   const workId = 'ses-opencode-barrier'
   const toolCallId = 'call-relay'
@@ -181,7 +181,7 @@ test('provider barrier: OpenCode apply keeps user messages and the triggering re
   }
 })
 
-test('provider barrier: registered OMP context hook keeps user messages and the triggering review', async () => {
+test('WHAT[work-008] provider barrier: registered OMP context hook keeps user messages and the triggering review', async () => {
   const { workspace, stateRoot } = prepare('wxs-omp-barrier-')
   const workId = 'ses-omp-barrier'
   const toolCallId = 'call-relay'
