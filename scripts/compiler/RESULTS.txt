@@ -98,3 +98,48 @@ README.md 但仍被声明为打包文件而失败，未修改 upstream 同样失
 没有实际升级 Node 二进制或开展数日的主仓常驻内存试验。
 不把专项测试通过、既有业务失败和部署成功混为一谈。
 详细命令日志、逐次计时、产物摘要和并发日志保留在本工作树 .fable-build/。
+
+2026-10-28：状态查询与使用记录后续
+
+原 PR #66 / 库 #5 已由 upstream 合并。本次基于主仓 06c10f8cd、库 0d86c38，
+保持十分钟，取消状态查询续期，新增有界本地记录；字段定义见 BUILDING.txt。
+常驻主仓测试 9 项通过；库常驻回归 21 项通过，rebase 后记录及延迟测试 29 项通过。
+最新干净全量构建的主仓 753 / 库 49 个 JS 与未修改 upstream 逐字节一致；
+无改动构建、状态查询不修改记录，无改动构建不重写主仓产物。
+
+同步最新 upstream 时额外发现既有增量工程选取问题：1350 项的影响范围工程
+包含 Execution/Fission/OpenCode/Tool.fs，却未包含 Execution/Tool/ToolResultText.fs，
+因而把 ToolResultText 解析到 Host/ToolContext.fs 中的同名模块；全量 1376 项
+工程则解析到 Execution/Tool/ToolResultText.fs。这产生一个 JS 文件的导入差异。
+使用独立 Fable CLI 编译同一份 1350 项工程也复现该选择，不依赖常驻状态。
+上一轮未修复此问题；原始对照保存在 .fable-build/usage-upstream-focused-cli.log。
+
+2026-10-28：按用户后续要求修复上述增量漏选
+
+Fission 工程补上 execution-tool-product 引用。单独编译这个闭包又暴露
+ToolRuntimeScope 缺少 HostJoinAttemptFactory：补上 sharedstatesurface 引用，
+并将后者原来的 hostturnobservedsurface 反向引用换成实际需要的 wait-contract
+和 delegation-recovery-runtime，避免环依赖。业务源文件和规划算法不变。
+回归位于 requirements/structured-workflow/tests/impact/012.test.mjs；运行：
+WXS_TIER_INTEGRATION=1 node --test requirements/structured-workflow/tests/impact/012.test.mjs
+规划检查和独立 CLI 实编译通过。Fission、PluginSessionScope、ToolResultText.fsi
+三个增量范围分别生成 537、342、712 个 JS，与干净全量对应文件逐字节一致。
+正常 npm run build 实测单模块、双模块真实字符串修改：每次增量的最终
+753 个 JS 均与同一源状态的全量参考构建逐字节一致。相对原基准只出现
+预期的一处、两处 JS 内容变化；双模块构建复用同一 checker。实验修改已
+手工还原，增量产物回到原基准。随后无改动构建保持全部 JS 字节、mtime
+及两仓使用记录不变。日志在 .fable-build/performance/fission-*.log。
+旧 tests/012.test.mjs 引用了 upstream 已删除的 scripts/owner-impact-report.mjs，
+整文件执行会中断；在未修改的 upstream 06c10f8cd 副本复现，未恢复旧报告工具。
+
+2026-10-28：CI / review 复查与 upstream 同步
+
+PR #67 的 0077d5749 CI（run 40631698152）在 format:check 失败，未进入构建。
+同期 upstream 前进至主仓 38867da64、库 359a1ec，造成子模块引用冲突。
+现有分支已同步，库使用 5daad07；冲突仅涉及库说明文档和主仓 gitlink，
+保留 upstream 文档内容及本功能说明，服务实现和增量依赖修复未变。
+同步后主仓 020 与 impact/012 共 11 项、库 012–016 共 21 项回归全部通过；
+三个真实增量闭包的 537 / 342 / 712 个 JS 仍与全量逐字节一致。
+本地同款 Fantomas 检查有 107 项失败，与未修改 upstream 副本清单完全相同；
+最新 upstream 与基准副本的 F# 源码和格式配置也相同。未修改无关业务格式。
+复查时两个 PR 均无 review 或行内意见。CI 既有失败不能算作完整套件通过。

@@ -112,6 +112,8 @@ let compile (request: JsonElement) = async {
               compileMs = compileMs
               totalMs = total.Elapsed.TotalMilliseconds
               pid = Environment.ProcessId
+              memory = {| rss = Process.GetCurrentProcess().WorkingSet64
+                          managedHeapBytes = GC.GetTotalMemory(false) |}
               memoryBytes = Process.GetCurrentProcess().WorkingSet64 |}
 }
 

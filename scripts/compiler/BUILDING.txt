@@ -36,3 +36,24 @@ WXS_CHECKER_BUILD_LIMIT、WXS_CHECKER_MEMORY_MIB、WXS_CHECKER_IDLE_MS。
 
 实际测量与测试边界见 RESULTS.txt。当前实测平台为 macOS / Node 26.6.0。
 Windows 分支尚未实测；发布 PR 不代表已部署到运行版本。
+
+使用记录（2026-10-28）
+
+--checker-status 不延长空闲期限，不写使用记录。默认仍为十分钟。
+.fable-build/compiler/usage.json 记录真正发给 worker 的编译请求；
+状态查询和无改动构建不计入。只保存在本机，不上传，不进入 Git。
+intervalMs 是两次编译开始之间的间隔，idleMs 是上次完成到本次开始的间隔；
+时间戳使用 Unix 毫秒，durationMs 不包含 worker 初始化或整个 npm 构建流程。
+记录跨服务重启保留，便于观察超过十分钟的间隔。
+
+totals 保存累计次数，samples 保存最近 256 次编译。reuse.created 统计新建
+checker，reused / reusedAcrossBuilds 统计复用 checker 的编译请求次数；
+主仓每次影响范围编译发一个项目请求，计数单位与库逐模块检查不同。
+workerMemory.rss 和 managedHeapBytes 分别为返回时 RSS 与未经强制 GC 的
+托管堆估计；serviceMemory 是 Node 服务收尾时的内存。单位均为字节。
+这些是快照，不是峰值、空闲采样或 macOS footprint。
+
+失败也记录；服务强杀留下 pending，下次编译标为 unknown。
+没有收到复用报告时累计 missingReuseReports，不推测丢失数据。
+记录损坏或不可写时保留现有文件，在服务日志报告并停用本服务的记录，
+不改变编译结果。修复文件后重启服务可恢复；清空记录应先停止服务再删除文件。
