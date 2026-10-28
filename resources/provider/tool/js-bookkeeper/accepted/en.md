@@ -1,1 +1,1 @@
-The transformation was applied to the staged case.
+The staged case accepted this transformation.

@@ -12,11 +12,15 @@ export function createManifestFixture(t) {
     return target
   }
   const entry = {
-    module: 'Owner/Surface.js',
-    source: 'src/Wanxiangshu/Owner/Surface.fs',
+    module: 'Owner/Surface.js', owner: 'owner', laws: ['owner-001'],
+    source: 'src/Wanxiangshu/Owner/Surface.fs', representation: 'json', kind: 'pure',
   }
+  const testFile = 'requirements/consumer/tests/001.test.mjs'
+  const importPath = '../../../' + 'dist/' + entry.module
+  write('requirements/owner/WHAT.md', '# owner — WHAT\n\n## [001] Contract\n')
   write(entry.source, 'module Owner.Surface\nlet value = 1\n')
   write('src/Wanxiangshu/Wanxiangshu.Owner.owner.fsproj', '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
   write('dist/' + entry.module, 'export const value = 1\n')
-  return { root, write, entry }
+  write(testFile, `import { value } from ${JSON.stringify(importPath)}\n`)
+  return { root, write, entry, testFile, importPath }
 }

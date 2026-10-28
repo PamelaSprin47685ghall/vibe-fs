@@ -1,1 +1,1 @@
-- Parallel {{toolName}} calls are safe for same-file and cross-file reads: each read observes the file on its own, so concurrent programs do not interfere with each other.
+- Parallel {{toolName}} calls are absolutely safe for same-file and cross-file reads.

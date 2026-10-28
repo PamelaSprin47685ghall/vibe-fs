@@ -5,10 +5,9 @@ class Js extends JsProgram {
     if (matches.length === 0) {
       return;
     }
-    let text = draft;
-    for (const [begin, end] of matches.reverse()) {
-      text = text.slice(0, begin) + "可判定" + text.slice(end);
+      let text = draft;
+      for (const [begin, end] of matches.reverse()) {
+        text = text.slice(0, begin) + "可判定" + text.slice(end);
     }
-    this.write("plan.md", text);
-  }
+      this.write("plan.md", text);
 }

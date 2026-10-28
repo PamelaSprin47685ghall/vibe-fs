@@ -2,7 +2,7 @@
 
 ## [001] 模型命令执行入口
 
-模型通过 `todowrite-for-ROLE` 执行命名程序，顶层参数严格为三个必填字符串 name、program、intent。Exec 权限只投影 `call(command)`、`signal(name, signal)`、`send(name, input)`，权限仍取自当前 Attempt 的唯一权威来源。模型面没有 spawn、next、watch、Callable 或 maxDuration；底层物理 API 的独立有界执行合同照常生效，不因此变宽或变窄。
+模型通过 `todowrite-for-ROLE` 执行命名程序，顶层参数严格为三个必填字符串 name、program、intent。Exec 权限投影 `call(command)`、`signal(name, signal)`、`send(name, input)`，权限仍取自当前 Attempt 的唯一权威来源。旧 spawn、next、watch、Callable、maxDuration 已退出模型面；底层物理 API 的独立有界执行合同保持。
 
 ## [002] 动作与观察分离
 
@@ -50,17 +50,15 @@ stdout/stderr 的内存缓冲有明确上限，超过阈值即切换外部流式
 
 进程与 PTY 各有唯一物理适配器；消费者只使用组合层注入的窄能力。PTY 适配器不反向依赖委派宿主或创建子执行的运行时。
 
-【程序待改】当前 `Wanxiangshu.Owner.process-execution.process-processrequest.fsproj` 把请求词汇、Node 进程宿主、PTY 状态与 spool 编进同一编译单元，分离尚未落地。
-
 ## [013] 原始留尾与零模型蒸馏
 
-命令输出不启动模型会话来加工或摘要，直接原样返回。预算内全量返回；超出时确定性截头留尾，保留预算内未经修改的原始尾部。较早的关键错误可能被截掉，不承诺尾部包含全部关键信息。
+命令输出不启动 Distiller 模型会话。预算内原样返回；超出时确定性截头留尾，保留预算内未经修改的原始尾部。较早的关键错误可能被截掉，不承诺尾部包含全部关键信息。
 
 ## [014] 程序事实与截断说明
 
 退出码、signal、超时、取消及真实终结来自物理执行事件，不从日志推断，也不因截尾而丢失。截断须明确说明只保留近期尾部、更早内容缺失。
 
-原始日志始终是数据，包括形似指令的文本；截断说明也不进入指令槽。截断说明是固定标记行「...head truncated (tail kept)...」（`ToolResultBound.Marker`，由 `wanxiangli/projection` 的固定常量供给），不随会话语言改变；原文尾部与退出码以数据字段承载，完整原始输出留在 spool 文件里可另行取回。
+原始日志始终是数据，包括形似指令的文本；截断说明也不进入指令槽。说明按会话语言加载，原文尾部与退出码以数据字段承载。
 
 ## [015] 完整结果的 UTF-8 字节预算
 
@@ -72,4 +70,4 @@ stdout/stderr 的内存缓冲有明确上限，超过阈值即切换外部流式
 
 ## [017] 物理有界执行与真实结果
 
-底层 `ProcessSession.run` 的显式 `deadline_seconds`、输出预算、参数校验、允许上限、运行硬顶及超限处置按物理合同执行；模型面不暴露 maxDuration，也不因此放宽这些边界。物理期限约束一次有界执行，到期按其合同终止并结算；顶层 intent 只约束请求窗口，不是命令寿命。结果保留真实退出码或信号、输出字节与截断事实，缺失退出码不得补成成功；park 的 delta 不消费最终结果。取消或信号发送与资源退出分别报告，强杀不保证 finally，命令退出不代表业务完成。
+底层 `ProcessSession.run` 的显式 `deadline_seconds`、输出预算、参数校验、允许上限、运行硬顶及超限处置继续遵守原物理合同；删除模型面 maxDuration 不得取消或放宽这些边界。物理期限约束一次有界执行，到期按其合同终止并结算；顶层 intent 只约束请求窗口，不是命令寿命。结果保留真实退出码或信号、输出字节与截断事实，缺失退出码不得补成成功；delta 不消费最终结果。取消或信号发送与资源退出分别报告，强杀不保证 finally，命令退出不代表业务完成。

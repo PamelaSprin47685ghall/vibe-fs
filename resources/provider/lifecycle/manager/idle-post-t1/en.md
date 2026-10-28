@@ -6,4 +6,4 @@ A long road is still a road.
 Look again at what the mission still owes.
 
 If useful action remains, continue.
-When nothing useful remains, bring the work to a close.
+When nothing useful remains, seek your end.

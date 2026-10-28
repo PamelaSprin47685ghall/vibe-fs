@@ -2,15 +2,15 @@
 
 ## [001] 业务层不消费流式碎片事件
 
-万象通（宿主适配层）在最早边界过滤宿主流式碎片事件（如 `message.updated`、`part.delta` 等），将其收敛为粗粒度唤醒信号；核侧业务逻辑严禁直接消费流式碎片，统一读取完整快照作为业务事实来源。
+业务逻辑严禁直接消费流式碎片事件（如 `message.updated`、`part.delta` 等）。合法交互路径仅允许由最早边界过滤碎片，转化为粗粒度的唤醒信号，随后读取完整的 SDK 快照作为唯一的业务事实来源。
 
 ## [002] 业务层信号闭集与精准分型
 
-万象通将宿主物理事件解码为中立的类型化信号闭集（`SessionIdle`、`ProviderRetry`、`ProviderFailure`、`SessionDeleted` 与 `AttemptAborted`）后投递给业务层。中止操作必须解码为专用物理中断唤醒，绝不得与提供者失败混淆。
+进入业务层的宿主信号严格限于类型化闭集（`SessionIdle`、`ProviderRetry`、`ProviderFailure`、`SessionDeleted` 与 `AttemptAborted`）。中止错误必须解码为专用的物理中断唤醒，绝不得与提供者失败混淆。
 
 ## [003] 传输与领域分离且信号仅作唤醒
 
-宿主信号仅作为单向唤醒触发器，不得作为业务事实载体。信号内携带的尝试次数仅供诊断参考，不得直接作为领域的重试或回退计数。粗粒度 `AttemptAborted(SessionId)` 仅唤醒调和器（reconciler）；撤销静止门禁、取消 Strength 所有者与推进 attempt stop fence 必须依据快照或公开 exact 取消回执，校验本次 `PhysicalUserMessageId` 仍拥有对应执行。无 exact `PhysicalUserMessageId` 的粗粒度信号不得把该会话的全部执行投影为 `SessionAborted`，也不得撤销已被更新用户消息接纳的新执行。当前操作者中止仅撤销本次执行能力，旧执行迟到的中止不影响新执行。
+宿主信号仅作为单向唤醒触发器，不得作为业务事实载体。信号内携带的尝试次数仅供诊断参考，不得直接作为领域的重试或回退计数。coarse `AttemptAborted(SessionId)` 只唤醒 reconciler；撤销 quiescence、取消 Strength owner 与推进 attempt stop fence 必须依据 SDK 快照或公开 exact cancelled assistant receipt，校验本次 `PhysicalUserMessageId` 仍拥有对应执行。coarse 信号没有 exact `PhysicalUserMessageId`，不得把该 session 的全部 current chat execution 投影为 `SessionAborted`，也不得撤销或终结已被更新 user message 接纳的新 execution。真正的当前 operator abort 仍由其 exact cancelled observation 撤销本次能力，旧执行迟到的 abort 不影响新执行。
 
 ## [004] TurnUnknown 为对齐私有观测而非业务结局
 
@@ -18,23 +18,23 @@
 
 ## [005] Reconciler 单飞快照观测与事件驱动收敛
 
-调和器对每个会话严格保证单飞执行（single-flight），接收到粗粒度信号时执行单次完整快照读取。在无新信号或明确投影边缘时，严禁通过墙钟轮询重复读取快照。提供者失败的 exact assistant `message.updated` 即使尚无 retry 所有者的终态决策，也必须用自身精确物理身份发出类型化失败唤醒；`TurnFailed` 只有在该精确物理身份匹配时方可发布，先到达的 idle/retry 只能等待，不得将裸错误终态化；同一物理执行随后的 idle/retry 唤醒或无身份的粗粒度失败不得覆盖它，新物理执行或显式 abort 才能替换它。无当前物理绑定的粗粒度失败不得读取快照或发布 terminal turn，只能等待精确投影证据。精确失败不得伪装成受管会话终态，也不得因粗粒度 `session.error` 缺席被丢弃。
+调和器对每个会话严格保证单飞执行（single-flight），接收到粗粒度信号时执行单次完整快照读取。在无新信号或明确投影边缘时，严禁通过墙钟轮询重复读取快照。Provider failure 的 exact assistant `message.updated` 即使尚无 retry owner 的 terminal disposition，也必须用自身 exact physical identity 发出 typed failure wake；`TurnFailed` 只有在该 exact typed witness 匹配时才能发布，先到达的 idle/retry 只能等待，不得把裸错误 terminalize；同一 physical 随后的 idle/retry wake 或无 identity 的 coarse failure 不得覆盖它，新 physical 或显式 abort 才能替换它。无 current physical binding 的 coarse failure 不得读取快照或发布 terminal turn，只能等待 exact projection evidence。Exact failure 不得伪装成 managed-chat terminal，也不得因 coarse `session.error` 缺席或 disposition 缺失被丢弃。
 
 ## [006] Raw Part 与 ToolParts 状态投影一致性
 
-万象通在将宿主原始工具调用分段映射到中立 ToolParts 时必须保持状态严格一致：未完成状态映射为挂起调用，已完成或失败状态映射为调用结果，严禁出现状态分叉投影。
+工具调用的原始分段状态与业务分段状态必须保持严格一致：未完成状态映射为挂起调用，已完成或失败状态映射为调用结果，严禁出现状态分叉投影。
 
 ## [007] Compaction 观测门禁之预防与收容
 
-宿主压缩控制实行双层防护：启动前校验并关闭宿主自动压缩配置；启动阶段只在首回合窗口内（会话开始至首个 completed assistant 消息含自身）拒绝非预期压缩；首回合窗口之后的压缩（含用户手动 `/compact` 与后续回合压缩）属于运行时收容范围。运行时观测到压缩事实时，必须立即触发原子上下文重锚定。
+宿主压缩控制实行双层防护：启动前严格校验并关闭自动压缩配置；启动探针只在第一回合窗口内拒绝非预期压缩——窗口从会话开始、截止于首个 completed assistant 消息（含该消息本身）；窗口之后的压缩（含用户手动 `/compact` 与后续回合压缩）属于运行时收容范围。运行时若观测到压缩事实，必须立即触发原子上下文重锚定。
 
 ## [008] Transform 到 ProviderRunIdentity 因果读与唯一性
 
-从快照提取运行身份必须基于因果规则（角色、完成时间、父节点匹配与最大序列）；命中唯一候选方可确认绑定，命中 0 个或多个候选一律安全失败。万象通挂载的 `experimental.chat.messages.transform` 属于模型推理前的物理边界，该 Hook 不得把“当前 assistant run 已经存在”作为前置条件，亦不得通过有界等待将未来 run 伪装成投影延迟；在该 Hook 冻结的恢复决策必须先以精确 `PhysicalUserMessageId` 保存为未绑定 attempt plan，同一物理消息的重复 transform 只能复用首次冻结值；待后续完整观测出现精确 `ProviderRunIdentity` 后一次性绑定。各 Hook（`chat.params`、transform、tool context、provider-start）通过物理证据（物理消息 ID、assistant parentID、`ProviderRunIdentity`）关联到精确执行并保持只读，不允许使用 session-current 回退替代精确证据。
+从快照提取运行身份必须基于严格的因果规则（角色、完成时间、父节点匹配与最大序列）；当且仅当命中唯一候选时方可确认绑定，命中 0 个或多个候选时一律安全失败。`experimental.chat.messages.transform` 属于 provider inference 之前的物理边界，因此该 hook 不得把“当前 assistant run 已经存在”作为业务前置条件，也不得通过 bounded wait 把未来 run 伪装成 projection lag；需要在该 hook 冻结的 recovery 决策必须先以 exact `PhysicalUserMessageId` 保存为未绑定 attempt plan，同一 physical 的重复 transform 只能复用首次冻结值，不得重算后以冲突终止；待后续完整 Host 观测出现 exact `ProviderRunIdentity` 后再一次性绑定。各 hook（`chat.params` / transform / tool context / provider-start）通过公开物理证据（物理 message ID、assistant parentID、`ProviderRunIdentity`）关联到 exact execution，保持只读；不允许用 session-current 值回退替代 exact 证据。
 
 ## [009] Tool 身份双半边与缺失 Fail-Closed
 
-工具执行上下文必须同时具备消息 ID 与调用 ID 两个半边身份；任一半边缺失直接安全失败，严禁跨上下文推测配对。
+工具执行上下文必须同时完整具备消息 ID 与调用 ID 两个半边身份；任一半边缺失直接安全失败，严禁跨上下文推测配对。
 
 ## [010] 多实例边界与共享注册表访问纪律
 
@@ -42,13 +42,13 @@
 
 ## [011] 空 Content 预防与连续 User 消息插桩
 
-在向底层提供者交付消息前，万象通必须对空白内容进行安全补占位符处理，并在连续出现的两条用户消息之间插桩无语义的助手消息，防止底层协议报校验错误。
+在向底层提供者交付消息前，必须对空白内容进行安全补占位符处理，并在连续出现的两条用户消息之间插桩无语义的助手消息，防止底层协议报校验错误。
 
-**专席 Advisor 的独立出站投影例外：**专席的持久原文包含只有 reasoning、没有普通正文的助手回合，或相邻的两条用户载体时，不得给模型捏造 `assistant "."`（避免模型将兼容占位错认为真实历史答复）。仅在专席的提供者请求副本中省略没有正文也没有工具效果的纯 reasoning 助手消息，并合并相邻用户消息及其原始文字；原始会话、reasoning 的持久事实与已经产生的真实助手正文不被修改。普通角色仍受上述非空与交替规则约束；判断专席身份依据持久的 CanonicalRole，而非用户消息文字。
+**专席 Advisor 的独立出站投影例外：**专席的持久原文包含只有 reasoning、没有普通正文的 assistant 回合，或相邻的两条 user 载体时，不得给模型捏造 `assistant "."`（它会把此兼容占位错认成自己前次的真实答复）。仅在专席的 Provider 请求副本中省略没有正文也没有工具效果的 reasoning-only assistant，合并相邻 user 消息及其原始文字；从不修改原始会话、reasoning 的持久事实或已经产生的真实 assistant prose。普通角色仍受上述 Provider 非空与交替规则约束。判断专席身份依据持久的 CanonicalRole，而不是 user 消息文字。以 HOST-011 的 HNI 正反例和已建立真实 AcceptedChatExecution、ProviderRun 的 OpenCode 正式 transform 反例验证。
 
 ## [012] SessionID 与 CallID 定位唯一性
 
-依据 `SessionID + CallID` 在完整快照中解析原始调用分段时，必须能够唯一确定对应的运行上下文与追踪范围；若匹配出现歧义或无法唯一定位，必须安全失败。
+依据 `SessionID + CallID` 在完整快照中解析原始调用分段时，必须证明其能唯一确定对应的运行上下文与追踪范围；若匹配出现歧义或无法定位，必须安全失败。
 
 ## [013] Stream Sensor 专属识别与单 Run 触发限制
 
@@ -56,7 +56,7 @@
 
 ## [014] 零 Host 源码修改与 Typed Hook Membrane
 
-系统完全基于公开的宿主 Hook 与 SDK 集成，不修改宿主源码。所有挂载 Hook 必须经过万象通统一的 typed membrane：边界将底层异常收敛为中立的类型化代数（execution-failure-policy-001），再解释其完整决策。提供者/模型工具参数未通过已声明 wire/schema 属于 `ProtocolRejection`，原 typed rejection 返回宿主供模型修正，不触发进程 fatal。membrane 禁止通配 catch 后直接重试或退出，禁止按异常文本做字符串匹配路由；未分类物理异常必须 fail closed 并扩展类型代数。
+系统完全基于公开的宿主 Hook 与 SDK 集成，不修改宿主源码。所有挂载 Hook 必须经过同一个 typed membrane：边界用公开 evidence 将失败穷尽归一为 `execution-failure-policy` 的 closed algebra，再解释其完整 decision。Provider/LLM 工具参数未通过已声明 wire/schema 属于 `ProtocolRejection`，原 typed rejection 返回 Host 供 provider 修正，不触发 fatal。membrane 禁止 wildcard catch 后直接 retry/fatal，禁止按 exception/error text 路由；未分类物理形状必须 fail closed 并扩展代数。
 
 ## [015] Tool 文本返回结果有界截断
 
@@ -64,24 +64,23 @@
 
 ## [016] HostEventPort Run 去重与 Sticky 重放
 
-事件端口对同一运行周期的完成事件执行幂等去重，对迟到订阅者提供粘性重放，并在监听器释放后彻底停止投递。run 作用域的 `Failed/Aborted` 与 `Completed` 一样必须保留其 Authority Root 因果身份；新工作单元的订阅者不得重放既有粘性终态，只能观察订阅后的新事件。
+事件端口对同一运行周期的完成事件执行幂等去重，对迟到订阅者提供粘性重放，并在监听器释放后彻底停止投递。run-scoped `Failed/Aborted` 与 `Completed` 一样必须保留其 Authority Root causal identity；future-only subscriber 不得重放既有 sticky terminal，供新 work unit 使用时只能观察订阅后的新事件。
 
 ## [017] Host 身份提取与 Managed Config 投影适配
 
-万象通负责将宿主原始事件解析为规范的会话与角色身份，并单向将托管配置投影到底层宿主；核侧只认中立身份与配置，宿主适配逻辑不反向生成业务权威。
+宿主边界负责将原始事件解析为规范的会话与角色身份，并单向将托管配置投影到底层宿主，宿主适配逻辑不反向生成业务权威。
 
 ## [018] Host 源码零 Fork
 
-系统只通过受支持的公开 Hook 与 SDK 无侵入集成。宿主源码修改、补丁、私有模块 import、运行时 monkey patch 与 vendored fork 均不属于合法实现路径，严禁作为能力缺口的补偿方案。
+系统只通过受支持的公开 Hook 与 SDK 无侵入集成。Host 源码修改、补丁、私有模块 import、运行时 monkey patch 与 vendored fork 均不属于合法实现路径，严禁作为能力缺口的补偿方案。
 
-## [019] 宿主物理能力边界与适配层隔离
+## [019] Host 物理能力缺口必有 Canary 与 Contract 证明
 
-万象通（宿主适配层）向核侧提供经适配校验的物理交互能力（时序、快照解析与模型请求路由）；核侧业务仅依赖万象通暴露的中立能力合同，不假设未经适配层确认的底层宿主隐式行为。在单次 provider transform 期间，不依赖未提交的试探状态，也不通过跨回调的可变标志传递截断决定。
-【程序待改】清退 canary 夹具与环境证明装置（如 `fixtures/*canary*.json`、`tests/support/*canary*.mjs`），将真实宿主能力检验迁入宿主适配层的集成测试，核侧不再保留 canary 宗教叙事。
+业务所依赖的全部宿主物理能力（包括时序、快照解析、模型路由等）必须同时具备契约测试与真实 canary：canary 必须启动受支持的真实 Host build，经公开 Hook/SDK 发起实际场景并观察公开结果；mock adapter、源码/类型形状检查、伪造 callback 与 UI 截图均不算 canary。缺少任一级证明即判定环境不支持。一次 provider transform 不选择未提交的 probe，也不以跨 callback mutable registry/flag 传递截断决定。
 
 ## [020] 观测不足或多解严格 Fail-Closed
 
-宿主边界在面临任何观察证据不足、查询返回类型化失败、多重冲突或数据不一致的情形时，一律执行安全失败（fail closed），严禁妥协猜测；流逝时间本身不构成业务结论。
+宿主边界在面临任何观察证据不足、查询返回 typed failure、多重冲突或数据不一致的情形时，一律执行安全失败（fail closed），严禁妥协猜测；elapsed time 本身不构成业务结论。
 
 ## [021] Plugin Load Phase 纯洁性与 Activation 分界
 
@@ -89,95 +88,102 @@
 
 ## [022] Fatal 前必须完成 exact settlement
 
-万象通 typed membrane 收到 `FatalAfterSettlement` 后，必须先按同一策略决策完成精确的不透明容量围栏结算（capacity fence settlement），并将类型化消息处置交给 `managed-chat-execution` 完成持久化提交；提交结果未知必须显式记录为 unknown。只有所有已持有的所有权均取得已提交或明确未知的结算证据后，方可调用 `FatalProcess`。严禁先退出再依赖 `finally`、宿主清理、会话删除或尽力而为的计数递减收尾。
+Typed hook membrane 收到 `FatalAfterSettlement` 后，必须先按同一个 policy decision 完成 exact opaque capacity fence settlement，并把 typed message disposition 交给 `managed-chat-execution` durable 提交；提交未知必须写成显式 unknown。只有所有已持有 ownership 均取得 committed/unknown settlement evidence 后才可调用 `FatalProcess`。严禁先退出再依赖 `finally`、Host cleanup、session deletion、UI 提示或 best-effort count decrement 收尾。
 
 ## [023] 业务承诺只建立在公开 Host contract
 
-万象通与业务系统的交互只能基于受支持的公开 Hook 与 SDK 接口。私有宿主字段、未公开的回调顺序、内部重试计数器、界面文本或渲染时机均不得作为身份认定、准入、开始、终态、容量结算或退出决策的输入；凡无法通过公开接口可靠获取的状态一律视为不存在并安全失败（fail closed）。
-【程序待改】废止依赖私有字段或特定宿主版本（如 OpenCode 1.18.29）私有属性的适配逻辑，统一由万象通向核侧暴露标准化语义。
+Requirement、领域状态与恢复策略只能依赖受支持的公开 Hook/SDK 输入输出及真实 canary 已证明的物理行为。private Host field/module、未公开 callback ordering、内部 retry counter、DOM/UI text、toast、spinner 或渲染时机均不得成为 identity、acceptance、provider start、terminal、capacity 或 fatal settlement 的证明；无法由公开 contract 观察的能力视为不存在并 fail closed。
 
-## [024] Hook 策略分级与可选观测隔离
+## [024] Hook Policy 闭集与可选观测隔离
 
-挂载到宿主的各 Hook 按照关键等级（安全性、业务流、不变式、可降级、仅审计）进行静态注册与错误分流。涉及安全性、业务工作流与核心不变式的 Hook 发生失败时必须执行安全失败（fail closed），不得降级为尽力而为（best-effort）；审计与诊断等可选观测失败时仅记录中立诊断日志，不得改变或破坏核心 Hook 的执行结果与既有决策。
+每个 live Host Hook 必须且只能对应一行 closed metadata，声明 `Security | Workflow | Invariant | Degradable | AuditOnly` criticality、允许的 context/effect、retry permission、capacity owner 与 failure disposition。composition root 按该 closed score 显式静态注册，固定次序不得由 list iteration、动态 middleware 或 service locator 隐藏。Hook identity 权限至多只读，admission 权限至多进入唯一 owned gate；不存在 identity mutation 或 admission bypass。`Security`、`Workflow`、`Invariant` 失败始终经 `policyAwareHook` fail closed，不能降级为 best effort。已证明可选的 Casebook/audit observation 必须置于 typed best-effort boundary；其失败只发送现有 diagnostic，不能改变已完成的 critical Hook result。
 
 ## [025] 单一因果诊断与显式脱敏
 
-系统通过 `ReliabilityDiagnostics.CausalDiagnosticRecord` 发布结构化因果记录。可用事实携带精确 logical run、session、physical user message、provider run、participant、role、request kind、state transition、typed failure/retry/fallback、capacity、recovery 与 persistence commitment；不可用事实记录为 `None/null`，严禁猜测。诊断结构不接收 prompt、content、token、credential、cookie 或 path 字段；适配层对允许的自由文本显式脱敏并压成单行。已知类型化失败仅输出紧凑 JSON 且不带调用栈。诊断输出失败不得改变 Hook 结果、准入、重试、恢复、容量结算或持久化事实。
+Host 只通过 `ReliabilityDiagnostics.CausalDiagnosticRecord` 发布结构化因果记录。可用事实携带 exact logical run、session、physical user message、provider run、participant、role、request kind、state transition、typed failure/retry/fallback、capacity、recovery 与 persistence commitment；不可用事实必须为 `None/null`，严禁猜测。schema 不接收 prompt、content、token、credential、cookie 或 path 字段；adapter 对允许的自由文本显式脱敏并压成单行。known typed failure 只输出一行 JSON 且无 stack。diagnostic emit/counter/query 失败不得改变 Hook result、admission、retry、recovery、capacity settlement 或 durable fact。
 
 ## [026] Host Contract/Runtime 编译分界与单向依赖
 
-宿主子系统的公开 Contract、Runtime 与物理 Adapter 必须保持编译隔离。以下名称标识合同和编译边界，不赋予 compile shard 独立的架构治理身份或 consumer 授权：
+Host subsystem 的公开 Contract、Runtime 与物理 Adapter 必须保持编译隔离。以下名称标识合同和编译边界，不赋予 compile shard 独立的架构治理身份或 consumer 授权：
 - `Host.Session.Contract`（`host-session-contract`）：仅包含会话静止 capability 与纯 `SessionSnapshot` 词汇、端口、定位 decision，不依赖 SDK/HTTP 投影、具体 Host 运行时、进程控制、诊断或 Sphinx MCP。
-- `Host.Signal.Contract`（`host-signal-contract`）：仅发布共享终端词汇 `Foundation.TerminalSignal`，无状态且零副作用；不得因终端词汇而传递摘要实现、消息词汇、SDK 类型、工具注册或物理启动配置。
+- `Host.Signal.Contract`（`host-signal-contract`）：仅发布共享终端词汇 `Foundation.TerminalSignal`（原 `OpenCode/Signals/EventContract`，已移出适配层），无状态且零副作用；不得因终端词汇而传递摘要实现、消息词汇、SDK 类型、工具注册或物理启动配置，不作为兼容 umbrella。
 - `Host.Message.Contract`（`host-message-contract`）：独立发布 `Message`/`MessagePart` 消息词汇，不携带 SDK 类型、终端事件或摘要实现。
-- `Host.SDK.Types`（`host-opencode-types`）：独立发布 `OpencodeTypes` SDK 数据类型与 `HostModel` 宿主中立模型词汇，不携带消息词汇、终端事件或物理 Host 能力。
-- `Host.Event.Envelope`（`host-event-envelope`）：只发布原始宿主 envelope unwrap、event type、session identity 与 message-session identity 的无状态提取逻辑；不得修改输入对象。
-- `Host.Message.Codec`（`host-message-codec`）：只发布原始宿主 message part 到 `MessagePart` 的无状态解码；其边界仅服务消息消费者。
-- `Host.Fatal.Effect`（`host-fatal-effect`）：进程级退出熔断（`Foundation/FatalProcess`）的窄物理效果边界；其能力注入与结算顺序遵守 [029]。
-- `Host.Diagnostics.Runtime`（`host-diagnostics-runtime`）：Hook 策略与因果诊断单向消费 Contract，不得反向侵入应用契约闭包。
-- `Host.Signal.Adapter`（`host-signal-adapter`）：宿主信号词汇 `HostSignal`、完整提供者 failure/terminal `HostEventCodec`、信号路由（`HostSignalAdapter`）、物理订阅与事件总线适配器（`TerminalWiring`/`Events`）；按实际需要消费窄 codec contract，不向外部输出完整闭包。
-- `Host.Tool.Adapter`（`host-tool-adapter`）：独立拥有 `ToolHostCodec` 与 `ToolHostSurface` 的参数解码、上下文身份配对、SDK schema、工具注册、abort 监听与有界输出接线；工具注册闭包不得获取信号路由或终端总线实现。
+- `Host.SDK.Types`（`host-opencode-types`）：独立发布 `OpencodeTypes` SDK 数据类型与 `HostModel` 宿主中立模型词汇（原 `OpencodeModel`，HNI-10 于 2026-10-22 就地改名），不携带消息词汇、终端事件或物理 Host 能力。
+- `Host.Event.Envelope`（`host-event-envelope`）：只发布 raw Host envelope unwrap、event type、session identity 与 message-session identity 的唯一无状态公式；不得修改输入对象。
+- `Host.Message.Codec`（`host-message-codec`）：只发布 raw Host message part → `MessagePart` 的无状态 decode；其 bounded audience 只包含实际 message consumer。
+- `Host.Fatal.Effect`（`host-fatal-effect`）：进程级 fatal fuse（`Foundation/FatalProcess`）的窄物理效果边界，不是纯合同；其 capability 注入、唯一物理实现与结算顺序遵守 HOST-BOUNDARY-029。
+- `Host.Diagnostics.Runtime`（`host-diagnostics-runtime`）：封闭 Hook 策略元数据与因果诊断单向消费 Contract，不得反向侵入应用契约闭包。
+- `Host.Signal.Adapter`（`host-signal-adapter`）：宿主信号词汇 `HostSignal`、完整 provider failure/terminal `HostEventCodec`、信号路由（`HostSignalAdapter`）、物理订阅与事件总线适配器（`TerminalWiring`/`Events`）；按实际知识消费窄 codec contract，不向 message/loop consumer 输出自身完整闭包，也不编入工具注册实现。
+- `Host.Tool.Adapter`（`host-tool-adapter`）：独立拥有 `ToolHostCodec` 与 `ToolHostSurface` 的参数解码、上下文身份配对、SDK schema、工具注册、abort listener 与有界输出接线；它是物理适配器，不是纯合同。工具注册闭包不得取得信号路由或终端总线实现；同时需要两侧的 composition 显式装配，不恢复宽 adapter 或复制物理实现。
 - `Host.Session.Runtime`（`host-session-runtime`）：SDK/HTTP 快照投影、进程级静止门禁状态机（`SessionQuiescenceGate`、`QuiescenceSurface`）、消息就地变更与宿主上下文投影，禁止被普通业务契约直接引用。
-- `Sphinx.Host.Adapter`（`sphinx-host-adapter`）：OpenCode 的 dispatch 借道端口（`OpenCodeHostPort`，能力仅 `dispatch`），隔离于核心契约之外；不注册原生工具，不注入 Sphinx MCP。
+- `Sphinx.Host.Adapter`（`sphinx-host-adapter`）：`Hosts/OpenCode` 的 dispatch 借道端口（`OpenCodeHostPort`，Capabilities 仅 `dispatch`），隔离于核心契约之外；不注册原生工具，不启动或注入 Sphinx MCP。
 
-`HostDigest` 属于 `runtime-platform/digest` 的无领域摘要原语，不属于 `Host.Signal.Contract`；摘要计算不使调用方获得宿主消息、SDK、终端或物理适配能力。普通业务契约仅按实际需要依赖窄契约、纯数据或 capability port；严禁传递编译 Sphinx、诊断、消息修改、工具注册、信号订阅或具体宿主运行时。
+`HostDigest` 属于 `runtime-platform/digest` 的无领域摘要原语，不属于 `Host.Signal.Contract`；摘要计算不应使 consumer 获得 Host 消息、SDK、终端或物理适配能力。物理启动配置留在对应适配器，不回填共享终端合同。
 
-## [027] Host codec 按语义与 consumer cohort 切片
+普通业务契约只按真实知识依赖消费窄 public contract、纯数据/decision 或 capability port，包括会话、终端、消息与 SDK 数据合同；允许消费窄合同不等于授予物理能力。严禁传递编译 Sphinx、诊断、消息就地修改、工具注册、信号订阅或具体 Host 运行时；需要物理效果时由 composition 注入窄 capability。
 
-无状态 `HostEventEnvelope` 是原始宿主 envelope unwrap、event type 与 session/message-session identity 读取的唯一实现；`HostEventCodec` 消费该 contract，禁止复制动态字段解析逻辑。`HostMessageCodec` 形成独立 bounded contract，只服务消息消费方。`Host.Session.Runtime` 不得为 message codec 引用完整 signal adapter；signal adapter 不得反向引用 diagnostics runtime。
+## [027] Host codec 按语义与consumer cohort切片
 
-## [028] signal subscription 与 optional diagnostic 必须分型
+无状态`HostEventEnvelope`是raw Host envelope unwrap、event type与session/message-session identity读取的唯一公式；`HostEventCodec`必须消费该contract，禁止复制dynamic field parser。`HostMessageCodec`形成独立bounded contract，只服务message consumer。`Host.Session.Runtime`不得为message codec引用完整signal adapter；signal adapter不得反向引用diagnostics runtime。
 
-宿主信号订阅必须返回严格类型的 `HostSignalSubscriptionError` 与 `LocalEventHook | EventsListen of HostSignalSubscription` 模式，不得以 `option + string` 表达非法组合。顶层 input 与显式非 null `events` 载体必须是普通记录；`client` 是不透明 SDK capability，缺少 `events` 成员时回退为 `LocalEventHook`。输入格式错误一律收敛为 `InvalidInput`；`events.listen` 异常收敛为 `EventsListenFailed`，Surface promise 必须 resolve 类型化错误而非 reject。`EventsListen` 必须携带唯一 disposable 所有者；监听器注册失败即刻报错，禁止延迟到清理时爆发。万象通适配器只报告类型化错误，`HostSignalBootstrap` 是唯一退出决策者。循环诊断经必填窄 capability 注入，其失败不得改变主流程执行。
+## [028] signal subscription 与optional diagnostic 必须分型
 
-## [029] fatal process 是唯一注入的 physical adapter
+Host signal subscription必须返回closed `HostSignalSubscriptionError`与`LocalEventHook | EventsListen of HostSignalSubscription` mode，不得以`option + string`表达非法组合。顶层input与显式非null `events` carrier必须是plain record；`client`是opaque OpenCode SDK object capability，可为plain record或class instance，缺少legacy `events`成员时必须返回`LocalEventHook`。primitive、array、boxed scalar、Date与坏direct events/client-events一律`InvalidInput`，且坏direct events不得借合法client旁路。顶层/client carrier getter或Proxy抛错收敛为`InvalidInput`；`events.listen`读取或调用抛错收敛为`EventsListenFailed`，Surface promise必须resolve typed error而非reject。`EventsListen`必须携带唯一opaque disposable owner；缺失或非函数`listen`、缺失或非函数disposer均返回对应typed failure，禁止延迟到dispose时才爆炸；合法disposer自身抛出的异常必须原样传播给资源owner。未提供legacy events capability时只返回`LocalEventHook`，不得制造disposer。callback等JavaScript decode failure只在Surface膜上fail closed，不污染production DU。adapter只报告typed failure且不得到达Diagnostic或Temporal；`HostSignalBootstrap` composition是`signal-subscribe-failed`的唯一fatal解释者。Loop diagnostic经必填窄`emitDiagnostic` capability注入；其失败只能产生非权威诊断outcome，不得改变arm、interrupt、consume或continuation结果。
 
-`FatalProcessPort` 契约只包含不可变事件词汇与 capability 类型，不包含物理工厂或 Node 导入。唯一 fatal adapter 拥有该路径的 `console.error`、`process.kill` 与 `process.exit`；所有调用方由 composition 注入 capability，普通契约与适配器不得直接引用物理实现。退出前必须由持有所有权的模块完成类型化结算证据；同一事件仅允许一次上报与一次终止。
+## [029] fatal process 是唯一注入的physical adapter
 
-发生未恢复致命异常时，系统触发子进程确定性硬退出（通过 signal 或 `process.exit(1)`），且此前提交的持久化事实必须安全留存。退出熔断机制保证同一故障事件仅上报并终止一次，控制台输出异常或标准流关闭不得绕过终止逻辑。非致命拒绝与正常耗尽路径正常退出（code 0）。
+`FatalProcessPort` contract只含immutable incident vocabulary与capability type，不得含value、factory或Node import。唯一fatal adapter拥有该路径的`console.error`、`process.kill`与`process.exit`；所有caller由composition获得mandatory capability，普通contract/runtime/adapter不得直接引用physical implementation。fatal前置settlement由caller owner提供typed evidence；同一incident只允许一次report与一次kill。
+
+物理退出语义由真实子进程证明，不由 harness flag 证明：`requirements/host-boundary/tests/029.test.mjs` 经 `tests/fixtures/fatal-process-child.fixture.mjs` 触发编译后的 `FatalProcess.trip` / `Diagnostic.fatal` 真实路径，父进程观察硬退出（平台交付 signal 则断言 signal，`process.exit(1)` 回退则断言 code 1，不硬编码 Unix），并重开此前已提交的 store 验证 durable 事实幸存；console renderer 抛错、stdio 关闭、重复 incident 均不得绕过 fuse 或产生第二次 report；正常拒绝、stale callback、修复耗尽路径必须 exit 0。SIGKILL 语义不得为让 finally 运行而弱化。
 
 ## [030] raw Host membrane 只接受精确 JavaScript 类型
 
-布尔标记只接受原生 `true | false`；字符串、数字、对象均不得通过隐式真假值（truthiness）转化为 compaction、synthetic 或 abort 标记。parts 只接受真实 Array，其他值安全投影为空且 Hook 不得抛出未捕获异常。事件与响应中的 SessionId、parentID、agent 只接受非空原始字符串。所有动态读取逻辑在 Fable/JS 边界执行显式类型判定，正确性不得依赖运行时异常捕获或偶发拒绝。
+布尔marker只接受primitive `true | false`；字符串、数字、对象、boxed value均不得借truthiness成为compaction、synthetic或abort。parts只接受真实Array，其他值安全投影为空且hook不得抛异常。session event与`session.get`响应中的SessionId、parentID、agent只接受原始非空白primitive string，禁止`string value`制造领域值。所有dynamic reader必须在Fable边界执行显式JavaScript type predicate；正确性不得依赖`unbox`、异常捕获或下游字符串函数偶然拒绝。
 
-## [031] Root workspace first-bind effect 隔离
+## [031] Root workspace first-bind effect隔离
 
-Root workspace 是进程局部的宿主资源定位结果，非公开可变状态。私有宿主运行时仅在当前值为 `None` 且候选为非空路径时完成首次绑定；空值与纯空白不占用绑定，首次绑定后任意后续候选均不得改写结果。Host composition 是绑定的唯一生产消费方，其余生产路径只能消费显式注入的只读 capability。不得从 Git 隐式推导工作区根路径，亦不得由消费方自行重算或读取全局状态。
+Root workspace 是process-local Host资源定位结果，不是公开可变状态。private Host runtime只在当前值为`None`且候选为非空白`Some path`时完成首次绑定；`None`、空串与纯空白均不占用绑定，首次绑定后的任意候选不得改写结果。Host composition是binder的唯一production consumer；其余production路径只能消费显式注入的只读capability。不得从Git推导workspace family root，不得按consumer自行重算或直接读取全局atom。
 
 ## [032] 不注入评审保证书参数
 
-`todowrite-for-manager` 的工具定义不得追加 `contract` 参数、固定 token 或必填签署字段。评审接纳前后的定义保持一致；是否允许执行只由当前 Manager 能力事实决定，不依赖模型签署保证。
+`todowrite-for-manager` 的工具定义不得追加 `contract` 参数、固定 token 或必填签署字段。评审接纳前后的定义保持一致；是否允许执行只由当前 Manager capability facts 决定，不依赖模型承诺。
 
-工具入参中的 `contract` 仅作为对模型的提示字段；万象通在工具调用执行前（`before` 阶段）对参数进行私有暂存，并在执行完成后（`after` 阶段）原样恢复原始键序与对象属性，使模型上下文与 wire 层历史准确保留原始入参，异常退出路径同样保证同源恢复。参数暂存机制仅按字段所有权处理提示字段 `contract`，不为工具定义追加估计轮次或短记字段。
-【程序待改】清理对 OpenCode 1.18.29 特定 canary 夹具与时序的硬编码依赖，由万象通统一提供参数暂存与恢复保证。
+工具入参中的 `contract` 仅作为对 provider 的提示字段；插件本地对缺失或错误的 `contract` 采取乐观处理，不进行二次强校验。执行清理时，对需要暂存的参数执行私有暂存，并在 `after` 回调中原样恢复；异常退出路径同样保证同源恢复，确保历史原始调用与上下文记录不被参数清理逻辑改写。此处「历史」指每次 provider 请求发给模型的 provider wire 层历史投影：参数清理后由 provider-facing transform 从 before 期私有暂存还原协议字段，使 wire 层历史保留原始入参；宿主持久化快照的内部形态属宿主实现，在公开 Hook API 内既不可满足也不可观测，不作为本仓门禁对象。参数恢复后的对象身份与原始键顺序必须以真实 canary 得到严格证明。参数清理机制只按字段所有权处理服务评审提示字段 `contract`。不为工具定义追加估计轮次或短记字段。原始参数保证主要落在 provider wire 历史投影，不得承诺 Host 持久化快照对象形态或宣称重启后宿主内部字段必然完整。
 
 ## [033] 读取端 hook 的 exact 只读租约校验
 
-`chat.params`、提供者步骤门禁与 attempt 生命周期一律以精确 `(SessionId, PhysicalUserMessageId)` 读取容量所有者已提交的租约完成校验：查询不得调用 scheduler、不得发放 fence、不得建立或回填第二份绑定状态。同一物理消息的重复观察幂等，拒绝原因保持一致；交错消息各自校验自身物理 ID，互不串读。受管输入缺少已提交租约时 fail-closed 拒绝且宿主输出不被改写，不得回退到 session-current 绑定副本，亦不得将观察升级为受管租约；未绑定辅助会话保持豁免。attempt plan 冻结与 `ProviderStarted` 持久化按精确键查验已提交的 Accepted 执行，缺失即明确拒绝。
+`chat.params`、provider step 门禁与 provider attempt 生命周期一律以 exact `(SessionId, PhysicalUserMessageId)` 读取容量所有者已提交的租约完成校验：查询不得调用 scheduler、不得发放 fence、不得建立或回填第二份绑定状态。同一物理消息的重复观察幂等，拒绝原因保持一致；A/B 交错消息各自校验自身物理 id，互不串读。受管输入缺少已提交租约时 fail-closed 拒绝且 Host 输出不被改写，不得回退到 session-current 绑定副本，也不得把观察升级为受管租约；未绑定 Host 辅助会话保持豁免。attempt plan 冻结与 `ProviderStarted` 持久化按 exact key 查验 durable Accepted 执行，缺失即明确拒绝，不得兜底重建准入；terminal 后的迟到事件不得复活准入。
 
-活跃 run 的用户消息在宿主保存前不得撤销旧租约。provider transform 选择可见新输入时，先经 managed-chat-execution-003 的独立准入操作验证精确 Accepted、同 run 与旧租约，交接原容量并提交新租约，随后执行只读门禁。不得将任意缺失租约视为追加材料或从当前会话猜测身份。
+活跃 run 的 `HumanMessage` / `BusyAgentNudge` 在 Host 保存前不得撤销旧 committed lease。provider transform 选择可见新输入时，先经 managed-chat-execution-003 的独立准入操作验证 exact Accepted、同 run 与旧 opaque lease，交接原容量并提交新 exact lease，然后执行只读门禁。不得把任意缺失租约视为追加材料或从 session-current 猜造身份。Join 的输入唤醒只消费已保存消息的 exact 可见回执，不在 `chat.message` 保存前唤醒。
 
-## [034] 宿主适配器薄度与中立端口分层
+## [034] adapter 薄度与 Host 命名空间层级的门禁契约
 
-万象通适配器文件（`src/Wanxiangshu` 下的 `OpenCode/`、`Omp/` 适配面）不得自行承担产品业务决策，不持有第二业务账本，亦不控制核心外部生命周期。纯粹的命名空间引用数量不作为硬性计数棘轮。
+adapter 文件（`src/Wanxiangshu` 下的 `OpenCode/`、`Omp/` 适配面）不得自行承担产品决策。引用数量与端口出现与否不作为硬性计数棘轮：一个职责明确的合法 adapter 即使引用较多领域命名空间，只要不越界替领域对象作决策、不持有第二业务账本且不控制外部生命周期，即为合规；单纯的命名空间计数或基线不作为交付否决依据。
 
-核侧的中立端口（`src/Wanxiangshu/Host/Ports/`）与领域模型（`src/Wanxiangshu/Host/Domain/`）保持宿主中立：中立端口签名只声明纯抽象接口与数据类型，严禁直接绑定特定宿主 SDK（如 OpenCode、omp）的私有客户端或句柄。物理接入统一由适配器装配注入。
-【程序待改】废止端口签名中的 `HNI P-xx` 仪式性标记与硬编码门禁，简化架构分层检查。
+中立端口纯度是严格约束：`src/Wanxiangshu/Host/Ports/` 下的每个 `.fs` 与 `.fsi` 文件不得引用适配器命名空间、产品域或宿主词汇，只允许 Foundation、`Wanxiangshu.Host` 与 System。宣称纯计算的中立端口签名严禁携带具体 Host SDK 客户端句柄、物理文件句柄（如 `System.IO`、`FileStream`、`StreamReader`、`StreamWriter`）或可变注册表（如 `Dictionary`、`HashSet`、`ResizeArray`）。纯度范围从源码发现，不依赖任何硬编码族名：任意名称的新端口族自动纳入范围，其签名文件声明的 `type` 名即成为中立端口词汇表的一部分，词汇表同样从源码发现。端口族完整性由族签名自述：每个端口族签名必须以 `HNI P-xx` 头标记声明恰好一个保留端口 id，不得声明零个或多个；两个族不得声明同一保留 id；直接位于 `src/Wanxiangshu/Host/` 下的文件不得占用某个中立族的基名，否则该族一旦被移入 `Host/Ports/` 就会静默覆盖。
 
-## [035] omp 入口无产品决策接线
+`src/Wanxiangshu/Host/` 承载两层且每层只有一个命名空间：A 层 `Host/Ports/` 必须声明 `Wanxiangshu.Host.Ports`，B 层 `Host/Domain/` 必须声明 `Wanxiangshu.Host.Domain`，直接位于 `Host/` 下的文件两者均不得声明——目录位置与命名空间因此不得各自漂移。层范围从源码发现，新增的族与接缝自动被覆盖。
 
-omp 入口模块位于 `src/Wanxiangshu/Composition/Omp/`，负责将产品接入 omp。宿主翻译的目标归属是万象通；现有代码尚未迁入，程序待改。业务状态及规则应由其实际主人持有，不靠扫描关键词或控制流判断职责。
+## [035] omp 入口模块不持有产品决策
+
+omp 入口模块（`src/Wanxiangshu/Composition/Omp/` 下携带 `[<ExportDefault>]` 的那个文件及其 `.fsi`）是手写、无产品决策的接线层：它只建立子会话接缝、调用 `activateOnOmp`，并以普通 `IHostPlugin` 值接收 Fable 编译出的产品。它不得反射产品、不得动态 import 产品内部、不得在运行时查产品符号。
+
+入口模块不得出现任何产品决策：不写准入/拒绝规则、不写重试、不算预算、不渲染产品散文、不保留产品状态；并且不 import 任何产品模块。允许的命名面只有中立端口、omp 适配器与 second-host plugin 取值面（`System`、`Fable.Core`、`Wanxiangshu.Host.Ports`、`Wanxiangshu.Host.SecondHost`、`Wanxiangshu.Omp`），产品散文只存在于产品资源树。
+
+该约束由门禁 `scripts/checks/omp-entry-decision-gate.mjs` 强制：门禁只读取入口模块与其接口，不扫描其他 lane 的文件；入口模块缺失、导出点缺失或歧义时必须 fail closed。门禁自带 planted-violation 自证——每一类禁止项都必须在植入违规后被拒绝，且真实入口模块必须被接受；自证失败本身就是门禁 issue。
+
 
 ## [036] 宿主功能性角色与自动 compaction 隔离契约
 
-宿主内置的功能性代理（title、compaction、summary、explore、generate）服务于宿主自身的生命周期与元数据维护，不隶属于万象术受托治理的核心角色（manager、orchestrator、engineer、devops、plan、advisor）：
+宿主内置的功能性代理（title、compaction、summary、explore、generate）服务于宿主自身的生命周期与元数据维护，不隶属于万象术受托治理的 managed roles（manager、orchestrator、engineer、devops、plan、advisor）：
 
-1. **请求级系统所有权与视图隔离**：宿主底层可能存在不携带当前代理标识的 Hook 调用；万象通负责将非受托的功能性请求与受托角色请求隔离开来，仅以受托角色提示词前缀开头的请求才进入核心 system 改写与出站快照。功能性请求原样保留，禁止通过宿主提示词片段或会话历史猜测当前角色；
-2. **历史会话压缩服从 as-is 语义**：压缩钩子授权仅在当次上下文转换中旁路处理，宿主存活上下文传入什么内容即原样提供给压缩模型，不回溯已被裁切的早期历史，亦不注入预算后缀；
-3. **宿主自动压缩策略保留**：万象术不物理禁用宿主原生自动压缩，允许宿主自发触发安全压缩；该压缩不推进 Scope epoch、不扣减计费估计、不更改在途委托；
-4. **准入与执行旁路**：功能性角色在消息处理中不受受管租约约束，工具不进行强制屏蔽，允许其直接执行；
-5. **参数隔离**：非受管请求不结算 Scope 进度、不触发 Advisor、不覆盖模型快照亦不记录受管模型容量；
-6. **共享历史中的作者身份**：系统在请求副本追加的提示在出站时必须标记为合成消息（`synthetic=true`），避免宿主将系统提醒误判为真实用户输入而静默取消后台自动标题。
+1. **请求级系统所有权与视图隔离**：OpenCode 1.19.4 的 system hook 不携带当前 agent，且先于 chat.params；title 可复用 managed 会话及用户消息。只有以万象术自有角色提示词完整字节开头（后接换行或结束）的请求，才进入产品 system 改写与出站快照；临时协商沿专用前缀投影处理。其他请求原样保留，即使自定义功能性提示词、与 managed 请求同会话交错，或在尾部引用产品提示词，也不得注入 Scope 或污染快照。禁止用宿主英文提示词片段、历史用户 agent 或会话身份猜当前角色；
+2. **历史会话压缩服从 as-is 语义**：`session.compacting` 只授权该会话紧接的一次 `messages.transform` 旁路，读取时即消费，不延续到 system/params 或后续普通请求。宿主传入当前存活上下文的什么内容，就原样提供给压缩模型；绝不恢复前任已被 tenure cut 裁切的历史，也不得注入预算后缀。其他会话不受影响；
+3. **宿主自动 compaction 策略保留**：万象术不得物理禁用宿主自动压缩。配置钩子必须保留 `auto=true, prune=false, autocontinue=true`，允许宿主自发触发安全压缩，且该压缩不推进 Scope epoch、不扣减计费估计、不更改在途委托事实；
+4. **准入与执行旁路**：功能性角色在 `chat.message` 中不受 managed lease 约束或强加 tools 屏蔽，允许其无阻碍直接执行。
+5. **参数隔离**：chat.params 以实际调用的 agent 为准，非 managed 请求不得结算 Scope 进度、触发 Advisor、覆盖模型快照或记录 managed 模型容量；宿主参数原样保留。
+6. **共享历史中的作者身份**：产品在请求副本追加的 Scope 提醒必须将每个文本 part 标记为宿主原生 `synthetic=true`，不伪装成真实用户消息。OpenCode 的后台 title 与普通请求变换可共享同一数组；变换后 title 的真实用户计数必须仍只包含原始用户消息，不能因产品提醒从一条变成两条而静默取消自动命名。
 
-真机事实：在开启插件的会话中，未标记为合成消息的系统提示会污染用户消息计数导致宿主后台跳过自动标题；标记为合成消息后宿主正常发出标题请求并持久化更新。
-【程序待改】万象通适配层应进一步抽象宿主原生功能性请求的过滤机制，避免在核侧保留针对具体 OpenCode 版本的特定提示词开头嗅探逻辑。
+2026-10-27 实测：上一轮仅 system/params 旁路不能修复 title。未标记的 Scope steer 使真实 DevOps 会话不发出 title 请求；补齐 synthetic 后，OpenCode 1.19.4 在开启插件的真实 DevOps 新会话中发出 `small=true agent=title`，并将持久标题更新为「自动标题生成诊断」。普通 DevOps 模型请求在诊断上限被停止，此证据仅证明后台自动标题完成，不冒充普通任务完成。
+
+源码依据：[OpenCode v1.19.4 request.ts](https://github.com/anomalyco/opencode/blob/v1.19.4/packages/opencode/src/session/llm/request.ts)、[compaction.ts](https://github.com/anomalyco/opencode/blob/v1.19.4/packages/opencode/src/session/compaction.ts)、[prompt.ts](https://github.com/anomalyco/opencode/blob/v1.19.4/packages/opencode/src/session/prompt.ts)。

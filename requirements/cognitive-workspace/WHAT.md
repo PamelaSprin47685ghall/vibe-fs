@@ -1,57 +1,44 @@
 # cognitive-workspace — WHAT
 
-本包划定 `assume` 工具与认知状态的边界：系统里「笃定」只是一个动作承诺点，
-不携带画板、待办或压缩状态。待办归编程面工具，上下文压缩归 `resetScope` 屏障。
+本包现为退休边界：系统不再提供持久认知画板。保留这些条款，是为了防止已经删掉的 jq/canvas 协议以“兼容”名义重新进入生产路径。
 
-## [001] 无 session 级持久认知画板
+## [001] 不存在 session 级持久认知画板
 
-系统的持久状态里没有 session 级 JSON 认知画板这一形态。Life、重启、deliver、
-退休等生命周期只携带 durable facts 投影，任何组件都不得引入或恢复画板形态的
-session 状态。
+生产代码不得维护、恢复或投影 session 级 JSON 认知画板；Life、重启、deliver、退休等生命周期都不再携带此类状态。
 
-## [002] assume 只接受 assumption
+## [002] assume 只有 assumption
 
-`assume` 的参数表只有 `assumption: string` 一个字段。调用方传入其他字段
-（`update`、`query`、`todos`、selector、vars 或任何 jq 参数）即为非法调用。
+`assume` 只接受 `assumption: string`。不得出现 `update`、`query`、`todos`、selector、vars 或任何 jq 参数。
 
-## [003] 历史 Cognition journal 只读
+## [003] 旧 Cognition journal 只读兼容
 
-历史 journal 中已存在的 `AgentFact.Cognition/AssumePhaseCommitted` 可被兼容
-decoder 读取；fold 对它一律 no-op，不生成 projection、不开新写入口。
-读取只为诚实恢复旧数据。
+历史 journal 中已经存在的 `AgentFact.Cognition/AssumePhaseCommitted` 可以被兼容 decoder 读取，但 fold 必须为 no-op，不恢复画板，不产生新 projection，也没有任何新写入口。
 
-## [004] durable projection 不含 Cognition 字段
+## [004] durable projection 不含 Cognition
 
-`AgentProjectionSet` 只保存会话、任务、关联等结构事实，没有 `Cognition`、
-canvas snapshot、owner ordinal 或同义字段。
+当前 `AgentProjectionSet` 不得保存 `Cognition`、canvas snapshot、owner ordinal 或同义字段。
 
-## [005] 编译图与依赖保持无画板运行时
+## [005] 不存在 canvas runtime、codec、owner 与 jq 依赖
 
-生产编译图不含 `Participant/Cognition` 的 runtime、workspace、codec、admission
-或 fold；包依赖中不含 `jq-wasm`。需要新增认知类状态时，走 durable facts，
-不另造画板运行时。
+生产编译图不得包含 `Participant/Cognition` runtime、workspace、codec、admission、fold、TodoSink；包依赖中不得包含 `jq-wasm`。
 
-## [006] 压缩边界唯一由 resetScope 划定
+## [006] assume 不产生 compression 边界
 
-`assume` 成功不产生 compression 边界。上下文压缩边界唯一由显式 `resetScope`
-宿主工具调用划定（见 context-compression [033] 与 obligation-ledger [001]）。
+`assume` 成功不产生 compression 边界。原视图声明与 compression checkpoint 准入已彻底退役，上下文压缩边界唯一由显式 `resetScope` 宿主工具调用划定（见 context-compression [033] 与 obligation-ledger [001]）。
 
-## [007] 待办唯一写入面是 todowrite-for-<role>
+## [007] 待办写入不通过 canvas 兼容桥
 
-宿主待办写入只经编程面 `todowrite-for-<role>`，插件不维护第二份待办真相，
-也不提供任何待办 UI 写入桥。
+宿主待办写入只经编程面 `todowrite-for-<role>`，插件不维护第二份待办真相。不得恢复 TodoSink、`assume(update,todos)` 或 Magic Todo 作为 UI 写入桥。
 
-## [008] 系统不执行 jq
+## [008] 不执行 jq
 
-任何 provider 输入都不会在本系统内作为 jq 程序执行；工具实现与包依赖中
-都不引入 jq runtime、jq 编译错误分支或 jq 输出数量协议。
+没有任何 provider 输入会在本系统内作为 jq 程序执行；不得为了 assume 再引入 jq runtime、jq 编译错误分支或 jq 输出数量协议。
 
 ## [009] assume 是无状态动作
 
-`assume` 的结果只取决于本次合法调用与 provider 语言；它不读取前一次 assume、
-session 私有记忆或跨实例缓存，也不留下可变状态。
+`assume` 的结果只取决于合法调用与 provider 语言；它不读取前一次 assume、session 私有记忆或跨实例缓存。
 
 ## [010] 笃定不等于事实、权限或完成
 
-`assume` 只表示「当前判断已经完成抽象并准备据此行动」。它不证明判断为真、
-不授予角色权限、不证明测试通过，也不构成完成或退休证据。
+`assume` 只表示“当前判断已经完成抽象并准备据此行动”。它不证明判断为真、不授予角色权限、不证明测试通过，也不构成完成或退休证据。
+

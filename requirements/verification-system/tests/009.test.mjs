@@ -1,5 +1,5 @@
 import test from 'node:test'
-import { testDeclarations } from './support/test-declarations.mjs'
+import { testDeclarations } from '../../requirement-system/tests/support/structure.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -257,7 +257,7 @@ test('WHAT[verification-system-009] every ladder step target exists as a real fi
     assert.ok(existsSync(join(ROOT, rel)), `ladder step target missing: ${rel}`)
   }
 })
-test('WHAT[verification-system-009] every wired check path exists', () => {
+test('WHAT[verification-system-009] every wired gate path exists and every gate script is registered or explicitly aggregated', () => {
   for (const gatePath of checks) {
     assert.ok(
       existsSync(gatePath),
@@ -265,6 +265,43 @@ test('WHAT[verification-system-009] every wired check path exists', () => {
     )
   }
 
+  const dirEntries = readdirSync(join(ROOT, 'scripts/checks'))
+
+  // Data files that are not gate scripts
+  const nonGateFiles = new Set([
+    'owner-impact-corpus.json',
+    'subsystems.json',
+    // Helper / non-gate modules:
+    'fsharp-control-pyramid-guide.mjs',
+    'js-module-linkage.mjs',
+    'js-surface-gate.mjs',
+    'js-surface-manifest.mjs',
+    'llm-facing-format-gate.mjs',
+  ])
+
+  const wiredBasenames = new Set(checks.map((p) => basename(p)))
+  const gateScriptsInDir = dirEntries.filter((f) => f.endsWith('.mjs') && !nonGateFiles.has(f))
+
+  // A gate script reaches the release gate set in one of two ways: it is registered in
+  // check.mjs, or a registered gate imports it and calls it — that is how
+  // adapter-thinness.mjs runs (architecture.mjs imports scanAdapterThinness). Counting
+  // registrations alone would call that a missing gate, so the invariant is that every
+  // gate script is reachable from the registered set.
+  const aggregated = new Set()
+  for (const gatePath of checks) {
+    const text = readFileSync(gatePath, 'utf8')
+    for (const name of dirEntries) {
+      if (!name.endsWith('.mjs') || wiredBasenames.has(name)) continue
+      if (text.includes(`./${name}`) || text.includes(`'${name}'`)) aggregated.add(name)
+    }
+  }
+
+  const unreachable = gateScriptsInDir.filter((f) => !wiredBasenames.has(f) && !aggregated.has(f))
+  assert.deepEqual(
+    unreachable,
+    [],
+    'every gate script in scripts/checks must be registered in check.mjs or aggregated by a registered gate',
+  )
 })
 }
 
@@ -372,5 +409,38 @@ test('WHAT[verification-system-009] repository closure gates reject an unassigne
   } finally {
     rmSync(fixture, { recursive: true, force: true })
   }
+})
+
+test('WHAT[verification-system-009] clean-break symbol gate is red on an empty directory, a read failure, and a scan that did not run', async () => {
+  const { default: assert } = await import('node:assert/strict')
+  const { mkdirSync, mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { assess, check: scanCleanBreak, registrationGap } = await import('../../../scripts/checks/clean-break-symbols.mjs')
+  const { checks } = await import('../../../scripts/check.mjs')
+  const empty = mkdtempSync(join(tmpdir(), 'clean-break-empty-'))
+  try {
+    mkdirSync(join(empty, 'src'))
+    const emptyResult = scanCleanBreak({ root: empty })
+    assert.equal(emptyResult.ok, false)
+    assert.ok(emptyResult.issues.some((issue) => issue.code === 'scan-empty'))
+  } finally {
+    rmSync(empty, { recursive: true, force: true })
+  }
+
+  const unreadable = scanCleanBreak({
+    root: join(import.meta.dirname, 'fixtures/clean-break-symbols/legal'),
+    readText() {
+      throw new Error('clean-break fixture read denied')
+    },
+  })
+  assert.equal(unreadable.ok, false)
+  assert.ok(unreadable.issues.some((issue) => issue.code === 'read-failed'))
+
+  const notRun = assess({ ran: false })
+  assert.equal(notRun.ok, false)
+  assert.equal(notRun.issues[0].code, 'scan-not-run')
+  assert.equal(registrationGap([]).code, 'scan-not-run')
+  assert.equal(registrationGap(checks), null)
 })
 }

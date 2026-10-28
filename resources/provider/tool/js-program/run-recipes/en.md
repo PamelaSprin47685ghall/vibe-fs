@@ -31,6 +31,20 @@ class Js extends JsProgram {
         const firstError = result.stdout.split("\n").find((l) => /error:/i.test(l));
         this.failureReason = `build_failed:exit_${result.exitCode}${firstError ? ": " + firstError.trim() : ""}`;
       }
+
+      // Self-test thunks, run first on their own instance. They only set state
+      // and return argument arrays; the Host calls next/watch. "all done" (past
+      // the build step) → next returns null; "something is wrong" (a recorded
+      // failure) → watch vetoes. Writing them is designing the exits.
+      sanity() {
+        return {
+          nextDone: () => [{ root: "/", step: 1 }],
+          watchVeto: async () => {
+            this.failureReason = "prove: simulated build failure";
+            return [{ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }];
+          },
+        };
+      }
     });
   }
 }
@@ -65,6 +79,16 @@ class Js extends JsProgram {
       onExit(result) {
         testExitCode = result.exitCode;
       }
+
+      // Self-test: past the last step, the Host calls next and gets null; a crashed
+      // srv in the observation window makes the watch call veto. Thunks return
+      // argument arrays only.
+      sanity() {
+        return {
+          nextDone: () => [{ root: "/", step: 4 }],
+          watchVeto: () => [{ root: "/", step: 2, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }],
+        };
+      }
     });
     return { ...outcome, testExitCode };
   }
@@ -85,7 +109,8 @@ class Js extends JsProgram {
       reaped = false;
 
       // Event-driven: read the instance state, decide. Send the next line,
-      // reap the child once every line is sent, and return null after the reap.
+      // reap the child once every line is sent, and return null after the
+      // reap — the exit exists and sanity() shows it.
       next(ctx) {
         if (this.reaped) return null;
         if (this.sent >= this.lines.length) {
@@ -104,6 +129,16 @@ class Js extends JsProgram {
         }
         if (ctx.stdout.trim()) answers.push(ctx.stdout.trim());
         return null; // observed, nothing alarming — continue
+      }
+
+      sanity() {
+        return {
+          nextDone: () => {
+            this.reaped = true;
+            return [{ root: "/", step: 9 }];
+          },
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "py", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 30000 }],
+        };
       }
     });
     return { ...outcome, answers };

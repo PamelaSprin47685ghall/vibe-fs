@@ -1,1 +1,1 @@
-One call to review settles the current milestone and states what work remains. This note is not a separate lifecycle tool.
+One call to review records the obligation ledger and settles the current milestone. This note is not a separate lifecycle tool.

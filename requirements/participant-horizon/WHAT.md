@@ -1,18 +1,14 @@
 # participant-horizon — WHAT
 
-## [001] 只传递会改变行动的关键上下文
+## [001] 信息准入由 decision filter 决定
 
-一段信息要进入 Provider 可见视界，须先过这几问，任一不过即不呈现：
+信息进入 Provider 可见视界前，必须通过 Decision Filter：
 1. 参与者是否已知？已知则省略。
 2. 是否为参与者自身刚提供的内容？是则省略。
 3. 是否已被成功状态所蕴含？是则省略（回声不是有效观测）。
 4. 是否仅用于内部关联或调试？是则留在机器侧。
 5. 取值不同是否会改变下一步合法行动？否则省略。
 6. 参与者是否需要数值本身而非其后果？若否仅渲染自然语言后果；若是仅保留最小物理观测。
-
-省略本身是可观察的：同一事实第二次进入视界不再出现原文；留在机器侧的字段不出现在提示、工具参数或返回值里。
-
-【程序待改】这几问没有统一的程序组件（没有「Decision Filter」这样的接口）；过滤实际散在 `Execution/Session/HorizonRoster.fs`、`Execution/Delegation/Fork/OpenCode/JoinTool.fs` 与 `Participant/Provider/Projection/` 的渲染路径里。若要这条可整体核查，需要一处显式准入函数承担这几问。
 
 ## [002] 内部机器拓扑不穿过 horizon
 
@@ -48,23 +44,21 @@ Manager 的 system prompt、continuation、Schema、错误、工具描述及结�
 
 ## [010] fork/commission 可见集合与固定 DevOps 语义
 
-`fork` 与 `commission` 是编程面的成员调用（`this.fork`、`this.commission`），宿主工具面不再各自挂这两个动词；可见集合按调用者的合法身份判定。
-
-- Manager `fork` 仅可见：`engineer`（单一本名版本）；Manager 严禁通过 `fork` 启动 DevOps、Manager 自身或内部身份。
-- Orchestrator `commission` 只委托 Manager（calling `lead`）；`engineer`、`devops`、`coordinator`、`bookkeeper` 一律按未知 calling 拒绝。合法身份词汇由 participant-identity 与 delegation 定义。
+- Manager `fork` 仅可见：`engineer`（单一本名版本）；Manager 严禁通过 `fork` 启动 DevOps 或内部身份。
+- Orchestrator `commission` 只委托 Manager；合法身份词汇由 participant-identity 与 delegation 定义。
 - 固定 DevOps 由合法 Runtime 绑定创建，在模型视界中仅以稳定 Byname（常量 `devops`）呈现，仅通过 `resume` 续做调用（传入 name = `devops`），严禁出现在 `fork` 的候选名单中。
 - `horizon()` 仅返回在场名册的 Byname 或 TerminalName，不暴露底层 id。
-- Bookkeeper 等内部角色以及已退役或非法的历史角色名（如 coder、inspector、browser、inquiry、distiller、blogger、predictor）严禁出现在可 fork 集合中。
+- Bookkeeper 等内部角色以及已退役或非法的历史角色名（如 blogger、predictor、coder、inspector、browser、inquiry、distiller）严禁出现在可 fork 集合中。
 
 ## [011] `horizon()` 是 pull-only snapshot
 
-`horizon()` 只在调用时读取当前快照，不轮询、推送或订阅。可见子智能体须提供最新已交付的 TOML 视图记录；不可读时说明，不以旧记录代替。
+`horizon()` 只在调用时读取当前快照，不轮询、推送或订阅。可见子智能体须提供最新已交付的 TOML 视图记录（不存在三段式 `WorkRecord`）；不可读时说明，不以旧记录代替。
 
 已 durable 建立的可见 child，在最终后果交付前不得消失。`Abandoned` 仍按 Byname 显示“未返回”，直至 Join 消费后果并将 handle 置为 `Retired`；仅 `Retired` 可移出名册。已作废（`voided`）的 child 同样在最终后果被报告前保持可见：作废结清父方的未解除义务，但它不是"什么都没发生"，名册在 Join 报告这一次 `voided` 后果之后才把该 handle 置为 `Retired` 并移出。
 
 名册中的每个子智能体，在其委任者 estimate 与自身会话起点两者都可读时另附四个数：已用/预计还剩的工具调用回合数，与已用/按它已显示出的节奏按比例估计还剩的 wall-clock 时间（剩余时间 = 已用回合的平均代价 × 剩余回合数，已用为 0 时以 1 计）。缺任一来源即不呈现这四个数，不以旧值或猜测顶替。
 
-同一份在场名册也以 `this.horizon()` 的数据信封（`agents`/`ptys`）取得，成员与四数遵循同一可见性规则。
+同一份在场名册也以 `js.horizon()` 的数据信封（`agents`/`ptys`）取得，成员与四数遵循同一可见性规则。
 
 ## [012] warm-start hints 只向有 repository 证据 authority 的角色准入
 

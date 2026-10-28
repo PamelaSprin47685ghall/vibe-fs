@@ -1,1 +1,1 @@
-本次 transformation 已应用到 staged case。
+staged case 接受了这次 transformation。

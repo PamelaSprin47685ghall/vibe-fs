@@ -1,11 +1,15 @@
 # attention-regulation — WHY
 
-注意力表达收敛在两个已有入口上：`assume` 声明「这个判断已经完成、按它行动」，活跃 scope 文本承载当前回合内的旁支与备忘。独立的注意力工具和持久队列会把同一件事拆成多套状态，又在自然终点和交付处引入额外核对通道。
+这里记录的是注意力调节工具集的收敛决定：独立的 `enough`、`abandon` 与 `defer` 工具以及专门的 `DeferredWork` 持久队列拆散了注意力表达，并在自然终点与 Manager 退休处引入了额外的续行与待办核对通道。
 
-`assume` 不证明判断正确，也不创造权威事实；执行与验证的结果、或足以改变结构的新输入，才是重开判断的理由。跨 scope 的关键备忘由 `resetScope` 逐字抄写进经验文本，不依赖独立投影。
+现在这些职责收敛到已有原语：
+
+- `enough`（信息已足够）与 `abandon`（放下自建计划或推论）由 `assume(assumption)` 统一表达；
+- 非阻塞旁支与跨步备忘由编程面（`todowrite-for-<role>`）程序控制流、`carry` 数组及自动保留的当前回合、`assume` 承载，不再维护独立的 `Attention` 持久投影或终点续行呈现。
 
 ## DEPENDS ON
 
 - `participant-identity`
 - `cognitive-environment`
 - `repository-programming`
+

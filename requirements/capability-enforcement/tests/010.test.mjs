@@ -297,7 +297,7 @@ integrationTest('WHAT[capability-enforcement-010] AGENT_023_bash_honeypot_is_den
       {},
       { sessionID: 'unresolved-bash-honey', agent: 'engineer' },
     )
-    assert.match(result, /authority|权威/i)
+    assert.match(result, /authority is established|权威确立/)
   })
 })
 }

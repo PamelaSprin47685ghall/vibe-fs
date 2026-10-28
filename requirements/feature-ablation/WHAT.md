@@ -23,4 +23,9 @@
 
 ## [004] 配置集
 
-`resources/ablation/profiles.json` 定义配置集，环境变量 `WANXIANGSHU_ABLATION_PROFILE` 按名选用。单个节点可用 `WANXIANGSHU_ABLATION_<node>=ablated|borrowed|active` 显式覆盖（节点 id 中的 `.` 与 `-` 归一为 `_`，小写）。覆盖与配置集叠加后仍须通过 DAG 校验；非法取值在加载时报错。
+`resources/ablation/profiles.json` 定义配置集。显式环境变量 `WANXIANGSHU_ABLATION_<node>=ablated|borrowed|active` 覆盖后仍须通过 DAG 校验。
+
+## [005] 只读副本与 Predictor 不是消融可以重新打开的功能
+
+只读副本、Predictor 槽位与 speculative-investigation 不是生产功能，也不是消融节点可以重新打开的开关。研究对照不得把它们注册回当前合同。
+其他特性的消融行为不变，仍按 [001]-[004] 的三态与 DAG 规则运行。

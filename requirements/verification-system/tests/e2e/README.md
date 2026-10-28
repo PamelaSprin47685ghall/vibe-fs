@@ -1,37 +1,42 @@
-# E2E 端到端场景测试
+# E2E — One World / The Long Stroke
 
-本目录收录长程端到端（Long Stroke）场景测试的配置文件与支持工具。规范说明见 [WHAT.md](../../WHAT.md)。
+Sole entry: `requirements/verification-system/tests/014.test.mjs`，由 `npm run verify:release` 开启 release 层执行；直接运行文件不会自动开启真实验收。分层和因果进展例子见 [测试说明](../README.md)。
 
-## 运行方式
+| File | Role |
+|------|------|
+| `../014.test.mjs` | Only top-level E2E entry (One World) |
+| `scenarios/long-stroke.toml` | Provider turn script for the Long Stroke |
+| `support/long-stroke-oracles.mjs` | Sequencing / adversity oracles the TOML cannot express |
 
-E2E 测试在单次启动的真实 OpenCode 宿主进程中运行长程交互场景，耗时较长，主要用于发布前验证：
+One continuous OpenCode lifetime (`spawn === 1`). There is no multi-canary pool, no `cases/` suite runner, and no `--repeat` / shuffle release gate.
 
-- **全量发布验证统一运行**：
-  ```bash
-  npm run verify:release
-  ```
-- **单独执行 E2E 套件**：
-  ```bash
-  node requirements/verification-system/tests/014.test.mjs
-  ```
+## What the Long Stroke covers
 
-## 目录文件与分工
+Public product contracts exercised here (formal docs win on conflict):
 
-| 文件或目录 | 作用 |
-|------------|------|
-| `../014.test.mjs` | E2E 顶层入口测试脚本 |
-| `scenarios/long-stroke.toml` | 长程对话场景定义（包含多轮交互与预期结果） |
-| `support/` | 辅助工具集合（含宿主进程生命周期管理、网络 Mock、诊断收集与时序预算） |
+- **Join user-message wake (EXEC-017)** — blocked Manager `join` exits with
+  `status="interrupted"`, `reason="user_message"` (not `operator_abort`).
+- **Consecutive provider failure + fallback** — failure → failed recovery → one successful recovery, with distinct durable episode claims and no retry/return overlap.
+- **Manager loop assessment & retirement** — each tenure independently audits the same authority, non-empty findings assign current repair, and retirement closes live resources before the system continues or accepts.
+- **Publish conflict / reconciliation** — stale target via `gitConflictProof` invalidates the certificate; another ordinary tenure resolves the conflict and retires, then the rebased candidate is Published.
+- **§21 adversity oracles** — see `support/long-stroke-oracles.mjs` (`oracleLongStroke`).
 
-## 验证内容与输出预期
+### Strict mock causal hold
 
-测试在同一个 OpenCode 进程生命周期内完整执行以下真实行为：
-- **多轮交互与状态收敛**：驱动 Manager 循环多轮迭代，验证消息继承与状态收敛。
-- **并发与打断**：验证 Join 阻塞被用户消息打断时的状态转移与资源释放。
-- **故障恢复**：验证 Provider 连续故障后的回退与恢复流程。
-- **变更合并**：验证发布冲突检测与候选变更重整。
+`support/strict-mock-responses.js` supports `respond.waitUntil` (a Promise).
+While the promise is pending, the mock keeps the SSE open after tokens and only
+writes `[DONE]` after resolve. The Long Stroke uses this so a child can stay
+incomplete across join + external user message without fixed sleep as the wake
+mechanism.
 
-### 输出说明
+## Related unit proof
 
-- **正常执行**：单次拉起 OpenCode 进程，标准输出/标准错误逐步打印各轮进展，全部回合通过后以退出码 0 正常结束。
-- **异常排查**：若进程发生因果静默超时或断言失败，运行器会打印最近一次推进位点、当前等待状态与相关诊断日志，并以非零退出码退出。
+`requirements/delegation/tests/015.test.mjs` — real journal-less
+join interruption, child completion after interruption, spurious wakes and lock release.
+
+`requirements/change-integration/tests/014.test.mjs` and `015.test.mjs` — real verdict
+mailbox drain-before-interrupt, removal of interrupted waiters, bounded FIFO and
+idle completion. Neither probe claims journal-backed or fission-lane coverage.
+
+Temporal race examples live in `requirements/verification-system/tests/007.test.mjs`,
+with shared support in `requirements/verification-system/tests/support/temporal-harness.mjs`.

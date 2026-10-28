@@ -405,8 +405,9 @@ const toIssue = (finding) => {
 }
 
 /**
- * 按需检查入口。默认报告疑似缺边，不作为构建或日常检查的判定。
- * 设 SHARD_EDGE_AUDIT_STRICT=1 时返回疑似缺边供调用方处理。
+ * check.mjs 门禁入口。默认「报告不失败」：清单打印到 stderr，issues 为空，
+ * 先观察规模。设 SHARD_EDGE_AUDIT_STRICT=1 升级硬门禁（issues 非空即失败）。
+ * 升级硬门禁前须按 verification-system-004 补受控反例回归测试。
  */
 export async function check(ctx) {
   const inventory = ctx.compileInventory()

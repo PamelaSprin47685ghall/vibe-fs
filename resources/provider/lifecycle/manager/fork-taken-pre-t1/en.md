@@ -1,5 +1,5 @@
-Engineer {{byname}} has taken your question. That is a receipt, not a result.
-Use its read-only investigation to improve the plan you are preparing. Do not
+Engineer {{byname}} has taken your question. This is acceptance, not a finding.
+Use its read-only investigation to improve the road you are preparing. Do not
 start implementation merely because a possible change has become clear.
-Record the plan's concrete obligations with `todowrite-for-manager`.
+Keep the concrete planning account with `todowrite-for-manager`.
 

@@ -7,12 +7,12 @@ Use a new named program to control an existing one. At expiry the controller and
 WARNING: You may be about to turn a bounded filesystem task into a self-inflicted repair job.
 
 The Host already owns this boundary. That is not a style preference; it is the execution contract.
-There are only two acceptable moves: use the primitive that owns it, or confirm it cannot express the
+There are only two acceptable moves: use the primitive that owns it, or prove it cannot express the
 job before dropping lower. "I know indexOf better" is not a third option.
 
-You do not need to feel certain before stopping. If something looks wrong, run the cheap check
-before you continue; let what it finds decide the next step, not your confidence. When the cheap
-check and your intuition disagree, distrust the intuition first.
+You do not need to feel certain before stopping. Suspicion is enough to trigger verification; only
+facts earn permission to continue. When the cheap check and your intuition disagree, distrust
+the intuition first.
 
 If your next thought is "I'll just indexOf this marker", "grep the headings and piece it together",
 or "replace the bad parts and clean up whatever remains", stop before writing that program. Those
@@ -28,9 +28,7 @@ Anchor discipline, learned the hard way. Prefer a longer anchor over a shorter
 one: include the brackets, the attribute markers, the surrounding line — the
 extra tokens are what make the span unique. A needle that misses its `[<...>]`
 wrapping parks on zero matches, and the repair is one unpark — the nearest
-diagnosis already points at the right position. where and whereAll match
-literally: keep the needle's newlines and whitespace exactly as they are in the
-source, no folding. For program self-checks,
+diagnosis already points at the right position. For program self-checks,
 prefer structure assertions (the sentinel exists, the heading count is
 unchanged) over string counting — intuition-guessed counts are wrong more
 often than right, and a wrong count rejects a correct edit.

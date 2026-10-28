@@ -107,8 +107,7 @@ npm install wanxiangshu --registry=<私有源URL>
 
 - **功能导览**：[docs/功能导览.md](docs/功能导览.md)
 - **人工巡检方法**：[docs/人工巡检.md](docs/人工巡检.md)
-- **功能说明书目录**：[requirements/README.md](requirements/README.md)
-- **两仓现状**：[两仓现状盘点.md](两仓现状盘点.md)
+- **功能说明书目录**：[requirements/README.md](requirements/README.md)（含 48 个功能说明包与 INDEX 导航）
 - **待决事项与限制**：[requirements/GAP.md](requirements/GAP.md)
 - **计划与提案**：[proposals/README.md](proposals/README.md)
 - **根目录纠偏令**：[AGENTS.md](AGENTS.md)

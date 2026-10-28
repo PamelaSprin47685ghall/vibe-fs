@@ -195,7 +195,58 @@ test('WHAT[durable-events-009] Fact_codec_reports_migration_markers_as_data_erro
 })
 }
 
+{
+const { default: assert } = await import("node:assert/strict");
+const { readFileSync } = await import("node:fs");
+const { default: test } = await import("node:test");
+const { CANONICAL_EVENT_READER_OWNER_PATHS, DUAL_WRITE_ALLOWLIST, GIT_BYPASS_ALLOWLIST, NON_STORE_SCHEMA_VERSION_SITES, PHYSICAL_HISTORY_OBSERVER_PATHS, SCANNER_IDS, collectProductionEntries, scanCanonicalSharedProgram, scanDualWrite, scanFeatureHistoryLoop, scanFeatureRef, scanFiles, scanGitBypass, scanPrivateDurableSubstrate, scanSchemaVersionInStoreContext, scanText } = await import("../../../scripts/checks/unified-store-gate.mjs");
 
+const readFixture = (name) =>
+  readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
+
+test('WHAT[durable-events-009] fixture unified-store-dual-write.fs is RED for dual-write', () => {
+  const source = readFixture('unified-store-dual-write.fs')
+  const hits = scanDualWrite(source, 'src/Wanxiangshu/Application/DualWriteBridge.fs')
+  assert.ok(hits.length >= 1, 'expected dual-write violation')
+  assert.equal(hits[0].id, 'dual-write')
+})
+test('WHAT[durable-events-009] Journal-only or EventStore-only modules are not dual-write', () => {
+  const journalOnly = [
+    'module RuntimePath',
+    'let root = joinPath common "wanxiangshu"',
+    'let file = sprintf "%s.ndjson" runtimeId',
+    'type AgentJournal(writer: JournalWriter) =',
+    '    member _.AppendAgent fact = writer.Append fact',
+  ].join('\n')
+  assert.equal(scanDualWrite(journalOnly, 'src/Wanxiangshu/Journal/AgentJournal.fs').length, 0)
+
+  const eventStoreOnly = [
+    'module EventStore',
+    'let append (store: IEventStore) candidate =',
+    '    store.Append candidate.NewEvents',
+    'let create store = EventStore.create store',
+  ].join('\n')
+  assert.equal(
+    scanDualWrite(eventStoreOnly, 'src/Wanxiangshu/Persistence/EventStore/Store.fs').length,
+    0,
+  )
+})
+test('WHAT[durable-events-009] dual-write allowlist is empty (no parked bridges)', () => {
+  assert.deepEqual([...DUAL_WRITE_ALLOWLIST], [
+    'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
+  ])
+})
+test('WHAT[durable-events-009] production scan has no dual-write residue', () => {
+  const entries = collectProductionEntries()
+  const violations = scanFiles(entries)
+  const own = violations.filter((v) => v.id === 'dual-write')
+  assert.deepEqual(
+    own,
+    [],
+    own.map((v) => `[${v.id}] ${v.file}:${v.line} ${v.label}`).join('\n'),
+  )
+})
+}
 
 {
 const { default: assert } = await import("node:assert/strict");

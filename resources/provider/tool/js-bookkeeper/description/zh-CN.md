@@ -6,4 +6,4 @@
 
 setQuestion(newText) 与 setAnswer(newText) 各自暂存完整的下一侧，且各自最多只能调用一次。零次 mutation 合法。被抛出的 program 或非法 mutation 两侧都不改变。
 
-该 program 没有任何外部世界能力。在调用前先决定 Case 应表示什么；本 program 只用来执行那一决定所要求的、连贯的机械重塑。
+该 program 没有任何外部世界能力。在调用前先决定 Case 应表示什么；本 program 只用来执行那一决定已经证成的、连贯的机械重塑。

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ⑪/⑫/⑬ host-neutral interface gates (HNI-04, HNI-11, root AGENTS.md).
+// ⑩/⑪/⑫/⑬ host-neutral interface gates (HNI-04, HNI-11, root AGENTS.md).
 //
 // ⑪ port-purity (strict): every file under src/Wanxiangshu/Host/Ports/** (.fs and .fsi) references no adapter
 //   namespace and no product domain — only Foundation, Wanxiangshu.Host and System. The scope is discovered
@@ -31,6 +31,8 @@ import { walk } from '../lib/walk.mjs'
 
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
 export const PORT_ROOT = `${PRODUCTION_ROOT}/Host/Ports`
+export const PRODUCT_DOMAINS = ['Ablation', 'Change', 'Composition', 'Context', 'Execution', 'Git', 'Interaction',
+  'Mission', 'Participant', 'Persistence', 'Process', 'Repository', 'Sphinx', 'Verification']
 
 const norm = (path) => path.replace(/\\/g, '/')
 
@@ -42,7 +44,30 @@ export const isPortFile = (file) => {
   return path.startsWith(`${PORT_ROOT}/`) && (path.endsWith('.fs') || path.endsWith('.fsi'))
 }
 
+// Adapter areas: the OpenCode adapter folder, any domain-local `…/OpenCode/` adapter folder, and the Omp
+// adapter folder (any location). src/Wanxiangshu/Host/** is NOT an adapter area: it holds neutral host code
+// and the retained legacy seams, and the port files themselves live under Host/Ports/.
+export const isAdapterFile = (file) => {
+  const path = norm(file)
+  return path.endsWith('.fs') &&
+    (path.startsWith(`${PRODUCTION_ROOT}/OpenCode/`) ||
+      path.includes('/OpenCode/') ||
+      path.startsWith(`${PRODUCTION_ROOT}/Omp/`) ||
+      path.includes('/Omp/'))
+}
+
 const code = (text) => text.split('\n').filter((line) => !/^\s*\/\//.test(line)).join('\n')
+
+const PRODUCT_REF = new RegExp(`\\bWanxiangshu\\.(?:${PRODUCT_DOMAINS.join('|')})(?:\\.[A-Z]\\w*)*`, 'g')
+export function productReferences(text) {
+  const found = new Set()
+  for (const match of code(text).matchAll(PRODUCT_REF)) {
+    const ns = match[0]
+    if (/\.OpenCode(?:\.|$)/.test(ns) || /\.Omp(?:\.|$)/.test(ns)) continue // adapter-to-adapter
+    found.add(ns)
+  }
+  return [...found].sort()
+}
 
 // Signature files that declare the neutral port vocabulary, discovered from the sources.
 // The disk fallback is relative to `root` (the tree being scanned), not to this file, so the gate
@@ -64,6 +89,49 @@ export function portTypeNames(read, productionFiles, root) {
     for (const m of text.matchAll(/^type\s+(\w+)/gm)) names.add(m[1])
   }
   return names
+}
+
+// A port type name also declared outside the port files (e.g. an older `ToolResult`) only counts when
+// qualified as `Host.<Name>`; distinctive names count once the file opens or qualifies Wanxiangshu.Host.
+export function distinctivePortNames(names, productionFs, read) {
+  const elsewhere = new Set()
+  for (const file of productionFs) {
+    if (isPortFile(file)) continue
+    const text = read(file)
+    for (const m of text.matchAll(/^\s*(?:and|type)\s+(?:private\s+)?(\w+)/gm)) elsewhere.add(m[1])
+    for (const m of text.matchAll(/^\s*\|\s*([A-Z]\w*)\b/gm)) elsewhere.add(m[1]) // union cases
+  }
+  return new Set([...names].filter((n) => !elsewhere.has(n)))
+}
+
+export function referencesPort(text, names, distinctive = names) {
+  const body = code(text)
+  if (!/\bWanxiangshu\.Host\b/.test(body)) return false
+  if ([...body.matchAll(/\b(?:Host|Ports)\.([A-Z]\w*)/g)].some((m) => names.has(m[1]))) return true
+  return [...body.matchAll(/\b[A-Z]\w*\b/g)].some((m) => distinctive.has(m[0]))
+}
+
+export const readThinnessBaseline = () =>
+  existsSync(THINNESS_BASELINE) ? JSON.parse(readFileSync(THINNESS_BASELINE, 'utf8')) : null
+
+export function measure(productionFiles, read, root = process.cwd()) {
+  const files = (productionFiles ?? []).map(norm)
+  const fsFiles = files.filter((f) => f.endsWith('.fs'))
+  const names = portTypeNames(read, files, root)
+  const distinctive = distinctivePortNames(names, fsFiles, read)
+  const adapters = fsFiles.filter(isAdapterFile).sort()
+  const productReference = {}
+  const withoutPort = []
+  let lines = 0
+  for (const file of adapters) {
+    const text = read(file)
+    lines += text.split('\n').length
+    const refs = productReferences(text)
+    if (refs.length > 0) productReference[file] = refs.length
+    if (!referencesPort(text, names, distinctive)) withoutPort.push(file)
+  }
+  const total = Object.values(productReference).reduce((a, b) => a + b, 0)
+  return { adapterFiles: adapters.length, adapterLines: lines, productReference, productReferenceTotal: total, withoutPort }
 }
 
 // The strict purity scope: every file under the port root, implementation and signature alike.
@@ -164,10 +232,18 @@ export const DOMAIN_ROOT = `${PRODUCTION_ROOT}/Host/Domain`
 export const PORT_NAMESPACE = 'Wanxiangshu.Host.Ports'
 export const DOMAIN_NAMESPACE = 'Wanxiangshu.Host.Domain'
 
+// P-17 converged into Execution/Fission/FissionEnvironment.fs(i); no file is exempt.
+export const DOMAIN_SEAM_LOCATION_EXEMPT = []
+
 const declaresNamespace = (text) => {
   const decl = /^(?:namespace|module)\s+(?:rec\s+)?([\w.]+)/m.exec(text)
   return decl ? decl[1] : null
 }
+
+// The ratchet scope: an adapter file that opens or qualifies the tier-B namespace. The set may not
+// grow and a baselined file that stops referencing the seam must leave the baseline, so the
+// ratchet never loosens. It records existing debt; it does not forbid the seam from being used.
+const referencesDomainSeam = (text) => /\bWanxiangshu\.Host\.Domain\b/.test(code(text))
 
 export function scanNamespaceTiers(productionFiles, read, options) {
   const violations = []
@@ -185,6 +261,7 @@ export function scanNamespaceTiers(productionFiles, read, options) {
   for (const file of tierFiles) {
     const ns = declaresNamespace(read(file))
     if (!ns) continue
+    const exempt = DOMAIN_SEAM_LOCATION_EXEMPT.includes(file)
     if (file.startsWith(`${PORT_ROOT}/`)) {
       if (ns !== PORT_NAMESPACE) {
         fail('namespace-tier', `${file}: a tier-A port file must declare '${PORT_NAMESPACE}', not '${ns}'`)
@@ -198,7 +275,7 @@ export function scanNamespaceTiers(productionFiles, read, options) {
       continue
     }
     // Directly under Host/ (or another folder): neither tier namespace may be claimed here.
-    if (ns === PORT_NAMESPACE || ns === DOMAIN_NAMESPACE) {
+    if ((ns === PORT_NAMESPACE || ns === DOMAIN_NAMESPACE) && !exempt) {
       fail('namespace-tier', `${file}: declares '${ns}' but sits outside ${PORT_ROOT}/ and ${DOMAIN_ROOT}/`)
     }
   }
@@ -228,7 +305,8 @@ export function scanAdapterThinness(productionFiles, read, options) {
   // file name, so both are checked here rather than discovered by a failing build.
   violations.push(...scanPortFamilies(files, read, { root }).violations)
 
-  // ⑬ namespace-tier integrity — the two Host/ tiers keep their own namespaces.
+  // ⑬ namespace-tier integrity — the two Host/ tiers keep their own namespaces, and the tier-B
+  // ratchet keeps the domain seam from spreading into more adapter files.
   violations.push(...scanNamespaceTiers(files, read, { root }).violations)
 
   return { violations }

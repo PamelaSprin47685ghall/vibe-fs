@@ -1,11 +1,23 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { validateModuleLinkage, validateModuleLoadability, run } from '../../../scripts/checks/js-module-linkage.mjs'
 import { createWorkspaceFixture } from './support/workspace-fixture.mjs'
+import { HOST_PHYSICAL_CANARY_FILES, scanFile } from '../../../scripts/lib/test-surface-scan.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
+
+test('WHAT[js-semantic-surface-006] non-compiler physical probes do not import unregistered internal modules', {
+  todo: '03-D2: existing Host exit probes bypass the public surface; retain their physical proof pending the boundary decision',
+}, () => {
+  const violations = [...HOST_PHYSICAL_CANARY_FILES]
+    .filter((file) => existsSync(join(ROOT, file)))
+    .flatMap((file) => scanFile(join(ROOT, file), file))
+    .filter((hit) => hit.rule === 'deep-dist-import')
+  assert.deepEqual(violations, [])
+})
 
 test('WHAT[js-semantic-surface-006] the complete emitted graph links and its production modules load', async () => {
   assert.deepEqual(validateModuleLinkage(join(ROOT, 'dist')), [])

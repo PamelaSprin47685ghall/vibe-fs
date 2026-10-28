@@ -6,11 +6,11 @@
 
 ## [002] 关联先于首 Prompt
 
-子会话的 SessionAssociation 必须先持久确认，才可发送首个 prompt，使首次交互即可判定分类。并发的首次 ensure 单飞：同一子会话只创建一次，重复请求复用同一创建结果。
+子会话的 SessionAssociation 必须先持久确认，才可发送首个 prompt，使首次交互即可判定分类。
 
 ## [003] 恢复只认确切关联
 
-重启时仅复用与 journal 的 SessionId、agent、title 恰好单一匹配的 Attached 会话。无关联则新建并挂到 family root，不收养无关联会话；属性冲突、多候选或查询失败均 fail closed，不猜测、不创建。
+重启时仅复用与 journal 的 SessionId、agent、title 恰好单一匹配的 Attached 会话。无关联则新建并挂到 family root，不收养无关联会话；属性冲突、多候选或查询失败均 fail closed。
 
 ## [004] Reusable 与 OneShot
 
@@ -22,7 +22,7 @@ Dedicated 绑定键为 `(OwnerReuseScopeId, Role)`。同一 scope 内每个 Role
 
 ## [006] Handle 四态
 
-Handle 仅有 `Active | CompletedAwaitingJoin | Retired | Abandoned` 四态。Retired 与 Abandoned 为持久终态，不可恢复为活动状态。作废（`ChildWorkVoided`）不是第五个 handle 态：它结清该 handle 的未解除义务，并要求 join 以 `voided` 报告一次；退役不得先于这一次报告发生，否则报告无处送达、父方的义务在名册里静默消失。
+Handle 仅有 `Active | CompletedAwaitingJoin | Retired | Abandoned` 四态。Retired 与 Abandoned 为持久终态，不可恢复为活动状态。作废（`ChildWorkVoided`）不是第五个 handle 态：它结清该 handle 的未解除义务，并要求 join 以 `voided` 报告一次。退役不得先于这一次报告发生，否则报告无处送达、父方的义务在名册里静默消失。
 
 ## [007] Completion 单赋值
 
@@ -42,7 +42,7 @@ HostOwnedHidden handle 对父会话的列表、等待、视图及恢复不可见
 
 ## [011] 永久丢失才替换
 
-关联子会话已确认永久丢失才允许替换。替换原子进行，次序为：建立新子会话 → 持久关闭旧关联 → 建立新关联，不出现双活动关联。
+关联子会话已确认永久丢失才允许替换。替换原子进行，次序为：建立新子会话 → 持久关闭旧关联 → 建立新关联。
 
 ## [012] Child Run 与父记录分离
 
@@ -62,39 +62,41 @@ Agent 子会话的 handle 就是其运行时 Agent ID；重启后同一 handle �
 
 ## [016] Attempt Interrupt 与 Logical Cancel
 
-内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。自动化机制不得任意中断用户根会话。
+内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。自动化机制不得任意中断用户根会话；deliver 可凭已落地的退休事实终止残余尝试——交付完成后的停止发生在 transform 钩子：抑制下一次 provider 请求、清空本次请求的消息、并中断本次 attempt。work-049 的已登记用户询问是另一项窄例外：同一 ask 的工具结果确认后，只暂停提问者的当前 attempt，不取消已入队的真实用户输入，也不影响子资源或逻辑运行。
 
-deliver 可凭已落地的退休事实终止残余尝试：交付已成立（提交面事实）后，本次请求在 transform 钩子被交付判定拦下——抑制下一次 provider step、清空本次请求的消息、中断本次 attempt。物理中断不在 deliver 工具内部发出，deliver 也不等 Host 中断回执才返回。有继任者的 Relayed 不发此中断；第一次确认也不中断。该判定只命中「登记时那次物理输入仍是当前物理输入」的交付，旧交付不得停住新输入或后任。「中断已发出」与「已观察到中断成功」是两个独立事实：中断未确认不推翻已提交的交付，失败必须如实呈现为「中断未确认」，不得用交付回执的成功文字代替停止保证。work-011 的 S4 Delivered 属于这种完成停止，不是任意取消。
+work-011 的 S4 Delivered 是完成停止，不是任意取消：交付已成立（提交面事实）后，本次请求在 transform 钩子处被交付裁决拦下——抑制下一次 provider step、清空本次请求的消息（LLM 因此看不到 deliver 回复）、中断本次 attempt。物理中断不在 deliver 工具内部发出，deliver 也不等 Host 中断回执才返回。有继任者的 Relayed 不发此中断；第一次确认也不中断。交付裁决只命中「登记时那次物理输入仍是当前物理输入」的交付：旧交付不得停住新输入或后任。
+
+「中断已发出」与「已观察到中断成功」是两个分别取证的事实。中断未确认不推翻已提交的交付，也不把已提交的交付呈现为失败：失败必须如实呈现为「中断未确认」，不得用交付回执的成功文字代替停止保证，也不得用它抹掉已提交的交付。
 
 真实外部物理用户输入只允许打断 `join` 等待，不得中断当前 LLM 输出或其他工具，也不得调用 Host `AbortSession` / `InterruptAttempt` 排空当前 attempt。新输入作为下一次 LLM 请求的材料，由 Host 在当前输出或工具自然结束后纳入；当前物理 assistant 与工具结果仍须正常保存。
 
-work-049 的 `ask` 是模型主动请求的人类等待，不是「新用户输入到来即中断」：它在自身工具结果得到 Host 确认后中断当前 attempt，保留 logical run 与工作资源。用户随后回复仍走上一段的普通人类输入准入，不再发一次 interrupt，也不因此注销任期。
+work-049 的 `ask` 是模型主动请求的人类等待，不是“新用户输入到来即中断”。它在自身工具结果得到 Host 确认后中断当前 attempt，保留 logical run 与工作资源。用户随后回复仍走本条的普通人类输入准入，不再发一次 interrupt，也不因此注销任期。
 
-准入 owner 以 durable `Accepted` 和 owner-issued 的 `HumanRoot` / `HumanMessage` evidence 精确接纳新输入。已有同一 run 的活跃租约时，`HumanMessage` 与 `BusyAgentNudge` 先持久接纳并投影已有目标，保留旧 exact lease，供当前输出、工具及已准备中的请求自然完成；Host 的下一次 provider 边界实际选择可见新输入后，才交接 exact lease 和原 capacity credit，不重新派工或抢占第二份容量。容量 owner 的 supersession 不授予物理中断权。同一 session 的准入投影与交接由一个 owner 串行处理，容量 pending 的完成等待不阻挡后来的输入入场；旧执行按 `Superseded` policy 精确结算，迟到旧回调不得取消或释放新执行；同次请求已包含、但未单独启动 provider 的较早追加材料也须精确结算，不留悬空执行。新输入不逻辑取消根会话、不级联 children，不自动发起新 mission 或工作记录；原 authority root、LogicalRunId、participant 与 obligation 延续。`PendingPromptIntent`、Guard、retry 与 HostInternal 也不得借此中断根会话。
+准入 owner 仍以 durable `Accepted` 和 owner-issued 的 `HumanRoot` / `HumanMessage` evidence 精确接纳新输入。已有同一 run 的活跃租约时，`HumanMessage` 与 `BusyAgentNudge` 先持久接纳并投影已有目标，保留旧 exact lease，供当前输出、工具及已经准备中的请求自然完成；Host 的下一次 provider 边界实际选择可见新输入后，才交接 exact lease 和原 capacity credit，不重新派工或抢占第二份容量。容量 owner 的 supersession 不授予物理中断权。
+
+同一 session 的准入投影与交接由一个 owner 串行处理，容量 pending 的完成等待不阻挡后来的输入入场；旧执行按 `Superseded` policy 精确结算，迟到旧回调不得取消或释放新执行。同次请求已包含、但未单独启动 provider 的较早追加材料也须精确结算，不留下可恢复的悬空执行。新输入不逻辑取消根会话、不级联 children，不自动发起新 mission 或工作记录；原 authority root、LogicalRunId、participant 与 obligation 延续。`PendingPromptIntent`、Guard、retry 与 HostInternal 也不得借此中断根会话，原有自动根会话中断禁令保持有效。
 
 ## [017] 中断必须有后继
 
-自动恢复的内部中断发起物理 abort 前，必须已有唯一 successor；没有 successor 则形成明确 Failed 终态并唤醒父等待。Failed 携当前物理用户消息提升所得的 Authority Root；缺失则 fail closed，不退化成 session-scoped/rootless 终态。work-049 的用户等待不属于失败重试：用户等待事实就是当前暂停的依据，下一步来自真实用户回复，不得为它制造 Failed、重试 successor 或逻辑关闭。
+自动恢复的内部中断发起物理 abort 前，必须已有唯一 successor；没有 successor 则形成明确 Failed 终态并唤醒父等待。Failed 携当前物理用户消息提升所得的 Authority Root；缺失则 fail closed，不退化成 session-scoped/rootless 终态。work-049 不属于失败重试：用户等待事实就是当前暂停的依据，下一步来自真实用户回复；不得为它制造 Failed、重试 successor 或逻辑关闭。
 
 ## [018] Abandon 需要不可逆授权
 
-HandleAbandoned 表示 child 不会再沿当前 handle 返回，只由已确认的 logical parent/session 终止或 child 永久丢失证据授权。Attempt/TurnAborted、provider failure/retry、Fission、插件卸载、进程 shutdown 或 runtime dispose 均无此权限，只结束当前观察者/attempt 或 detach 本地资源，保留 durable Active handle 供恢复与 Join/Horizon。未知停止信号不升级成 ParentCancelled。
+HandleAbandoned 表示 child 不会再沿当前 handle 返回，只由已确认的 logical parent/session 终止或 child 永久丢失证据授权。
 
-放弃原因（`HandleAbandonReason`）的合法集合是四项：`ParentCancelled`、`DeadlineExceeded`、`HostSessionGone` 与 `Voided`，也是 `wanxiangli/handle-lifecycle` 的 `recoverChild()` 接受的 `durableReason` 全集。`Voided` 表示该 child 工作已无法交付、以作废结清父方的未解除义务；作废不是完成，不写完成正文。两类作废事实都走 abandon，没有例外，差别只在于被 abandon 的对象：对 scoped 工作，其具体工作单元格转为 `Abandoned(Voided)`，该份工作义务就此终态，底层 handle 绑定仍可复用（它标识可再次参与的参与者身份）；对无 scope 历史，被 abandon 的就是 handle 绑定自身，转为 `Abandoned(Voided)`。两种情形都是 join 报告恰好一次 `voided` 之后退役；报告之后该 handle 经 `durableLifecycleByname` 的 `summary` 投影读出 `Retired`。结算按孤儿幂等：重启的进程不得再次作废同一份孤儿工作，每个孤儿一生只产生一条作废事实。
+Attempt/TurnAborted、provider failure/retry、Fission、插件卸载、进程 shutdown 或 runtime dispose 均无此权限，只结束当前观察者/attempt 或 detach 本地资源，保留 durable Active handle 供恢复与 Join/Horizon。未知停止信号不升级成 ParentCancelled。
 
-## [019] Cancel/Delete 精确排空与会话收束
+放弃原因（`HandleAbandonReason`）的合法集合是四项：`ParentCancelled`、`DeadlineExceeded`、`HostSessionGone` 与 `Voided`。`Voided`（作废）是 2026-10-21 裁决新增的一项：它表示该 child 工作**已无法交付**、因此以作废结清父方的未解除工作义务。**两类作废事实都走 abandon，没有一类是 abandon 规则的例外**，差别只在于被 abandon 的是工作单元格还是 handle 绑定：对 scoped 工作，其具体工作单元格转为 `Abandoned(Voided)`，它承载的那份**工作义务已是终态**；底层 handle 绑定仍**可复用**（它标识可再次参与的参与者身份，不是被作废的那份工作）；对无 scope 历史，被 abandon 的就是该 handle 绑定自身，它转为 `Abandoned(Voided)`。两种情形都是 join 报告恰好一次 `voided` 之后退役；**结算按孤儿幂等，重启的进程不得再次作废同一份孤儿工作**（每个孤儿一生只产生一条作废事实），报告之后该 handle 经 `durableLifecycleByname` 读出 `Retired`——**这是经 `summary` 投影读出的终态**，不是从原始 handle 绑定直接读出的。作废不是完成，它不写完成正文。这四项是 `wanxiangli/handle-lifecycle` 的 `recoverChild()` 所接受的 `durableReason` 全集——**已被 2026-10-21 作废裁决取代的旧口径**是「只有 `ParentCancelled`/`DeadlineExceeded`/`HostSessionGone` 三项」，现已作废，见 `requirements/delegation/tests/README.md` 的「未交付子工作的作废结清」一节。库侧已发布 0.66.0（`handle-lifecycle` 接受 `Voided`），**主仓的 `wanxiangli` gitlink 也已随 `cfa8d0dad` 前移到 0.66.0（`663ba59`）**（该 bump 已随行为泳道的 `6ccc761c2` 进入 `origin/master`），主仓把 `durableReason = "Voided"` 交给库的那条恢复路径现在交到的就是已发布并接受它的库版本。
+
+## [019] Cancel/Delete 精确排空
 
 获授权的 logical cancel/delete 等待 `managed-chat-execution` 确认作用域内全部已准入 execution 均 durable terminal 且 exact capacity 已归还，才发布完成。lifecycle 不复制执行状态机、不 blind release、不用 timer/deadline/sleep/polling 推断排空；process/plugin shutdown 仍只 detach。
 
-会话收束（宿主 `SessionDeleted` 触发的 Main 收束，或 `PluginSessionScope.ClearSession` 覆盖的自删）在 Main 自身义务之外，还覆盖仍属于当前本体的 linked Attached InternalLeaf：对每个 leaf 名下已准入 execution 逐个结算——未终态的先写 typed terminal（pre-provider 阶段用 `PreProviderSettlement.settle`，after-provider-start 阶段用 `ManagedChatProviderLifecycle.terminal`，均等 durable 提交确认），已 terminal 但容量仍 held 的直接请求 exact release（`ModelRouting.releasePhysicalExecution`）。只允许 exact per-execution fence 释放；`AlreadyApplied` 与 `StaleFence` 按幂等接受，`Conflict` 不得吞没。归还完成后该 execution 不得再出现在 shared capacity 快照中。
-
-收束同时取消该作用域名下全部 retained continuation input（execution-model-routing-006 在删除链上的落地），并完成由此解锁的旧 exact capacity 归还：取消以 exact `admissionOwner.ReleasePhysical` 路径回放挂起的旧 key 归还，不得用 `ReleaseExecution`/`ReleaseSession` 等 force 路径，不得触碰其他 session 的保留或无关 pending demand；最后一份保留撤销后旧 credit 立即归还，borrowed credit 不退休 lender。
-
-收束链上任一步失败只隔离该步：Main 自身的结算、保留取消或释放失败不得跳过 linked leaf 的对应义务；`ClearSession` 失败后 `PluginRuntimeScope.DisposeSession` 仍执行其后续清理组（registry 条目、quiescence、join-interrupt、recovery scope、attempt plan、parked sites 等）；首个真实失败在其余义务完成后重新抛出。重复收束幂等：重放不产生第二份 terminal、第二次释放副作用或重复异常，已归还容量的 execution 再次处理为 no-op。
-
 ## [020] Fresh identity 先关闭旧 run
 
-复用 SessionId 安装新身份前，依次完成 exact execution settlement、受权 child drain、`interaction-authority` 的 durable exact prior-run closure。closure 事实只由官方窄口写入（共享 Journal 的 `appendAuthorityLogicalRunClosed`，由 Manager 唯一 `review` 的 `Completed` 后置 stop effect 依 `completedClosureId` 触发）；`Relayed`、Plan 或缺少 exact retirement 时不得清除身份。association removal、detach、idle、timeout、Host observation、restart 都不能替代；缺证或 run 不匹配则拒绝。
+复用 SessionId 安装新身份前，依次完成 exact execution settlement、受权 child drain、`interaction-authority` 的 durable exact prior-run closure，并取得匹配 witness。association removal、detach、idle、timeout、Host observation、restart 都不能替代；缺证或 run 不匹配则拒绝。
+
+本轮接线验证：Manager 唯一 `review` 的 `Completed` 后置 stop effect 在已提交的 Work 中读取 `completedClosureId` 确切 retirement witness，调用共享 Journal 的 `appendAuthorityLogicalRunClosed`；`Relayed`、Plan 或缺少 exact retirement 时不得清除身份。原始 Work 领域直写的测试夹具必须显式调用同一官方窄口，不能将里程碑字串冒充 authority 已关闭。`requirements/work/tests/009.test.mjs` 验证真实注册 review 工具完成后 activeLogicalRun 为 null；`tests/020.test.mjs` 验证同 SessionId 的新身份和冷重开。
 
 ## [021] Lifecycle fatal
 
@@ -102,28 +104,64 @@ Session delete、turn observation 或 strength semantic-cut incident 先完成�
 
 ## [022] Inspector finalize 的结算边界
 
-Finalize 恒带 exact Inspector identity，commitment 闭合为 `Finalized | NothingToFinalize | NotCommitted | Unknown | PhaseConflict`。Bookkeeper 不可用或 store 写失败为 NotCommitted；archive 已提交但 index refresh 失败为 Unknown，不重做 archive；重复 finalize 为 PhaseConflict。仅 Finalized/NothingToFinalize 释放 identity；其他状态保留以便恢复后重试。Session deletion 先取得结算证据再决定 identity 去留，不在 finally 无条件删除。该收尾边界不授权创建新的活跃 Inspector。
+Finalize 恒带 exact Inspector identity，commitment 闭合为 `Finalized | NothingToFinalize | NotCommitted | Unknown | PhaseConflict`。Bookkeeper 不可用或 store 写失败为 NotCommitted；archive 已提交但 index refresh 失败为 Unknown，不重做 archive；重复 finalize 为 PhaseConflict。
+
+仅 Finalized/NothingToFinalize 释放 identity；其他状态保留以便恢复取证。Session deletion 先取得结算证据再决定 identity 去留，不在 finally 无条件删除。该收尾边界不授权创建新的活跃 Inspector。
 
 ## [023] 旧身份只收束、不升权
 
-新任务和新子会话仅接纳当前合法活跃身份。历史事件原样保留，旧身份解码隔离在历史边界（`LegacyParticipantName` 拒绝），不自动升级为 Engineer 或获得写入/Fission 权限。运行或重启发现遗留旧角色活跃会话时，按受权 cancel/drain 或 retirement 显式写终态并排空资源，不自动恢复成合法活跃运行链。
+新任务和新子会话仅接纳当前合法活跃身份。历史事件原样保留，旧身份解码隔离在历史边界，不自动升级为 Engineer 或获得写入/Fission 权限。
+
+运行或重启发现遗留旧角色活跃会话时，按受权 cancel/drain 或 retirement 显式写终态并排空资源，不自动恢复成合法活跃运行链。
 
 ## [024] 固定 DevOps 恢复
 
-同一道路只有一个 DevOps 逻辑操作员权威；故障恢复可替换物理 Session，但活动 handle 拒绝第二个物理绑定，同时至多一个物理权威可执行。沿用初始化绑定的模型和 Persona，不借 resume 重置或切换。恢复不重复未决物理命令。真实进程及 PTY 随会话、道路关闭彻底排空，不留孤儿进程。
+同一道路只有一个 DevOps 逻辑操作员权威；故障恢复可替换物理 Session，但同时至多一个物理权威可执行。沿用初始化绑定的模型和 Persona，不借 resume 重置或切换。
+
+恢复不重复未决物理命令。真实进程及 PTY 随会话、道路关闭彻底排空，不留孤儿进程。
 
 ## [025] DevOps 每次工作返回即排空 PTY
 
 固定 DevOps 每次 run 终态结算，立即收束其拥有的全部 PTY：TERM 后等待真实退出，必要时升级 KILL，随后清除记账。不得留到下次 resume，不因 Manager 退休触发，不影响其他会话的资源和生命周期。
 
+## [026] Main 收束级联 Attached InternalLeaf 的 execution 结算
+
+Main session 收束（宿主 `SessionDeleted` 事件，且存在仍属于当前本体的 linked Attached InternalLeaf）时，lifecycle owner 除排空 Main 自身已准入 execution 外，还必须对每个 linked Attached InternalLeaf 名下全部已准入 execution 逐一完成 typed terminal 与 exact capacity 归还：
+
+- 未终态 execution 先写 typed `Cancelled` terminal：pre-provider 阶段复用 `PreProviderSettlement.settle`，after-provider-start 阶段复用 `ManagedChatProviderLifecycle.terminal`；两者都等待 durable 提交确认后才可归还。
+- 已 terminal 但物理容量仍 held 的 execution 直接请求 exact release（`ModelRouting.releasePhysicalExecution`）；`AlreadyApplied` 与 `StaleFence` 按幂等结果接受，`Conflict` 不得吞没。
+- 只允许 exact per-execution fence 释放。禁止 session-wide blind release、计数减一、以错误文本或超时猜测释放。
+- 归还完成后，该 execution 不得再出现在 shared capacity 快照中。
+- 重复收束幂等：重放不得产生第二份 terminal、第二次释放副作用或抛错；已归还容量的 execution 再次处理为 no-op。
+- Main 自身与 linked InternalLeaf 各自的 execution 只由自己的 exact key 结算；本条款不改变 Main 自身容量的既有结算路径。
+
+## [027] Session 收束取消作用域保留并完成延后归还
+
+Session 收束（`PluginSessionScope.ClearSession`，覆盖宿主 `SessionDeleted` 的 Main 收束与 linked Attached InternalLeaf 的自删）时，lifecycle owner 除按 [026] 结算该作用域名下已准入 execution 外，还必须取消该作用域名下的全部 retained continuation input（`execution-model-routing` [006] 的「作用域关闭均须清理自己的保留」在删除链上的落地），并完成由此解锁的旧 exact capacity 归还；对 Main 自身与每个 linked Attached InternalLeaf 都执行。
+
+- 触发：作用域收束调用发生时，该 session 名下仍存在 retained continuation input（含其保留键没有对应 durable execution 的残余形态）。取消在自身与每个 linked leaf 上各自先于该 leaf 的 exact release 请求执行。
+- 允许后果：取消只移除该 session 名下的保留，并以 exact `admissionOwner.ReleasePhysical` 路径回放其挂起的旧 key 归还；最后一份保留撤销后旧 credit 立即归还，borrowed credit 不退休 lender。归还完成后旧 execution 不得再出现在 shared capacity 快照中。
+- 禁止后果：不得使用 `ReleaseExecution`/`ReleaseSession` 等 force 路径；不得 session-wide blind release、计数减一或以时间猜测释放；保留未取消时不得宣称归还完成；取消操作不得取消无关的 pending demand 或触碰其他 session 的保留。
+- 失败后果：取消回放对 `AlreadyApplied` 与 `StaleFence` 按幂等结果接受，视同归还完成并清除挂起记录；对 `Conflict` 不得吞没——以带 exact key 信息文本的 `InvalidOperationException` 显式暴露（风格对齐 [026] 的 `SessionRecoveryHost.release`），且暴露时保留挂起记录，使「取消已完成、归还未完成」的状态不被静默吞掉。重复收束幂等：保留已取消时不产生第二次释放副作用；除真实所有权冲突外不抛错。
+- 失败隔离：收束链的任一步失败只隔离该步自身，不得跳过其余独立义务。`ClearSession` 内，Main 自身的结算、保留取消或释放失败不得跳过 linked Attached InternalLeaf 的结算、保留取消与 exact 释放；任一作用域的失败也不得跳过本次收束的无条件 per-session 清理组（registry 条目、quiescence、join-interrupt、companion 等）。`PluginRuntimeScope.DisposeSession` 承接 `ClearSession` 失败后仍必须执行其后续清理组（recovery scope、attempt plan、parked sites 等）。失败在完成其余义务后仍显式暴露：首个真实失败被保留并在其余义务完成后重新抛出；上一段的真冲突例外语义不因隔离被吞掉或降级。重复收束继续幂等，已消费的失败源不得在第二次收束中再次产生副作用或吞掉新的失败。
+
 ## [028] Child 终态结算必须可观察
 
 child run 已在 journal 中证实的 Terminal 事实必须总能转化为一次可观察的 settlement。结算路径的任何故障都不得让父 join 陷入无界等待，也不得只靠 shutdown 取消收场。
 
-交付视图读取故障时降级为空视图继续结算，已完成的 child 仍写入可 join 的 `CompletedAwaitingJoin`，owner 的交付视图不因读取失败丢失。结算本身故障时，该 run 的唯一 completion promise 以显式 joinable 失败解决，join 消费到明确 outcome（完成、失败或取消），不静默、不搁浅 Source。PERSIST 形态：Source 结算为 PERSIST 失败而 durable work 仍 Active 时，join 经 pending Source 浮现该失败，不挂等 journal revision 前进；未知 durable commit 不放行新工作，durable work 保持 Active，不得伪装成成功或按完成释放。结算故障落为显式可 join 的失败事实并保留原始证据，供恢复后重试。
+- 允许后果：交付视图读取故障时降级为空视图继续结算，已完成的 child 仍写入可 join 的 `CompletedAwaitingJoin`，owner 的交付视图不因读取失败丢失。结算本身故障时，该 run 的唯一 completion promise 以显式 joinable 失败解决，join 消费到明确 outcome（完成、失败或取消），不静默，不搁浅 Source。
+- PERSIST 形态：Source 结算为 PERSIST 失败而 durable work 仍 Active 时，join 经 pending Source 浮现该失败，不挂等 journal revision 前进；未知 durable commit 不放行新工作，durable work 保持 Active，不得伪装成成功或按完成释放。
+- 禁止后果：不得以交付视图读取失败为由跳过结算或吞掉完成事实；不得让 join 无界等待；不得把未知 durable commit 当作已交付完成。
+- 失败后果：结算故障必须落为显式可 join 的失败事实并保留原始证据，供恢复与取证；不得用空视图、静默或成功文字代替停止保证。
 
-## [029] 已确认的子代理自然停机即可完成父 Join
+## [029] 已确认的子代理自然停机，不依赖第二个 session.idle 才能完成父 Join
 
-Engineer/DevOps 的自然停止必须使父 join 取得一次真正可消费的完成事实：宿主确切观察到相同物理请求的 assistant message.updated（完成时间、合法 stop/length/content-filter 结尾）以及有 ProviderStarted 证据且 durable 提交成功的 ChatExecution.Terminal(Completed) 后，用现有带代际和在途工具检查的 SessionQuiescenceGate permit 唤醒 Reconcile；不额外要求另一个可能丢失的粗粒度 session.idle，后续 session.idle 幂等。
+Engineer/DevOps 的自然停止必须使父 join 取得一次真正可消费的完成事实。宿主确切观察到相同物理请求的 assistant message.updated（完成时间、合法 stop/length/content-filter 结尾）以及有 ProviderStarted 证据且 durable 提交成功的 ChatExecution.Terminal(Completed) 后，可以使用现有带代际和在途工具检查的 SessionQuiescenceGate permit 唤醒 Reconcile；不得额外要求另一个可能丢失的粗粒度 session.idle 才结算子任务。后续 session.idle 应幂等。
 
-此规则只处理已证实的精确当前 Completed。旧物理 parent、superseded run、Cancelled/Failed、未完成的工具、没有匹配 ProviderStarted 的伪消息均不得产生完成事实；含 `time.completed` 的消息不充当 ProviderStarted。终态归属与持久写入仍由 Host/Fork owner 验证，不按时间或进程存活猜测完成。路由侧以解码所得的完整 `(SessionId, PhysicalUserMessageId, ProviderRunId)` 识别同一生命周期回调，不从当前 Session 猜 run；真实 Start 与独立送达的 Terminal 至少其一成立即可回调。
+此规则只处理已证实的精确当前 Completed。旧物理 parent、superseded run、Cancelled/Failed、未完成的工具、没有匹配 ProviderStarted 的伪消息均不得产生完成证明。终态归属与持久写入仍由已有 Host/Fork owner 验证，不能按时间或进程存活猜测完成。
+
+本轮定位与修复：HostEventCodec 的 `tryDecodeExactProviderStart` 明确排除含 `time.completed` 的消息；HostSignalRouter 原先只在这个 start decoder 成功时才调用 exact lifecycle callback，因此真正独立送达的 assistant terminal 被吞掉。现在路由器优先保留真实 Start，否则直接使用已解码并携全套确切 `(SessionId, PhysicalUserMessageId, ProviderRunId)` 的 Terminal 作为同一生命周期回调的身份，不从当前 Session 猜一个 run。`tests/029.test.mjs` 同时覆盖路由器最小红绿与真实 fork→Join，不靠额外 idle。
+
+真实事故（2026-10-25 UTC）：21:25 父 Manager resume(backport-runtime) 后 join；该子 Engineer 21:28:28 将 ChatExecution.Terminal(Completed) 写入 event sourcing 且有非空终态正文，但父 HandleWorkCompleted 从未追加，Join 停留在 external:child-completion。不能对磁盘日志直接补造 completion。
+
+先红后绿的物理证明：tests/029.test.mjs 从真实 fork 到新 assistant message.updated 的自然 stop，故意不发送 session.idle：旧实现得到 JOIN-HUNG，精确终态唤醒修复后得到父 join 的真实报告与 Retired 墓碑。不同 physical parentID 的伪 Completed 不结算。host-boundary/tests/005.test.mjs 与 tests/028.test.mjs 进一步保护身份/失败与未知持久化结果不被伪成功。

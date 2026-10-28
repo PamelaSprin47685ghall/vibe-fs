@@ -1,29 +1,23 @@
 # managed-chat-execution 测试说明
 
-本目录下的测试文件与 `WHAT.md` 中的条款一一对应，覆盖单物理消息在准入、执行、终态及异常恢复各阶段的可观察行为。
+规则以 WHAT 为准。本目录区分生产纯逻辑、受控端口、实际持久化和真实进程退出，不把它们相互替代。
 
-## 测试与条款映射
-
-| 测试文件 | 对应条款 | 覆盖行为 |
+| 条款 | 当前实际证据 | 未闭合范围 |
 |---|---|---|
-| `001.test.mjs` | `[001]` | 单会话内多个物理消息的 exact key 独立索引；会话 ID 不代替执行身份。 |
-| `002.test.mjs` | `[002]` | 版本化持久化事实的编解码与规范化；Accepted、ProviderStarted 与 Terminal 的确定性往返；未知 schema 版本安全封闭。 |
-| `003.test.mjs` | `[003]` | 固定准入次序与并发准入：投影已提交目标、独立模型获取、各步骤失败在边界短路、追加材料与旧租约交接。 |
-| `004.test.mjs` | `[004]` | Accepted 单次建立与重放幂等；冲突事实安全封闭；持久化不确定时不获取容量；同一计划二次绑定幂等。 |
-| `005.test.mjs` | `[005]` | ProviderStarted 作为 provider effect 的持久化前置；启动前缺少 Accepted 直接拒绝；转换层等待持久化 Started；后续 assistant 不重复记录 Started。 |
-| `006.test.mjs` | `[006]` | Terminal 单赋值与类型化结果；PreProvider 阶段禁止 Completed；相同终态重放幂等，冲突终态拒绝；取消与中断转换为封闭类型化终态。 |
-| `007.test.mjs` | `[007]` | 启动前故障精确结算：提交前失败精确释放租约；追加材料取代失败时先终结为 Failed 再释放自身准入；启动前取消/拒绝直接结算且不调用 provider。 |
-| `008.test.mjs` | `[008]` | 插件构造期保持纯接线；激活失败不启动恢复；因果唤醒后通过正常准入推进（目前为 `test.todo`，对应 GAP-126）。 |
-| `009.test.mjs` | `[009]` | 进程本地对象永不持久化：规范事实中不包含内存句柄；集成测试验证进程崩溃重启后已落盘事实保留，但旧内存租约与等待器全部归零。 |
-| `010.test.mjs` | `[010]` | 会话取消与删除逐 key 枚举未终结执行，发起类型化结算并等待持久化终态及容量归还；不影响相邻会话与执行。 |
-| `011.test.mjs` | `[011]` | 准入原子消费启动前权限事实；外部与插件入口共享 AcceptManagedChatIntent；畸形 identity seed 拒绝；不从外部文本反推身份。 |
-| `012.test.mjs` | `[012]` | 恢复决策纯函数与解释器执行：输入证据映射到封闭决策代数；恢复端口缺失或拒绝时发布单个 manual intervention；端口接受时重入正常准入；重复恢复信号保持幂等。 |
-| `013.test.mjs` | `[013]` | 可靠性查询与诊断生命周期：未终结与尝试计数从只读投影导出；执行达终态后撤销 manual intervention 记录。 |
-| `014.test.mjs` | `[014]` | 现场证据采集与重放：采集时规范化事实、脱敏已知失败、剔除 payload 与 stack；重放重建投影并仅返回副作用请求；数据篡改或未知证据安全封闭报错。 |
-| `015.test.mjs` | `[015]` | 启动边界拒绝的精确定夺：转换层计划冻结失败作为类型化启动前故障报告；处于 Accepted 的执行终结为 Failed 并归还容量；无对应记录时不伪造状态。 |
+| 001—002、004、011 | 真实 codec、fold、准入 owner；exact key、完整身份、幂等与冲突、旧 schema 样本 | 历史样本不是所有历史版本全集 |
+| 003、007 | 生产 transaction/settlement 的失败停止、terminal 与释放次序；003 实际注册 hook 的并发、完整模型/variant 投影、同 key 重放、HostInternal 与 typed 拒绝 | 全部 chat.message 到 provider body 的边界故障 |
+| 005—006 | 生产 lifecycle 的提交/拒绝；公开 Host event decoder；005 实际 transform 在 plan 冻结后读取 SDK assistant 并等待 durable Started，missing/foreign 拒绝，后续 assistant 不重复 Started；006 经真实 recovery signal 全链以 held/unknown barrier 验证 terminal append 确认前 exact lease 不释放，确认后仅 exact 释放，竞争 fail closed、等值重放幂等 | 全部事件来源的 cursor、wake 及真实重启 |
+| 008 | 显式 TODO | 构造无状态推进、激活失败、真实因果唤醒；常量信号名单不是证明 |
+| 009 | Accepted 后真实 OS 子进程退出，再开新进程读同一仓库；绑定、容量等旧资源消失 | 只覆盖这一中断点，不能代表全部 crash cuts；三个 codec 样本的字段扫描也不是类型不可表达证明 |
+| 010 | 实际 recovery Host 消费 exact cancel，验证 pre-provider/started 终态、重放及相邻执行不变；session.deleted 真实插件事件链结算同会话全部已准入 key 且旁会话事实与容量不动；公开 logical cancel（SignalSession drain owner）与 session delete（ClearSession drain owner）经 held barrier 逐 key 枚举：悬置 terminal append 期间生命周期完成 Promise 不发布、磁盘无 durable terminal 行、exact lease 保留，放行后逐 key Cancelled 终态与 exact 容量归还、旁会话不动 | held 时序经 B1 受控 writer 接缝证明，不在真实 journal 注入 barrier；commitUnknown fail-closed 场景锚定在 lifecycle-019 同链 |
+| 012 | 真实纯决策、解释器逐次端口观察、Host recovery port 接受/拒绝/缺失、实际重复终态结算 | 每个中断点真实输出驱动跨进程恢复；晚到释放与新资源所有者竞态 |
+| 013 | canonical 只读诊断、实际 Host 达终态后撤销 manual | 与实际全量 incident 现场的集成另依 014 |
+| 014 | 实际 incident capture/replay、redaction、版本与篡改拒绝 | 受控 Host contract 证据不等于当前真实 Host canary 已执行 |
 
-## 运行说明
+012 的 A—E 调用生产准入事务并在受控边界停止；F—I 验证生产 lifecycle 的事实前缀。它们没有把得到的持久化输出传给后续恢复，因此不能命名为完整 crash recovery。`admissionPhaseSamples` 显式构造不同阶段的输入，重复调用真正 recovery 并逐次保留 effect；它证明的是这些输入的局部决策，不是进程重启或 durable owner 的 effect 幂等。对重复输入的检查保留整个结果序列，不先转成按 key 去重的字典。
 
-- 普通单测：执行仓库标准检查脚本（如 `npm run check`）或通过测试运行器执行具体测试文件。
-- 集成测试：`009.test.mjs` 包含真实子进程退出与工作区恢复测试，需在包含集成测试层级的环境下执行。
-- 待补齐项：`008.test.mjs` 标记为 `test.todo`，待 GAP-126 纯接线与因果唤醒改造完成后补齐实现。
+007 的准入交接失败验证 superseded execution 结算失败后的补偿：新输入先持久 Failed，再释放自己的 admission；terminal unknown/unavailable 时不释放，并保留结算失败的原始原因。外部输入不再拥有物理 abort 路径，不以 SDK abort 失败构造该分支。003 与 Host 033 的实际 hook 验证追加材料 Accepted 时旧 lease 保留，实际选入 transform 后才交接，较早同请求材料不留下未启动执行，旧回调不动新资源。Host 033 的安装版 canary 证明输出/非 Join 工具不中断，delegation 027 的实际 Manager Join → resume → child wire → 原 work 完成链证明忙碌指导；transaction 受控端口不替代物理 Host 证明。
+
+003 的并发测试即使一条 hook 失败也会等待所有已启动 hook 收束后清理目录，不让仍在写入的 journal 失去目录。模型投影结束前封口 output 登记；正式迟到 hook 在公开投影的微任务窗口进入，仍须取得自己的完整模型且容量只有一个 exact owner。旧源码词形计数已由这些行为回归替代，不能继续把它们当作调用链证明。
+
+未闭合部分见 GAP-126/127 和正式 TODO。运行本包须开启 integration tier 才执行 009；即使普通用例全部通过，有 TODO 也不算完整验收。

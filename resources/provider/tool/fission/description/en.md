@@ -13,7 +13,7 @@ Every lane keeps the same Engineer identity, authority, responsibility, parent,
 and shared worktree. Fission grants no command execution, DevOps dispatch, or
 new agent ownership. It is not fork.
 
-The lanes converge; they do not each report a separate completion to the
-Manager. The converged continuation returns one final result for this
-assignment. Its combined file access and trace form one case source after
-logical completion; do not claim completion on behalf of unfinished lanes.
+Each lane contributes to convergence, not a separate Manager-facing completion.
+The converged continuation returns one final result for this assignment. Its
+combined file access and trace form one case source after logical completion;
+do not wait for casekeeping or claim completion on behalf of unfinished lanes.

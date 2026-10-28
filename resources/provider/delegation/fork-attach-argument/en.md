@@ -1,1 +1,1 @@
-Optional Byname of another person in this mission whose record should be attached as background context.
+Optional Byname of another person in this mission whose canonical work record should be attached as background context.

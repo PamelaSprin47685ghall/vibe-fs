@@ -1,72 +1,131 @@
-# Managed Chat Execution 运维操作说明
+# Managed chat execution operator runbook
 
-本文档供运维与开发人员在日常运行、排查异常及确认执行完成时参考。
+## Safety boundary
 
-## 怎么起（编译与运行）
+Incident handling is observation plus owner effect requests. Never edit journal facts, capacity maps, fences, queue nodes, counters, bindings, recovery ownership, Host messages, or provider receipts. Never clear a counter, release capacity, terminalize an execution, authorize retry/fallback, or resend an accepted message by hand. Facts are corrected only by an ordinary owner append; physical reconciliation runs only through `ChatExecutionRecoveryRuntime` ports.
 
-1. **构建与检查**：
-   运行仓库规定的构建与代码检查脚本：
-   ```bash
-   npm run build
-   npm run check
-   ```
+Evidence must not contain prompt/content/payload, stack, token, cookie, credential, filesystem path, or free-form provider response. `ReliabilityDiagnosticsSurface.projectRecord` is the only causal-record adapter; it rejects payload fields and redacts credential/path material.
 
-2. **宿主插件就绪与激活**：
-   - 宿主（如 OpenCode/万象通）加载插件时，由 `HostSignalBootstrap` 触发底座激活事件 `DurabilityActivated`。
-   - 恢复系统在持久层底座激活后自动折叠未终结执行，完全由投影、容量变动及外部回执等事件因果驱动，无需人工手动触发恢复，严禁使用定时器或轮询。
-   - 单条物理消息的正常受理完全由 `ChatAdmissionTransaction` 驱动，按严格次序（身份解析 → `Accepted` 落盘 → 获取容量 → 宿主投影 → 提交租约 → 触发 provider 动作）流转。
+## Exact read surfaces
 
-3. **进程重启与重载**：
-   - 遇到异常时，通过正常的系统/进程管理命令重启即可。
-   - 重启后旧进程持有的内存租约、等待器、取消令牌与回调全部自动作废；新进程只从已落盘的持久化事实重建状态。严禁手动注入虚假事件或调用未受控私有接口。
+All imports below are compiled, registered `dist` surfaces. Use exact `(sessionId, physicalUserMessageId)`; a session alone is not execution identity.
 
-## 看什么（状态观测与现场采集）
+| Question | API | Result |
+|---|---|---|
+| Durable identity and lifecycle | `Execution/Session/ChatExecution/Surface.js`: `canonicalize(serializedFact)`, `fold(serializedFacts)`, `nonTerminal(serializedFacts, sessionId)` | canonical facts and projection containing logical run, authority root, effective agent, provider run, request kind, phase, disposition |
+| Exact status | `Execution/Session/ChatExecution/StatusSurface.js`: `queryFacts(serializedFacts, sessionId, physicalUserMessageId)` | `{ accepted, providerStarted, terminal, disposition }` |
+| Live admission | `ModelRoutingSurface.admissionSnapshot(routingRuntime, sessionId, physicalUserMessageId)` | active capacity, pending admissions, exact provider binding count |
+| Capacity, queue, fences | `OpenCode/Host/ModelRoutingSurface.js`: `sharedCapacitySnapshot()`; isolated runtime: `capacitySnapshot(runtime)` | ledger/tokens/custodies/executions/waiters/owners/lineage, token-state and active counts, duplicate/stale/conflict counters |
+| Capacity consistency | `ModelRoutingSurface.reconcileCapacityEvidence(snapshot)` | immutable `NoOp` or typed `FailClosed` reasons; never repairs the snapshot |
+| Failure policy | `Execution/Failure/Surface.js`: `decide(typedFailureInput)` | one exclusive resolution plus orthogonal breaker, capacity settlement, and fatality decisions |
+| Causal record | `OpenCode/Host/ReliabilityDiagnosticsSurface.js`: `projectRecord(record)` | immutable redacted record; unknown schema fields fail |
+| Reliability summary | `ReliabilityDiagnosticsSurface.queryReliability(counters, canonicalExecutions, capacitySnapshot, recoveryOwnershipSnapshot)` | canonical lifecycle, queue/fence and typed recovery ownership counts; read-only |
+| Recovery representation | `Execution/Session/ChatExecution/RecoveryRuntimeSurface.js`: `recoverScenarios([scenario])` | typed decisions and append-only owner-port invocation trace; proof representation only |
+| Supported Host contract | `requirements/host-boundary/fixtures/opencode-chat-admission-1.18.29.json` | exact OpenCode/plugin `1.18.29`, public hooks/order and terminal evidence |
 
-1. **查看单个消息执行状态**：
-   - 执行身份仅由 exact `(sessionId, physicalUserMessageId)` 标识，不能按会话模糊归并。
-   - 通过 `StatusSurface.queryFacts(serializedFacts, sessionId, physicalUserMessageId)` 观察当前状态：
-     `{ accepted, providerStarted, terminal, disposition }`。
+Re-observe the installed public Host contract:
 
-2. **查看未终结执行**：
-   - 通过 `Surface.nonTerminal(serializedFacts, sessionId)` 筛选处于 `Accepted` 或 `ProviderStarted` 的未终结执行列表，确认是否存在未完成任务。
+```sh
+node --test requirements/host-boundary/tests/023.test.mjs
+```
 
-3. **查看容量与租约健康度**：
-   - 通过 `ModelRoutingSurface.sharedCapacitySnapshot()` 观测当前活跃租约、排队等待器与所有者分布。
-   - 通过 `ModelRoutingSurface.reconcileCapacityEvidence(snapshot)` 检查容量一致性；正常情况下返回 `NoOp`，若返回 `FailClosed` 则表明租约超出范围或计数异常，需立即排查。
+A version mismatch, missing exact assistant `message.updated` start/terminal evidence, or changed hook order is unsupported. Stop recovery action and escalate.
 
-4. **查看人工介入（ManualIntervention）记录**：
-   - 检查 `PluginRecoveryScope.ManualChatInterventions()` 中是否存在未处置记录。当外部回执缺失/模糊、持久化或物理状态未知、缺乏策略授权时，系统会生成 manual intervention 记录并安全封闭。
-   - 当对应执行成功落盘终态后，该 manual 记录应自动被撤销。
+## Identity conflict
 
-5. **事故现场采集（官方 npm 脚本）**：
-   - 当出现状态不一致、执行挂起或崩溃时，使用仓库官方采集脚本收集全息现场（自动脱敏 API Key、Token、Prompt 和调用栈）：
-     ```bash
-     npm run diagnostics:collect -- --run <runId>
-     ```
-   - 检查生成的报告包，重点比对持久化事实投影与容量快照。
+1. Run `Surface.fold(serializedFacts)` and isolate the exact `(sessionId, physicalUserMessageId)` plus `logicalRunId`, authority root and effective agent.
+2. Run `StatusSurface.queryFacts(serializedFacts, sessionId, physicalUserMessageId)` for each competing physical message. Same session with different physical ids is valid; conflicting evidence for one exact key is not.
+3. Project the conflict with `ReliabilityDiagnosticsSurface.projectRecord`; attach no prompt, content, stack or path.
+4. Preserve the first durable fact and escalate. Never overwrite identity, reuse a session-scoped binding, or clear `identityConflicts`.
 
-## 常见异常处置
+## Accepted nonterminal
 
-1. **仅有 `Accepted` 但未启动 provider**：
-   - 确认宿主侧是否确实未启动 provider。
-   - 若宿主具备恢复能力（`ExactAcceptedMessageRecoveryPort` 接受），系统自动重入准入流程；若宿主不支持，系统记录 manual 标记并安全封闭。严禁手动重发消息或向账本补写虚假状态。
+1. Select `phase === 'Accepted'` from `Surface.nonTerminal(serializedFacts, sessionId)` and confirm `providerRun === null`.
+2. Obtain exact public provider observation and explicit persistence commitment. Absence of a process-local binding is not provider absence.
+3. Capture/replay evidence. Only `ResumePreProvider` from the recovery owner is actionable; call no provider or capacity mutation directly.
 
-2. **执行已达终态但容量未释放**：
-   - 确认该执行是否已持久化落盘 terminal。
-   - 确认容量对齐为 `NoOp` 后，通过容量所有者按 exact key 触发精确释放，严禁按会话盲目整池释放。
+## Attempt amplification
 
-3. **物理标识冲突**：
-   - 同一 exact key 出现冲突事实时，系统保持首个落盘事实并安全封闭（fail closed）。严禁手动覆盖既有事实或重置冲突计数。
+1. Use `ReliabilityDiagnosticsSurface.queryReliability(...)` and inspect `physicalAttemptsByLogicalRun` together with each canonical provider run from `Surface.fold`.
+2. Correlate attempts by logical run and exact physical message; do not count log lines, hook deliveries or retries inferred from prose.
+3. More physical attempts than typed failure-policy authorizations → stop new admission and escalate with facts, policy decisions and public provider receipts.
 
-## 判定做成
+## Queue saturation
 
-系统正常完成执行的判定标准：
+1. Read `ModelRoutingSurface.sharedCapacitySnapshot()`.
+2. Record `waiters`, `activeCount`, ledger bounds and `counters`; correlate every waiter to its exact owner.
+3. Query `ReliabilityDiagnosticsSurface.queryReliability(...)` for `queueDepth`/`queueFull` evidence.
+4. Do not delete waiters, enlarge bounds, bypass admission or force-release a lease. Capacity owner alone consumes typed cancellation/release requests.
 
-1. **单物理消息完整闭环**：
-   物理消息经 `Accepted` 落盘 → 取得模型容量 → `ProviderStarted` 落盘 → 收到真实执行结果 → 写入 `Terminal`（Completed/Cancelled/Failed/Rejected）→ 精确归还容量。
-2. **无遗留悬挂状态**：
-   持久化投影中不存在遗留的 `Accepted without Terminal` 或 `ProviderStarted without Terminal`。
-3. **诊断表清空**：
-   `ManualIntervention` 诊断表清空，无遗留的阻断记录。
-4. **进程重启后自洽**：
-   旧进程的内存租约全部清空，新进程仅由持久化事实重建，无未授权的工具重放与重复调用。
+## Capacity divergence
+
+1. Freeze one `sharedCapacitySnapshot()` and pass that same object to `reconcileCapacityEvidence(snapshot)`.
+2. `NoOp` permits continued observation. `FailClosed` reasons (`ActiveOutsideLedgerBounds`, token/map/owner divergence or counter regression) require immediate escalation.
+3. Preserve snapshot and reasons. Never edit ledger, token state, custody, lineage, fences or counters to make reconciliation pass.
+
+## Hook criticality
+
+1. Query `OpenCode/Host/HookPolicySurface.js` with `rows()`; match the failing public hook to its registered criticality and failure disposition.
+2. `Security`, `Workflow` and `Invariant` failures remain typed fail-closed. Only the registered degradable/audit-only disposition may continue.
+3. Verify installed hook names/order with the public Host canary command above. Never downgrade a critical hook because provider work appears healthy.
+
+## Safe rollback and canary stop
+
+1. Stop rollout/canary traffic on any Host version drift, public hook-order drift, projection mismatch, capacity `FailClosed`, or integrity failure.
+2. Preserve the failing evidence envelope before rollback. Roll back only the deployed code/configuration through normal deployment control; never roll back or edit durable facts.
+3. Restart normally, wait for `DurabilityActivated` and `PluginRuntimeReloaded`, then capture a fresh envelope and rerun the Host canary.
+4. Resume traffic only when the installed version is exactly the passing canary version, capacity reconciliation is `NoOp`, and replay returns only expected typed owner requests.
+
+## Evidence collection
+
+Collect exactly: canonical serialized facts; exact key/status/projection; one immutable capacity snapshot plus reconciliation result; projected causal diagnostics; checked Host canary fixture/version/order; typed recovery observation/runtime decision; SHA-256 integrity. Record absent facts as typed null/absence, never guesses. Never collect secret/token/cookie/credential, stack, or filesystem path. Reject and recollect any envelope containing prompt/content/payload or provider response.
+
+Use `captureEvidence(input, surfaces)`; save only its returned sealed JSON. Validate operationally by replaying with the exact command below. Never collect private Host API output or process-local handle representations.
+
+## Incident evidence
+
+The v1 envelope schema is `requirements/managed-chat-execution/tests/fixtures/incident-evidence-v1.schema.json`. Capture through `captureEvidence(input, surfaces)` from `requirements/managed-chat-execution/tests/support/incident-evidence.mjs`; inputs must come directly from the APIs above and the checked Host canary fixture. The adapter canonicalizes every fact, projects exact status, reconciles capacity, projects/redacts diagnostics, records typed recovery observation/runtime output, then seals deterministic JSON with SHA-256.
+
+Replay a captured envelope:
+
+```sh
+node requirements/managed-chat-execution/tests/support/incident-evidence.mjs replay <evidence.json>
+```
+
+Success prints canonical execution/capacity/recovery equality, `EffectRequestOnly` owner actions, and `mutations: []`. Tamper, unsupported version, unknown/missing evidence, capacity divergence, projection/status mismatch, unsupported Host contract, or recovery-decision mismatch exits non-zero. Replaying the same envelope never accumulates state or authority.
+
+## Decision tree
+
+1. **No `Accepted` fact / pre-provider**
+   - Verify exact key and authority evidence through `fold` + `queryFacts`.
+   - If nothing durable exists, there is no managed execution to repair.
+   - If `Accepted` exists and public observation proves provider absent, recovery may return `ResumePreProvider`; submit that effect request to `managed-chat-execution`. Do not call provider directly.
+
+2. **In-flight provider**
+   - Require exact assistant start evidence: session, parent physical user message, assistant id/provider run, `time.created`.
+   - Provider alive → observe only. Exact terminal → owner may request `Finalize`. Missing/ambiguous receipt → manual intervention. Never infer terminal from idle, text, age, registry presence, or process loss.
+
+3. **Terminal but resource unreleased**
+   - Confirm durable terminal plus exact capacity owner/fence in the immutable snapshot.
+   - `reconcileCapacityEvidence` must be `NoOp`; recovery may request `ReleaseTerminalResource` through capacity owner. Never release by session or edit the fence.
+
+4. **Persistence unknown**
+   - Treat as manual intervention. Re-read durable facts through the journal owner and obtain explicit persistence commitment. Do not append a guessed duplicate or continue provider work.
+
+5. **Stale key/provider/policy or capacity conflict**
+   - Preserve both observations. Replay must fail closed/manual. Escalate with exact key, provider run, immutable capacity reconciliation reasons and causal record. Do not overwrite the current execution or reset conflict/stale counters.
+
+6. **Fatal after settlement**
+   - First prove typed terminal settlement and exact capacity outcome. Only then follow the failure-policy `FatalAfterSettlement` decision. A fatal diagnostic is not settlement evidence and never authorizes process termination before owners settle.
+
+## Restart or plugin reload
+
+1. Capture the pre-restart envelope and retain its SHA-256 seal.
+2. Stop/reload only through the deployment's normal process control; this repository exposes no operator command that mutates recovery state.
+3. On startup, wait for durable substrate activation. `HostSignalBootstrap` emits `DurabilityActivated`; `PluginRecoveryWiring` emits `PluginRuntimeReloaded`. These events re-enter ordinary recovery from canonical facts. Do not invoke a private Host API or inject a lifecycle event.
+4. Query the exact status and shared capacity snapshot again. Compare owner projections, not process-local lease handles, waiter tokens, callbacks, subscriptions, or old bindings.
+5. Capture and replay the post-restart envelope. Submit only the returned typed effect request to its named owner. If replay fails closed, preserve evidence and escalate.
+
+## Mandatory escalation
+
+The current public Host canary proves duplicate `chat.message` delivery and Host-side transform/provider deduplication. It does **not** prove an exact accepted-message replay capability. Therefore any recovery that would require replaying/resending an already accepted physical user message must stop at escalation until a passing public Host canary proves that exact capability. Restart count, operator judgment, raw HTTP, private SDK methods, or manual message construction cannot substitute for that prerequisite.

@@ -1,1 +1,1 @@
-This tool is unavailable: the caller's authority cannot be resolved.
+This tool is unavailable until the caller's authority is established.

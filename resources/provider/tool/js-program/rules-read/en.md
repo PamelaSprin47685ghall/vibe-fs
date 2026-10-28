@@ -2,10 +2,10 @@ Read with `cat(path)`: it returns the file as a string and registers the read sn
 
 Locate with `where` / `whereAll`:
 
-- `whereAll(content, needle, from = 0)` returns every match as `[[begin, end], ...]`.
+- `whereAll(content, needle, from = 0)` returns every normalized match as `[[begin, end], ...]`.
 - `where(content, needle, from = 0)` returns the single span. Zero or many matches suspend the program through the same channel as `park`, with `{ needle, candidates, nearest }`; resume by injecting the chosen span.
 
-Matching is literal: the needle is compared against the content exactly as written — no whitespace folding, no trimming; offsets always address the original string. `where` never throws a locating error and never silently picks a match: uniqueness is mechanical, ambiguity is yours.
+Normalization collapses whitespace runs to one space and trims the needle; offsets always address the original string. `where` never throws a locating error and never silently picks a match: uniqueness is mechanical, ambiguity is yours.
 
 Recompose with slices — do not re-search what you already located:
 

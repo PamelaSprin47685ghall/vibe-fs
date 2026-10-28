@@ -1,1 +1,1 @@
-可选。填写同一 mission 中另一位 person 的 Byname，把其记录作为背景材料附给本次被委托者。
+可选。填写同一 mission 中另一位 person 的 Byname，把其 canonical work record 作为背景材料附给本次被委托者。

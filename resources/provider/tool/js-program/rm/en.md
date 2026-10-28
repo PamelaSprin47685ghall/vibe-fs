@@ -1,1 +1,1 @@
-rm(path) — delete a file or an empty directory; refuse a non-empty directory. Takes effect immediately on success (as-is); FILE_CHANGED is checked before the write like edit. The first irreversible programming-surface operation (it supports finalizer cleanup cases); durable accounting is a single entry.
+rm(path) — delete a file or an empty directory; refuse a non-empty directory. Takes effect immediately on success (as-is); FILE_CHANGED is checked before the write like edit. The first irreversible programming-surface operation; durable accounting is a single entry.

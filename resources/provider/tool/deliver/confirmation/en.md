@@ -1,1 +1,1 @@
-No separate confirmation call exists. The review result states what was recorded and the next lifecycle action; follow that result.
+Review records the current obligation ledger and decides the next lifecycle action. There is no separate confirmation call. Follow the review result.

@@ -22,6 +22,7 @@
 /src/Wanxiangshu/Persistence/Journal/Surface.fs
 /src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs
 /src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntimeSurface.fs
+/src/Wanxiangshu/Enforcer/Cycle/Commit.fs
 /src/Wanxiangshu/Interaction/Dispatch/PhysicalAcceptance.fs
 /src/Wanxiangshu/Interaction/Dispatch/Ingress.fs
 /src/Wanxiangshu/Interaction/Dispatch/Recovery.fs
@@ -35,3 +36,9 @@
 /src/Wanxiangshu/Foundation/FatalProcess.fs
 /src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs
 /scripts/checks/retry-owner.mjs
+/scripts/checks/fatal-inventory-gate.mjs
+/src/Wanxiangshu/Execution/Failure/Model.fs
+/src/Wanxiangshu/Execution/Failure/Policy.fs
+/src/Wanxiangshu/Execution/Failure/Surface.fs
+/src/Wanxiangshu/Participant/Provider/Attempt/Failure.fs
+/src/Wanxiangshu/Participant/Provider/Attempt/FailureSurface.fs

@@ -1,4 +1,4 @@
-搜索和枚举走 `rg(argv)`。它只有一个 argv，返回 JSON 对象，不是文本。内容搜索等价于 `rg --json` 加上这个 argv。`--files`、`--files-with-matches`、`-l`、`--count` 及其他 summary 模式不能和 `--json` 同时使用，所以这些 argv 原样传给 rg，结果收成 `paths`：
+搜索和枚举走 `rg(argv)`。它只有一个 argv，返回 JSON 对象，不是文本。内容搜索等价于 `rg --json` 加上这个 argv。`--files`、`--files-with-matches`、`-l`、`--count` 及其他 summary 模式不能和 `--json` 同时使用，所以这些 argv 原样传给 `rg`，结果收成 `paths`：
 
 ```js
 const found = await this.rg(["RetryPolicy", "src", "-g", "*.fs"]);

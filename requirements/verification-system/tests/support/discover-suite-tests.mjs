@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { testDeclarations } from './test-declarations.mjs'
+import { testDeclarations } from '../../../requirement-system/tests/support/structure.mjs'
 
 /**
  * Deterministic discovery of `*.test.mjs` files directly inside a suite

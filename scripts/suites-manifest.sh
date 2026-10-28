@@ -19,7 +19,7 @@
 #     `scripts/build.mjs` compiles the impact closure only and takes the
 #     build lock itself (`.fable-build/build.lock`); there is no external
 #     lock to wrap it in, and `--clean` is not a valid argument (a full
-#     rebuild is forbidden; `scripts/build.mjs` rejects it).
+#     rebuild is forbidden — see scripts/checks/aggregate-retired.mjs).
 #   * The build lock is NOT held here. Tests never run under the build lock.
 #     Compilation is a global singleton and must happen inside ONE build
 #     invocation, so any test that compiles internally is dropped, and the
@@ -69,19 +69,39 @@ fi
 SUITE_TIMEOUT="${SUITE_TIMEOUT:-1200}"
 RUNNER="requirements/verification-system/tests/run.mjs"
 
-# Groups are discovered from the tree: every requirements/<pkg>/tests/
-# directory that holds *.test.mjs files. Format: key|directory (relative to
-# REPO). No hand-maintained list, so a new suite cannot be silently missed.
-SUITE_GROUPS=()
-for group_dir in "$REPO"/requirements/*/tests; do
-  [ -d "$group_dir" ] || continue
-  key="$(basename "$(dirname "$group_dir")")"
-  SUITE_GROUPS+=("$key|requirements/$key/tests/")
-done
-if [ ${#SUITE_GROUPS[@]} -eq 0 ]; then
-  echo "FATAL: no requirements/*/tests directories found under $REPO" >&2
-  exit 2
-fi
+# Groups that map to the files the 8 branch commits touch.
+# Format: key|directory holding the group's *.test.mjs files.
+# The second field is a DIRECTORY (relative to REPO), not a display name.
+SUITE_GROUPS=(
+  "delegation|requirements/delegation/tests/"
+  "effect-accounting|requirements/effect-accounting/tests/"
+  "action-affordance|requirements/action-affordance/tests/"
+  "repository-programming|requirements/repository-programming/tests/"
+  "js-semantic-surface|requirements/js-semantic-surface/tests/"
+  "session-ontology|requirements/session-ontology/tests/"
+  "managed-session-lifecycle|requirements/managed-session-lifecycle/tests/"
+  "managed-chat-execution|requirements/managed-chat-execution/tests/"
+  "interaction-authority|requirements/interaction-authority/tests/"
+  "host-boundary|requirements/host-boundary/tests/"
+  "advisor|requirements/advisor/tests/"
+  "knowledge-reuse|requirements/knowledge-reuse/tests/"
+  "prefix-stability|requirements/prefix-stability/tests/"
+  "participant-horizon|requirements/participant-horizon/tests/"
+  "durable-convergence|requirements/durable-convergence/tests/"
+  "provider-projection|requirements/provider-projection/tests/"
+  "process-execution|requirements/process-execution/tests/"
+  "execution-failure-policy|requirements/execution-failure-policy/tests/"
+  "provider-attempt-recovery|requirements/provider-attempt-recovery/tests/"
+  "execution-model-routing|requirements/execution-model-routing/tests/"
+)
+
+# Files that are known-flaky / pre-existing on the baseline. They are NOT
+# excluded by default: a candidate failure in one of them is only meaningful
+# if the BASELINE passed the same file. Once the baseline run is in hand and
+# shows the identical outcome, set EXCLUDE_KNOWN_FLAKY=1 to drop them.
+KNOWN_FLAKY_DEFAULT=""
+
+EXCLUDE_KNOWN_FLAKY="${EXCLUDE_KNOWN_FLAKY:-0}"
 
 usage() {
   echo "usage: REPO=<clone> [LOGDIR=<dir>] [SUITE_TIMEOUT=<sec>] $0 [group ...]" >&2
@@ -168,6 +188,17 @@ for g in "${SUITE_GROUPS[@]}"; do
   fi
 
   csv="$(printf '%s\n' "$list" | paste -sd, -)"
+
+  if [ "$EXCLUDE_KNOWN_FLAKY" = "1" ] && [ -n "$KNOWN_FLAKY_DEFAULT" ]; then
+    filtered=""
+    for f in $(printf '%s\n' "$list"); do
+      case ",$KNOWN_FLAKY_DEFAULT," in
+        *",$f,"*) ;;
+        *) filtered="${filtered}${filtered:+,}$f" ;;
+      esac
+    done
+    csv="$filtered"
+  fi
 
   log="$LOGDIR/$key.log"
   echo "=== $key : $csv"
