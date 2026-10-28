@@ -482,7 +482,7 @@ module HostSignalBootstrap =
                                 let! providerStarted =
                                     ProviderLifecycle.persistProviderStartedFromObservation
                                         journal
-                                        scope.TryBindAttemptPlan
+                                        scope.BindAttemptPlan
                                         started
 
                                 do! continueProviderStart started providerStepEnded terminal providerStarted

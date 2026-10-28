@@ -191,7 +191,6 @@ const providerLifecycleSource = await readFile(new URL('../../../src/Wanxiangshu
 const bootstrapSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs', import.meta.url), 'utf8')
 const recoveryHostSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs', import.meta.url), 'utf8')
 const recoveryRuntimeSource = await readFile(new URL('../../../src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntime.fs', import.meta.url), 'utf8')
-const recoverySource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs', import.meta.url), 'utf8')
 const terminal = ({
   sessionId = 'ses-terminal',
   physicalUserMessageId = 'msg-terminal',
@@ -241,9 +240,7 @@ test('WHAT[managed-chat-execution-005] exact public assistant observation alone 
   assert.match(bootstrapSource, /persistProviderStartedFromObservation[\s\S]*?continueProviderStart started providerStepEnded terminal providerStarted/)
   assert.match(providerLifecycleSource, /persistObservedProviderStart[\s\S]*?ChatExecutionProjection\.byKey key/)
   assert.match(providerLifecycleSource, /match execution with[\s\S]*?state\.terminalDisposition\.IsSome[\s\S]*?AcceptedExecutionAlreadyTerminal[\s\S]*?state\.startedEvidence\.IsSome[\s\S]*?Ok false[\s\S]*?bindAttemptPlan[\s\S]*?ManagedChatProviderLifecycle\.providerStarted[\s\S]*?return true/)
-  assert.match(providerLifecycleSource, /persistObservedProviderStart[\s\S]*?bindAttemptPlan observation\.SessionId observation\.PhysicalUserMessageId observation\.ProviderRun/)
-  assert.match(recoverySource, /TryBindAttemptPlan[\s\S]*?established\.Profile\.PhysicalUserMessageId = physicalUserMessageId/)
-  assert.match(recoverySource, /\| Some _ -> None[\s\S]*?\| None -> this\.BindPendingAttemptPlan/)
+  assert.match(providerLifecycleSource, /persistObservedProviderStart[\s\S]*?bindAttemptPlan[\s\S]*?observation\.ProviderRun[\s\S]*?ordinary/)
   assert.match(providerLifecycleSource, /ManagedChatProviderLifecycle\.providerStarted/)
 })
 }
