@@ -4,6 +4,8 @@
 
 用户选择：先修复现有失败，再优化主要慢点。按 `verification-system/AXIOMS.md`，保留现行合同的有效保护；归属调整、过时测试修订和等覆盖提速分别记录。
 
+随后按用户要求推送两个独立分支，并合入最新 upstream `4b099d0bb`。合并后的完整 unit 为 4174 pass、0 fail；详情见末节。下文原性能对照继续对应其原始提交，不用新版本结果覆盖。
+
 ## 基线
 
 - `node scripts/build.mjs` 成功，150 个 JS surface、753 个产物模块链接检查通过。此前缺三个产物的失败已消失。
@@ -95,7 +97,7 @@
 
 优化后最慢文件为 NuGet project 38.15 秒、npm tool archive 36.14 秒、verification 006 28.40 秒、Node tool candidate 23.75 秒、Fable project 19.60 秒、dotnet tool restore 17.60 秒。后续应先测这些组的准备与正文成本，区分可复用的只读准备、真实进程开销和合同要求的等待；不要仅为继续拆文件而重复昂贵准备。若调整资源共享，须另证隔离与失效条件，再做同范围完整对照。本轮没有实施这些后续策略。
 
-## 交付复核与未闭合边界
+## 性能实验后的收尾验证（同步前）
 
 性能对照后，补齐 `latency-degeneration` 的 53 个消融配置项：station-05 至 station-56 为 ablated，production 为 active，与 station-60 引入该节点的登记一致。修正本次新增接口的格式，不改变接口或执行逻辑。这些收尾改动不混入上表的性能提交。
 
@@ -108,6 +110,31 @@
 - 独立静态检查仍有 118 项控制结构嵌套问题，集中于 `fsharp-control-pyramid`。忽略行号移动后，与上游逐项相同；检查实现未改动。详见 [control-pyramid-comparison.json](control-pyramid-comparison.json)。这属于未修复的上游问题，不能写成检查通过。
 
 本轮没有重新执行 integration/release 或连续真实宿主验收，也没有清偿既有 110 skip、261 TODO。原失败基线的 81 项失败已不再出现，但 423.10 秒到 294.68 秒之间包含合同迁移、回归修复和执行范围变化，不能整体算作等覆盖收益。
+
+## 同步最新 upstream 后的验证
+
+2026-10-28 将主仓 `752c36d4c` 与内核 `9c0230b` 推送到各自 fork 的 `codex/test-updates-20261028`。随后获取 upstream：主仓从 `89ab1f399` 前进到 `4b099d0bb68d92e8c2a437d7c11909b548725e64`，新增五个提交；内核 main 仍为 `87de56a6`。采用 merge 保留已发布提交和固定性能对照的引用，合并提交为 `66f92bfdd`，没有冲突。PR 提交前再次读取远程，主仓 upstream 仍为上述版本。
+
+新增上游行为包括：空回合和长程角色的迟到咨询处理、OpenCode step 标记的分类、horizon 改读 join 的账本，以及根身份的完整闭合分类。`scripts/lib/test-surface-scan.mjs` 自动合并后已检查：上游删除的 HorizonSurface 登记继续删除，本轮的 LatencyWatchdog 登记仍保留。
+
+合并后发现 `interaction-authority/018` 的新增分类测试直接导入内部 `Origin.js`，并依赖联合类型表示，造成两条 JS 边界报错。提交 `97c6f6462` 把解码留在已有 `RuntimeSurface`，返回 JS 原生对象并调用上游真正的 `closureKindForRoot`。七种分类期望完整保留，另检查非法根身份拒绝；没有改检查器或增加豁免。
+
+| 验证范围 | 结果 |
+| --- | --- |
+| 官方 Fable 构建 | generation 13 成功；150 个公开 surface、752 个产物模块检查通过 |
+| 上游改动与公开边界相关的 9 个文件 | 70 pass、0 fail、0 skip、1 个原有 TODO |
+| 完整 unit，提交 `97c6f6462b2ab7275d54b8fd3947fc7c61a20bfe` | 811/811 文件完成；4174 pass、0 fail、110 skip、260 TODO；313.271 秒；退出 0，输入摘要前后相同 |
+| 内核 projection 全部测试，提交 `9c0230b` | 39 pass、0 fail、0 skip、0 TODO |
+| 独立静态检查 | 仅剩控制结构嵌套的 120 项；与新 upstream 逐项相同，忽略行号移动后摘要相等；检查实现未改 |
+| 官方完整验证入口 | format:check 失败，109 个文件需格式调整；该次流水线后续阶段未运行 |
+
+109 个格式失败中，101 个文件与新 upstream 相同；另外 8 个文件的上游原文已用同一格式配置复现失败，其原文在这五次上游提交中未变。本轮新增的 RuntimeSurface 接口单独通过格式检查。没有把这些问题算成通过，也没有顺手批量整理无关生产代码。
+
+TODO 从 261 变成 260 来自 upstream `cd55bd251`：horizon 不再读独立的 latest-record 渲染路径，旧 HorizonSurface 及对应 TODO 退出，替换为真实 join 账本行为测试。实际用例身份的新增、退出及唯一退出的 TODO 均记录在 [upstream-verification.json](upstream-verification.json)。未新增 skip/TODO，新的完整测试不是一组与旧版本等覆盖的性能对照；313.271 秒不能用来重算前述 14.18% 收益。
+
+内核修复单独提交为 [wanxiangli PR #8](https://github.com/PamelaSprin47685ghall/wanxiangli/pull/8)。官方仓库的 `refs/pull/8/head` 和 fork 分支均指向 `9c0230b`，主仓 gitlink 不依赖仅本机存在的提交。主仓 PR 将引用该依赖。规则与读取支持的 [PR #68](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/68) 仍单独保留；因其尚未合并，本分支包含该规则基础，建议先审阅、合入它。
+
+完整运行记录 ID 为 `contracts-20261028-upstream-merged`，定向运行 ID 为 `contracts-20261028-upstream-focused`，原始日志仍位于前述实验目录。新记录保留工具版本、环境、摘要、日志路径、实际失败及其归因；未运行 integration/release 或连续真实宿主验收。
 
 ## 边界
 
