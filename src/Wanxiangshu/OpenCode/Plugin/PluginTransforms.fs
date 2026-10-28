@@ -832,7 +832,20 @@ module PluginTransforms =
                 let answeredAlready = messages |> List.skip (index + 1) |> List.exists isAssistant
                 let previous =
                     messages |> List.take index |> List.rev |> List.tryFind isAssistant
-                marked && not answeredAlready && (previous |> Option.exists (fun assistant ->
+                // WHAT[delegation-041]: Manager, Orchestrator and Plan own long
+                // work. Their tool-free stop is no closing report; the answer
+                // is the nudge that carries the work on, never a wake-up to stop.
+                let agentOf item =
+                    let info = ProviderWireDecode.infoObject item
+                    ProviderWireDecode.firstString info [ "agent" ]
+                    |> Option.orElseWith (fun () -> ProviderWireDecode.firstString info [ "mode" ])
+                let longRunning =
+                    message :: Option.toList previous
+                    |> List.exists (fun item ->
+                        agentOf item
+                        |> Option.bind Roles.tryParseRole
+                        |> Option.exists Roles.isLongRunning)
+                marked && not answeredAlready && not longRunning && (previous |> Option.exists (fun assistant ->
                     let info = ProviderWireDecode.infoObject assistant
                     let finished = not (isNull info?time) && not (isNull info?time?completed)
                     let calls = ProviderWireDecode.rawPartsOf assistant |> List.exists (fun part -> ProviderWireDecode.firstString part [ "type" ] = Some "tool")
