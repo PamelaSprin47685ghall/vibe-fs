@@ -349,7 +349,9 @@ export async function runBuild({
   targetRoot = root,
   stdio = 'inherit',
   skipSourceDependency = path.resolve(targetRoot) !== root,
+  jobs = 1,
 } = {}) {
+  if (!Number.isInteger(jobs) || jobs < 1 || jobs > 4) throw new Error('--jobs must be an integer from 1 to 4')
   const resolvedRoot = path.resolve(targetRoot)
   const targetDist = path.join(resolvedRoot, 'dist')
   const lockFile = path.join(resolvedRoot, '.fable-build/build.lock')
@@ -362,7 +364,7 @@ export async function runBuild({
   try {
     // 使用源码依赖的当前产物；不能让旧 node_modules tarball 替新 submodule 报绿。
     if (!skipSourceDependency) {
-      buildSourceDependency(resolvedRoot)
+      buildSourceDependency(resolvedRoot, { jobs })
     }
     // A previously interrupted full rebuild may have left a staged backup
     // behind; settle it before reading any build state.
@@ -618,12 +620,40 @@ export async function planBuild({
 
 // ── Main Entrypoint ──────────────────────────────────────────────────────────
 
+export function parseParallelOptions(supplied) {
+  const args = []
+  let jobs = 1
+  let parallel = false
+  for (let index = 0; index < supplied.length; index++) {
+    const arg = supplied[index]
+    if (arg === '--parallel' || arg === '--jobs' || arg.startsWith('--jobs=')) {
+      if (parallel) throw new Error('Specify --parallel or --jobs only once')
+      parallel = true
+      const value = arg === '--parallel' ? '2' : arg === '--jobs' ? supplied[++index] : arg.slice(7)
+      if (!/^[1-4]$/.test(value ?? '')) throw new Error('--jobs must be an integer from 1 to 4')
+      jobs = Number(value)
+    } else args.push(arg)
+  }
+  if (parallel && args.some(arg => ['--plan', '--checker-status', '--checker-stop'].includes(arg))) {
+    throw new Error('Parallel compilation cannot be combined with plan, status or stop')
+  }
+  return { args, jobs }
+}
+
 async function main() {
+  let options
+  try {
+    options = parseParallelOptions(process.argv.slice(2))
+  } catch (error) {
+    fail(error.message)
+    return
+  }
+  const { args, jobs } = options
 
   // Full compilation is forbidden. A flag that wipes dist and compiles every
   // source is rejected with the other unknown flags; fix the impact set.
   const knownOptions = new Set(['--plan', '--help', '-h', '--checker-status', '--checker-stop'])
-  const unknown = process.argv.slice(2).filter((arg) => arg.startsWith('-') && !knownOptions.has(arg))
+  const unknown = args.filter((arg) => arg.startsWith('-') && !knownOptions.has(arg))
   if (unknown.length > 0) {
     console.error(`unknown option(s): ${unknown.join(', ')}`)
     console.error('full compilation is forbidden. Fix the impact set; do not rebuild the tree.')
@@ -635,6 +665,8 @@ async function main() {
 Usage: node scripts/build.mjs [options]
 
 Options:
+  --parallel   Compile independent wanxiangli modules in 2 processes
+  --jobs N     Use 1–4 library compiler processes (default 1); extra processes exit after the build
   --checker-status  Show the resident compiler process
   --checker-stop    Stop the resident compiler after pending work
   --plan       Compute and print the next build plan as JSON; no compile,
@@ -669,7 +701,7 @@ Options:
   }
 
   try {
-    await runBuild({ targetRoot: root })
+    await runBuild({ targetRoot: root, jobs })
   } catch (err) {
     fail(err.message)
   }
