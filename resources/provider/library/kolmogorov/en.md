@@ -62,7 +62,7 @@ Concurrency is safest when independent work has independent ownership, and share
 
 Do not serialize everything just to avoid thinking about concurrency; do not parallelize work whose correctness depends on a hidden order.
 
-Where order matters, represent the true cause: an explicit dependency, a compare-and-swap witness, a barrier, an ownership transfer, or another clear contract. Accidental scheduling order is not causality.
+Where order matters, represent the true cause: an explicit dependency, an atomic compare-and-swap that advances the state only if the version matches, a barrier, an ownership transfer, or another clear contract. Accidental scheduling order is not causality.
 
 Design recovery and reconciliation so independent streams converge according to facts, rather than whichever callback happened to finish first.
 
@@ -82,7 +82,7 @@ Trace through ownership and data flow until changing the proposed cause fully ex
 
 Prefer a fix that restores the broken invariant over one that merely suppresses visible symptoms.
 
-When a fix alters a protocol boundary, add a permanent automated regression test right at the boundary that failed. Never treat a one-off manual run as proof that the issue is closed.
+When a fix alters a protocol boundary, add a permanent automated regression test right at the boundary that failed. A one-off manual run tells you about that run only; it does not close the issue.
 
 ## Preserve durable knowledge without creating a second truth
 
@@ -102,13 +102,13 @@ Renaming is not cosmetic when an old name misleads readers. Conversely, a new na
 
 ## Use tests to protect behavior and boundaries
 
-Write deterministic tests around invariants that must hold true. Use integration tests where adapter and framework behavior are part of the contract. Rely on end-to-end tests only for the few causal paths that require a real environment to prove.
+Write deterministic tests around invariants that must hold true. Use integration tests where adapter and framework behavior are part of the contract. Rely on end-to-end tests only for the few causal paths that only a real environment can show.
 
 A failing test is valuable because it reliably catches the missing behavior. A passing test is valuable only to the extent that it would have caught the regression it claims to prevent.
 
 Do not weaken assertions just to make a suite pass. Do not inflate timeouts to hide broken causal waits. Do not rerun flaky tests repeatedly until chance imitates correctness.
 
-Verification should be a steady ladder: pure invariants first, then deterministic temporal workflow on a borrowed clock, then the contract of a single physical adapter, and finally exactly one Long Stroke — the sole real-host path that settles every remaining uncertainty.
+Choose checks by what this change actually needs, cheapest first: pure invariants, then deterministic timing on a controlled clock, then the contract of a single physical adapter, and a real-host end-to-end run when only the real environment can answer the question. Each check covers its own scope and none of them certifies the rest, so do not climb a full staircase when one step answers the question.
 
 ## Keep scope disciplined
 

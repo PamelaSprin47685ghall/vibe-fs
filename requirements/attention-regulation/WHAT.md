@@ -1,28 +1,27 @@
 # attention-regulation — WHAT
 
-本包现为退休边界：`enough`、`abandon` 与 `defer` 工具及其 `Attention` 持久投影均已退役，职责由 `assume` 与 `resetScope` 协议承接。保留这些条款，是为了锚定替代路径并防止已退役的注意力状态机回流生产路径。
+注意力调节只有两个入口：`assume` 工具与活跃 scope 文本。本包条款规定这两个入口各管什么，以及注意力状态不得回流为独立工具或持久状态机。
 
-## [001] enough 语义并入 assume
+## [001] 信息足够判断由 assume 表达
 
-`enough` 工具已退休。声明「当前信息已足以支持下一步行动；除非出现此前未消费且足以改变决策路径的新事实，否则不再重开同一判断」的语义，改由 `assume(assumption)` 表达。它不证明决策正确，不创造权威事实或持久认知状态；无新事实的重复调用不增加语义。禁止以兼容、别名或历史名义重新注册 `enough` 或任何同名工具。
+声明「当前信息已足以支持下一步行动；除非出现此前未消费且足以改变决策路径的新事实，否则不再重开同一判断」的语义由 `assume(assumption)` 承担。它不证明决策正确，不创造权威事实或持久认知状态；无新事实的重复调用不增加语义。工具目录里不存在 `enough` 这个名字，也不以兼容、别名或同义名注册同类工具。
 
-## [002] abandon 语义并入 assume
+## [002] 放下自建承诺由 assume 表达
 
-`abandon` 工具已退休。放弃自行形成的计划、推论或假设（无须审批或理由检验，使其不再自动占用注意力）的语义，改由 `assume(assumption)` 表达。放弃自我承诺不得取消真实任务义务、撤销用户授权、删除工作产物或终止会话。禁止以兼容、别名或历史名义重新注册 `abandon` 或任何同名工具。
+放弃自行形成的计划、推论或假设（无须审批或理由检验，使其不再自动占用注意力）的语义由 `assume(assumption)` 承担。放下自我承诺不取消真实任务义务、不撤销用户授权、不删除工作产物、不终止会话。工具目录里不存在 `abandon` 这个名字，也不以兼容、别名或同义名注册同类工具。
 
-## [003] defer 退役，旁支记录并入编程面与 resetScope 经验传承
+## [003] 旁支工作由编程面与 scope 文本承载，跨 scope 备忘经 resetScope 逐字抄写
 
-`defer(new_work)` 工具已彻底退役，不在 `StaticTools.knownToolNames`、`permissionFor`、`requestToolMap`、`ToolRegistry` 或 `resources/ablation/tool-map.json` 中登记或放行。非阻塞旁支工作改由编程面（`todowrite-for-<role>`）程序编排、活跃 scope 内部记录，以及 `assume(assumption)` 承载；跨 scope 的关键备忘在 `resetScope` 时逐字原样抄写进 `oldScopeVerboseVerbatimExperience`（见 context-compression [033]）。Pair Hint（`resources/provider/host/pair-programming-guideline/**`）不再注入 `defer` 鼓励句；`resources/provider/attention-regulation/**` 资源文件全部删除。
+非阻塞旁支工作由编程面（`todowrite-for-<role>`）程序编排、活跃 scope 内部文本与 `assume(assumption)` 承载；工具目录（`StaticTools.knownToolNames`、`permissionFor`、`requestToolMap`、`ToolRegistry`、`resources/ablation/tool-map.json`）中不存在 `defer` 工具。跨 scope 的关键备忘在 `resetScope` 时逐字原样抄写进 `oldScopeVerboseVerbatimExperience`（见 context-compression-033）。Pair Hint（`resources/provider/host/pair-programming-guideline/**`）不注入鼓励旁支记录的句子。
 
 ## [004] 不存在 Interaction/Attention 运行时或工具模块
 
-生产编译图不得包含 `Interaction/Attention`、`OpenCode/Tools/AttentionTools`、`OpenCode/Tools/AttentionToolSurface` 或 `Composition/Durable/AttentionConcernJournalAdapter`，也不得保留 `Wanxiangshu.Owner.attention-regulation.*` 编译分片。
+生产编译图不包含 `Interaction/Attention`、`OpenCode/Tools/AttentionTools`、`OpenCode/Tools/AttentionToolSurface` 或 `Composition/Durable/AttentionConcernJournalAdapter` 模块，也不含 `Wanxiangshu.Owner.attention-regulation.*` 编译分片。注意力表达不拥有独立运行时。
 
-## [005] 终点与退休流程不再执行 DeferredWork 消费注入
+## [005] 自然终点不注入旁支待办呈现
 
-`OrdinaryTurnWorkflow` 在 Engineer、DevOps 或 Orchestrator 自然终止时不再读取或发送 `presentPendingDeferredWork` continuation；Manager `DeliverTool` 不再从 `AgentProjection` 读取 `pendingAttentionWorkPairs` 待办列表。`PromptContinuationKind` 不再包含 `DeferredWorkPresentation`：它已无生产者，保留只会是一个无人发出的准入标签。
+`OrdinaryTurnWorkflow` 在 Engineer、DevOps 或 Orchestrator 自然终止时不读取、不发送任何旁支待办续行；Manager 的 `Deliver` 不从 `AgentProjection` 读取旁支待办列表。`PromptContinuationKind` 的取值集合为 InteractionRepair、JoinGuard、ManagerGuard、BusyAgentNudge、HumanMessage、ManagedDelegationAssignment、ProviderRetryAttempt、FissionHandoff，不含旁支待办呈现。
 
 ## [006] durable fact 与 projection 不含 Attention
 
-`AgentFact`、`AgentProjectionSet`、`ProjectionUpdate`、`Fold`、`AgentJournalPortAdapter` 与 `resources/ablation/fact-map.json` 均不得包含 `Attention`、`DeferredWorkRecorded`、`DeferredWorkConsumed` 或同义持久状态。
-
+`AgentFact`、`AgentProjectionSet`、`ProjectionUpdate`、`Fold`、`AgentJournalPortAdapter` 与 `resources/ablation/fact-map.json` 不含 `Attention`、`DeferredWorkRecorded`、`DeferredWorkConsumed` 或同义持久状态。注意力不是持久事实，只活在当前 scope 文本与 `assume` 声明里。

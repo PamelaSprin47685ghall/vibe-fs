@@ -13,7 +13,7 @@
     { "id": "host", "legacy_owners": ["host-boundary"] },
     { "id": "interaction", "legacy_owners": ["action-affordance", "attention-regulation", "capability-enforcement", "concern-routing"] },
     { "id": "knowledge", "legacy_owners": ["knowledge-reuse"] },
-    { "id": "output", "legacy_owners": ["output-distillation"] },
+    { "id": "output", "legacy_owners": [] },
     { "id": "participant", "legacy_owners": ["office-capability", "participant-identity"] },
     { "id": "planning", "legacy_owners": ["planning"] },
     { "id": "persistence", "legacy_owners": ["durable-convergence", "durable-events"] },
@@ -25,7 +25,7 @@
     { "id": "resources", "legacy_owners": ["cognitive-environment", "distribution"] },
     { "id": "runtime-platform", "legacy_owners": [] },
     { "id": "session-lifecycle", "legacy_owners": ["causal-wait", "managed-session-lifecycle", "session-ontology", "time-capability"] },
-    { "id": "sphinx", "legacy_owners": ["epistemic-reasoning", "external-investigation"] },
+    { "id": "sphinx", "legacy_owners": ["epistemic-reasoning"] },
     { "id": "verification", "legacy_owners": ["verification-system"] },
     { "id": "work", "legacy_owners": ["obligation-ledger", "work"] }
   ]

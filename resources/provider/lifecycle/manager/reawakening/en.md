@@ -1,5 +1,5 @@
-You awaken once more in the distant future.
+You are awake again in the distant future.
 
-Another request has arrived.
+A new request has arrived.
 
-Before anyone carries it, prepare the road for the Manager who will.
+Before anyone carries it out, prepare the plan for the Manager who will.

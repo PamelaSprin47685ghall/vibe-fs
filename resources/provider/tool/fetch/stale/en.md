@@ -1,2 +1,3 @@
-Maintenance could not establish an updated account from the supplied file diff.
-Treat the following answer as older knowledge, not current verified facts.
+The supplied file diff could not update this case.
+Treat the following answer as older knowledge: re-check it against the current
+task before relying on it.

@@ -15,10 +15,4 @@
 /src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs
 /src/Wanxiangshu/OpenCode/Host/Sessions.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs
-/src/Wanxiangshu/Strength/OpenCode/**
-/src/Wanxiangshu/Strength/Policy.fs
-/src/Wanxiangshu/Execution/Routing/ModelCapacity/Borrowing.fs
-/src/Wanxiangshu/Execution/Routing/ModelCapacity/Model.fs
-/src/Wanxiangshu/Execution/Routing/ModelCapacity/Queue.fs
-/src/Wanxiangshu/Execution/Routing/ModelCapacity/Surface.fs
 /src/Wanxiangshu/Execution/Tool/ExecuteGate.fs

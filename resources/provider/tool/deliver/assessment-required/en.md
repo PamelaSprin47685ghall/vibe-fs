@@ -1,1 +1,1 @@
-Cannot finish without a review. Call the review tool first: clarify the target state, state the current gap, and submit the findings pairs.
+Cannot finish without a review. Review the work first: state the target, the current gap, and the findings pairs. A review reports what remains unfinished or uncertain; user acceptance belongs to the user, not to this call.

@@ -1,32 +1,38 @@
-# repository-programming 测试范围
+# repository-programming 测试说明
 
-本包验证能力生成、真实沙箱、文件快照、编辑及事务。保留既有真实正反例；WHAT 规定必要规则，这里只说明用例覆盖和局限。
+本目录测试套件验证 JS 编程面的行为：能力生成、沙箱隔离、文件快照与修改、生命周期与持久化。这里说明用例的覆盖点与已知边界，供编写和维护测试的人使用。
 
-- 001—005、021—022 的生成器与源码门禁是局部证据，不等于实际 Attempt、Provider 可见面和运行门禁全部一致。003 不再用两次相同调用冒充 fast/deep 切换；特定例句不作为角色行为的证明。005/016 中 `BuiltinToolDescriptionHook`（`builtinTools`/`annotate`/`validateRecommendation`）已随直连宿主文件工具退役。
-- 006 真实执行程序，检查可见全局、同步超时、过期后 API 拒绝和输出预算。多字节结果按现有接口的 UTF-8 字节预算验证，包含恰好等于上限和超出一字节的对照。异步等待、await 后计算及内存隔离尚缺受控进程证据，不能从同步循环超时外推。
-- 007 的快照不变用例实际提交后核对 `cat` 取得的旧快照和 `write` 后的新磁盘。007/010 中 `FileToolsSurface` 的直连工具旧回归已随 `FileTools` 退役移除，由编程面 `cat`/`where`/`write` 承担契约。
-- 008—016、018—020、023—024 在直连文件工具（`read`/`write`/`edit`/`glob`/`grep`/`patch` 与插件 `mv`/`rm` `ToolSpec`）及旧 `file`/`edit`/`rewrite` 成员退役后，对齐到 `cat` + `where`/`whereAll` + `slice` + `write` 组合、Write-only 表面边界、`where` 歧义/未命中 park 载荷、`write` as-is 落盘语义（011/019 验证非法返回后 as-is 已落盘改动保留）以及编程面 `mv`/`rm` 的 POSIX 语义（020）。
-- 017 证明连续事务读取前一次提交；同一助理消息的实际并行调用由宿主按序执行仍是 TODO。描述里写着安全不算执行证据。
-- 025 的真实 EventStore 追加、fold 和同进程日志重开继续保留，名称改为实际场景；没有注入不确定追加或杀进程。删去辅助模型构造 incident 自证和源码词形代替 mandatory 注入的断言，真实结算先于唯一熔断留 TODO。
-- 026 验证 `runObserved` 与 `AccessTracker` 对显式读取（`cat`）、目录枚举/元数据扫描（`ls`/`stat`）、失败中断与提交后修改（`write`/`mv`）的实质访问分离：内部写前快照不进入显式读取，失败程序不触发已提交访问观察。
-- 027 证明 Engineer 与 DevOps 相同能力生成相同成员；直连文件工具已退役，两者统一经生成的编程工具访问文件系统。
-- 028—029 以 dist 产物真实运行：programPromise 句柄与 deadline 的过期、重置与催断，逐笔落盘的成功、失败与 FILE_CHANGED 预检结果面。异步等待与内存隔离的受控证据仍沿 006 的 TODO。
-- 030—037、039 真实运行 park/unpark/abandon 全周期：parked 载荷与渲染、handle 恰好消费一次、abandon 的 finalizer 与清理窗口、并发上限与释放、进程内存活；031 与 039 另含源码静态断言，核对三件套接线与现场表归属。会话 close 的 reap 仍是接线证据，未以真实会话关闭运行。
-- 040 真实运行 rm/mv 的 POSIX 语义、越界拒绝、durable 单笔记账与稳定失败码目录；EXDEV 只查目录登记，不造真实跨设备场景。
-- 041 是生产接线的源码静态断言：lifecycle persistence 沿 PluginHostInterop → ToolRegistry.create → JsToolSpec/execute 与 PluginBoot → PluginRuntimeScope → ClearSession 贯通，执行链不留硬编码 None，四类事件同住单一审计流，ParkedSites 表不触碰 durable。它证明接线存在，不证明运行期审计真实落盘。
-- 045—047 真实运行主原语面：cat/ls/stat/mkdir 的成功与稳定失败形态、write 覆盖与读快照冲突、whereAll 规范化匹配与 from、where 唯一/零/多三态与 park 注入、组合模式（find/replace、批量替换、append、锚点切片、grep/glob 组合）。长程异步与内存隔离仍沿 006 的 TODO，不在本批外推。
-- 048 真实运行 parked source：完整程序回传、挂起行 `>| ` 标记、where 调用点标记与渲染字面块；栈解析失败的降级路径未单独造桩。执行点换算同属本条款：经 `eval` 求值字符串的 park 落在程序自身的 `await eval(...)` 调用行，不落到被求值字符串自己的行号上（该行号与程序行号数值可相同，按数值范围判定会误标）；parked handle 以显式 abandon 收尾。
-- 050 真实运行 js.call 单进程循环：规格拒绝、前台命令与结构化结局、onExit 退出码派发、check abort 杀死命令、check park 挂起与 unpark 继续、maxDuration 超时。
-- 051 真实运行多进程代数：spawn 后台、waitFor 端口就绪、signal 收割、waitFor 超时与未知后台稳定码、后台崩溃经 backgrounds 观察并 abort。
-- 052 以本地限速 Range 服务器真实驱动 `wget -c`：中断后断点续传、部分文件保留、逐文件 park 汇报、404 退出码 8 分派给 onExit。wget 缺失或网络不可达的环境不适用。
-- 049 从真实注册的 Host 工具逐角色验证参数列表恰好为 `program`、非 optional、JSON Schema `required = ["program"]`；描述最前面交代唯一必填参数与完整 JsProgram 类模板。
-- 054 （原 deliver 成员测试已随条款废除；子智能体改为自然停机）。
-- 055 真实运行 vm 并行边界：Promise.all 并行读写、allSettled 兄弟失败不撤销已落盘写、十六路 cat 批处理。
-- 056 委托原语端到端：fork/join/fission 返回数据信封（缺名派生、拒绝信封不抛、无宿主 DELEGATION_UNAVAILABLE）、`dag` 波次推进与依赖记录传递、节点失败 park 后注入 `"skip"` 收尾。056 另见证作废分支：一个已作废的子工作在 join 记录里以 `status = "voided"` 出现（`returned` 为空数组，既非 `completed` 也非 `undelivered`），并让 `dag` 以 `code = "node-voided"` 挂起——作废结清了这份义务，父方据此自行决定重试、跳过或替换。
-- 057 真实运行 ls 的 ignore 语义（逐级 `.gitignore`、否定模式、嵌套规则、根 `.git/info/exclude`）与 glob/grep 退役后的组合写法（walk + `cat` + `whereAll`）。
-- 059 （原 this.deliver 材料记录与去重测试已随条款废除）。
-- 063 （原顶层视图声明捕获测试已随协议废除）。
-- 064 真实运行公开 Host 单入参合同：仅 `program` 必填、无需模型提供 `name`；缺少 `program` 时无副作用，旧顶层 `unpark`/`abandon` 参数无法替代程序、不能消费挂起现场。底层 workflow 的私有恢复与持久化审计仍由 030—041 等用例独立覆盖。
+## 用例覆盖导引
 
-2026-10-18 交付验证：`node scripts/build.mjs` 构建成功（169 surfaces、813 模块链接闭合），本包 001-059 全套 278 例 0 败 0 跳 7 todo（045-058 以本次 dist 产物真实运行：九原语、where 三态与组合模式、parked source、unpark 自由值 schema、js.call 单进程/多进程循环、wget 断点续传剧本、view 声明捕获、deliver 显式终值、vm 并行边界、委托原语信封与 dag park、ls 的 ignore 语义与 walk/search 组合、file/edit/rewrite 退役后的组合替代，以及 js.call 的交互 send 形态）。直连文件工具已整体退役（GAP-235）：005/007/010/016 的旧实现回归删除，020 改走 js `mv`/`rm` 成员，026 改走 `runObserved`。全量 unit 套件同版本 **865 文件 5113 例 0 败**（GAP-231 ~ GAP-237 CLOSED）。006 异步/内存隔离、017 同消息并行调用、027 直接与程序工具共享保护相关 TODO 随退役收窄；未闭合范围见 GAP-088。
+- **001—005、021—022**：生成器输出与调用准入。核对各角色生成的工具名、Schema、基类与示例与实际授权能力一致；非当前 Attempt 或跨角色的工具名被拒绝；描述不泄露宿主内部键。
+- **006**：执行进程隔离与计算预算。核对在独立 `node:vm` context 中执行，全局只有获授权成员；同步循环受 VM 超时保护，输出超出 UTF-8 字节上限报 `RESULT_TOO_LARGE`；constructor 逃逸被拒绝。
+- **007**：不可变快照。`cat` 读取的内容后续不随 `write` 改变，非法 UTF-8 报 `INVALID_UTF8`。
+- **008—016、018—020、023—024**：主文件原语与事务行为。核对 `cat` + `where`/`whereAll` + `slice` + `write` 的组合写法；Write-only 表面不暴露 `cat`；`where` 歧义/未命中产生包含 candidates/nearest 的 parked 载荷；`write` as-is 落盘（非法返回值后已落盘改动仍保留）；`mv`/`rm` 的 POSIX 语义与稳定失败码。
+- **017**：同会话并发调用的确定性串行化与读快照隔离，后提交的事务能读到先提交的效果。
+- **025**：坏输入与致命错误时的语义熔断。验证先完成 durable cut-tail 结算再触发熔断，保留已落盘的改动。
+- **026**：实质访问分离。`runObserved` 与 `AccessTracker` 只把显式 `cat` 与已提交的修改/创建/删除/移动记入案例关联，写前快照与 `ls`/`stat` 内部扫描不进入关联。
+- **027**：Engineer 与 DevOps 相同能力生成相同成员，统一通过生成的编程工具访问文件系统；Manager 仅通过 `reviewOnly` 访问仓库只读原语。
+- **028—029**：程序执行句柄与逐笔落盘。运行期 deadline 计量与超时拒绝；单笔写入即时落盘与写前 `FILE_CHANGED` 校验。
+- **030—037、039**：park / unpark / abandon 全周期。parked 载荷结构与 TOML 渲染；同一名字不能被活动程序重复占用（`NAME_TAKEN`）；终态后名字可复用；`abandon` 触发 finally 并结清资源；放弃期间禁止再次 park（`CANNOT_PARK_WHILE_ABANDONING`）；名字按会话隔离且无数量上限；两包边界（`wanxiangli/program` 拥有状态，主仓通过 Programs.fs 组装）。
+- **040**：rm/mv 的 POSIX 语义、越界解析与 durable 单笔记账。
+- **041**：生产接线。`IJsLifecyclePersistence` 沿 PluginHostInterop → ToolRegistry.create → JsToolSpec 与 PluginBoot → PluginRuntimeScope → PluginSessionScope 贯通，四类事件写入同一审计流。
+- **042**：rm/mv 落盘后程序失败的清单形态。失败结果的 `[fs]` 包含实际已落盘的 removed/moved 条目。
+- **043—044**：双语资源成对一致性（zh-CN.md 与 en.md 占位符相同）；稳定失败码与包含路径的 reason 对应。
+- **045—047**：文件原语行为与组合模式。cat/ls/stat/mkdir 的成功与稳定失败形态；where 字面 IndexOf 规范化；whereAll 起始偏移与全文匹配；原语组合食谱。
+- **048**：挂起源码标记。完整程序回传，当前挂起行以 `>| ` 标记，其余行以 ` | ` 呈现；`eval` 求值内的 park 标记在程序自身的 `await eval` 行。
+- **049、064**：公开工具入口签名。工具接受 name、program、intent 与 remainingScopeTurnsEstimate；缺项或类型不合在启动前拒绝；无顶层 unpark/abandon 参数。
+- **050—051**：命令执行与控制。`call(command)` 的排空屏障与独占执行；`signal(name, signal)` 与 `send(name, input)` 从控制程序向目标活动命令派发；单参形式报 `INVALID_ARGUMENT`；目标无命令报 `CALL_CHILD_UNKNOWN`。
+- **052**：准入期限与执行预算。按 intent 的 UTF-8 字节数计算期限；SDK 排空与命令等待不停表但暂停扣减执行预算。
+- **055**：SDK 并行与 call 屏障。同一程序内 `Promise.all` 运行多个 SDK 操作各自结算；进入 `call` 时先排空既有操作，同一程序不支持两条命令并发。
+- **056**：委托原语数据信封。fork/resume/commission/devops/fission/horizon 返回数据信封；未安装宿主返回 `DELEGATION_UNAVAILABLE`；`join()` 宿主工具收拢子智能体终态（含 voided 分支）；顾问（advisor）不作为编程面成员。
+- **057**：`ls` 的 gitignore 语义（逐级 `.gitignore`、否定规则、`.git/info/exclude`）与递归组合。
+- **058**：按名字控制命令与无隐式目标。单参控制被拒绝，目标缺失明确报错。
+- **060**：机器词汇与流名持久性。`js-tools/transactions` 与 `js-tools/lifecycle-audit` 流名稳定；结算失败不影响已落盘事实。
+- **065**：并行派发。同一会话的不同命名程序可并发执行，等待中的程序不阻塞其他程序或独立 join。
 
+## 运行方式与注意事项
+
+- 测试使用 `node --test` 驱动，位于各用例文件中（`001.test.mjs` 等）。
+- 依赖构建产物：部分用例通过 `dist/` 引入（`WorkflowSurface.js`、`RuntimeSurface.js` 等），运行前须确保构建产物为最新。
+- 测试辅助支持：`support/named-program.fixture.mjs` 提供带会话清理的命名程序夹具；`support/command-program.fixture.mjs` 提供命令执行相关夹具。
+- 局限：部分测试依赖本地 `rg` 命令与系统 POSIX 工具；跨设备移动（EXDEV）只验证目录登记与原子语义，未在物理不同挂载点运行。

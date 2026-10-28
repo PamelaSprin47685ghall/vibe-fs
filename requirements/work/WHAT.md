@@ -23,7 +23,7 @@
 review 是唯一的生命周期入口。updates 是 `{ key, value | null }` 数组：已有键覆盖、缺失键新增、value 为 null 删除该键。空数组不删除已有键。
 
 - 允许后果：初任空账只写 QuestionRequested，问句是「我需要干什么？」，不写 Reviewed，不推进里程碑。真实答复后仍是同一任。第一次非空账写 Reviewed 并进入工作期。其后账被清空才在同一笔写下旧任退休、Context Barrier、后任打开与继任提示。接任第一次空账只推进里程碑，不新建任期，不建屏障，并在该次 review 记下下一里程碑提示。待执行上的空 review 预留一次 Manager 启动，不消耗待执行。收尾空账且无真实资源阻塞则结案。已完成后只有新的真实操作员消息重开执行任期恰好一次。
-- 禁止后果：不得用 Promoted 或 Stayed 锁定晋级资格。晋级只能由本次 review 的已证事实直接推进。不得把空数组当成清空已有义务。Advisor steer 与其他代理答复不得重开已完成的工作。
+- 禁止后果：不得用 Promoted 或 Stayed 锁定晋级资格。晋级只能由本次 review 的实际账面直接推进。不得把空数组当成清空已有义务。Advisor steer 与其他代理答复不得重开已完成的工作。
 - 失败后果：已完成的工作再收到 review 时拒绝，零写。updates 含空 key 时拒绝。效果尚未确认时，另一笔 review 拒绝。
 
 ## [004] 询问尚未答复时的动作
@@ -86,7 +86,7 @@ review 是唯一的生命周期入口。updates 是 `{ key, value | null }` 数�
 
 接力提交成功后，才按持久 prompt 身份发送继任提示恰好一次。结案提交成功后，才请求停止当前 Provider attempt 恰好一次。崩溃发生在提交之后、效果确认之前时，重启用同一持久身份补齐一次。
 
-- 允许后果：继任提示不中止会话。停止只作用于当前 attempt，不删除会话。未知结果只观察或续办原请求。停止请求与观察到停止成功分别取证。
+- 允许后果：继任提示不中止会话。停止只作用于当前 attempt，不删除会话。未知结果只观察或续办原请求。停止请求与观察到停止成功分别落盘，是两条事实。
 - 禁止后果：不得在 Committed 之前发送或停止。不得把 Replayed、Conflict 或 Unknown 再执行一次外部动作。不得删改已存储的原文；后任看不见的部分由 [008] 的屏障裁切。
 - 失败后果：效果确认不明时保持未知。已提交的接力或结案不回滚，也不因此再开一任。
 
@@ -118,7 +118,7 @@ review 是唯一的生命周期入口。updates 是 `{ key, value | null }` 数�
 
 持久提交结果只按 wanxiangli journal 的 Committed、Replayed、Conflict、NotWritten、Unknown 解释；Observed 是 Work 的无新事实观察，不是假 durable append。接力的退休、屏障、后任与提示必须位于同一个规范 record，恢复不接受半对。
 
-- 允许后果：Committed 才证明本次新 record 已落地；Replayed 证明同 requestId 的同一 record 已存在；NotWritten 证明本次没有提交；Unknown 保持未知并要求重开 journal/组合后核对。Relayed 恢复到后任，并补齐尚未确认的继任提示。Advanced 恢复到同一任期的下一里程碑。Completed 恢复到已完成，并补齐尚未确认的停止。Launched 恢复到同一预留，不另开 Manager。
+- 允许后果：Committed 表示本次新 record 已落地；Replayed 表示同 requestId 的同一 record 已存在；NotWritten 表示本次没有提交；Unknown 保持未知并要求重开 journal/组合后核对。Relayed 恢复到后任，并补齐尚未确认的继任提示。Advanced 恢复到同一任期的下一里程碑。Completed 恢复到已完成，并补齐尚未确认的停止。Launched 恢复到同一预留，不另开 Manager。
 - 禁止后果：不得继续把旧 AppendNotAttempted/CommitUnknown 名称当现行结果。不得把只有 IncumbencyRetired(Relayed) 的篡改 record 修补为合法后任，不得靠裁掉坏字节、补换行或猜身份恢复。完整 record 本身不依赖 NDJSON 结尾换行。
 - 失败后果：规范 JSON、字段、摘要、事件对或状态跃迁任一损坏时整条 work 历史拒绝；保留原始存储证据，不跳过坏 record。
 
@@ -155,12 +155,12 @@ review 是唯一的生命周期入口。updates 是 `{ key, value | null }` 数�
 - `join` 与 `horizon` 按已确立角色和当前进程子任务归属执行，不要求 Work 活跃任期或 Review 接纳；清理 blocker 与退任冻结不能阻断既有子任务的观察、等待与收取。它们不因此开立 Work，也不取得新派工权限；角色、用户等待、消融与恢复边界不变。
 - 失败后果：上述拒绝发生在工具执行入口，不创建子会话。未知名字的生命周期权限查询结果为 null。
 
-## [020] 目标状态形式化与三样输入
+## [020] 任期输入的装配
 
 当 Plan 模式会话被初始化或任期推进时，系统为该任期装配输入。
 
-- 允许后果：跑者接收本规划任务范围内、且按 [008] 仍属于当前任期的真实用户输入原文（`U`）、当前活跃 scope 的可见交互，以及通过编程面读写的 Markdown 底稿。系统不生成合成工作记录。
-- 禁止后果：模型不得直接读写或篡改 `U`。系统不得向消息集注入合成前任记录。不得无条件保留屏障前的用户消息。底稿不得作为文本直接注入模型输入消息集。模型不得取得任何超出底稿之外的仓库或工作区写权限。
+- 允许后果：跑者接收本规划任务范围内、且按 [008] 仍属于当前任期的真实用户输入原文、当前活跃 scope 的可见交互，以及通过编程面读写的 Markdown 底稿。系统不生成合成工作记录。
+- 禁止后果：模型不得直接读写或篡改已存储的用户输入原文。系统不得向消息集注入合成前任记录。不得无条件保留屏障前的用户消息。底稿不得作为文本直接注入模型输入消息集。模型不得取得任何超出底稿之外的仓库或工作区写权限。
 - 失败后果：若输入集合遗漏必需事实，系统必须在消息投影阶段拒绝生成请求并终止本次调用。
 
 ## [021] 角色与严格权限投影
@@ -215,11 +215,11 @@ Plan 的里程碑单向前进：事实与取舍、理解与路径、流程与伪
 
 - 允许后果：启动的持久顺序是预留、创建 Session、绑定 Session ID、发送底稿全文、确认真实受理。每次有效调用各预留一次。结案先提交 IncumbencyRetired 与 StopObliged，再请求停止当前 Provider attempt。停止请求与观察到停止成功是两件事实。
 - 禁止后果：创建结果未知时不得发送底稿，也不得另开 Manager。不得把一次启动写成待执行退休。收尾仍有真实资源阻塞时不得结案。`execSessionId` 不得进入 provider 可见面。
-- 失败后果：预留提交失败为零启动。明确 NotStarted 可以追加拒绝事实，待执行保持可再次启动。结果未知则保留原预留。不得用抛异常本身证明外部效果没有发生。
+- 失败后果：预留提交失败为零启动。明确 NotStarted 可以追加拒绝事实，待执行保持可再次启动。结果未知则保留原预留。不得把抛异常本身当作外部效果未发生的依据。
 
 ## [027] 长程任务禁止静默停止
 
-Manager、Orchestrator 与 Plan 的目标义务独立于物理回合：空 stop、合格收尾散文或进度小结均不证明目标完成；Manager 与 Plan 严禁静默停止。作为对等收敛规则，子代理角色（Engineer、DevOps）豁免催促（nudge）并允许自然停机（context-compression [037]），其自然停机只交回末轮 assistant 散文（渲染为 `# ...` 注释）。
+Manager、Orchestrator 与 Plan 的目标义务独立于物理回合：空 stop、合格收尾散文或进度小结都不等于目标完成；Manager 与 Plan 严禁静默停止。作为对等收敛规则，子代理角色（Engineer、DevOps）豁免催促（nudge）并允许自然停机（context-compression-037），其自然停机只交回末轮 assistant 散文（渲染为 `# ...` 注释）。
 
 - 允许后果：对非豁免角色（Manager、Orchestrator、Plan），没有有效交接/完成事实，也没有 [049] 的用户等待时，新的自然停机必须在真实 idle 许可上得到同运行 nudge：提示指出尚未解除的任务义务与下一步；Manager 保留当前评审/工作/收尾提示，并说明 `join` 可以临时等待后台工作；Orchestrator 保留委任与接续职责；Plan 提醒 `devops` 与 `review` 的职责；空账 review 是等待用户的入口。Engineer 与 DevOps 彻底免除 nudge 催促，允许在工作完成后自然停机并交回成果。internal 末梢 Advisor/Bookkeeper 沿专用提交事实收敛，不承担结案义务。
 - 禁止后果：不得先发布 Completed 或关闭逻辑运行，再尝试催促；不得以无后台句柄、有正式文本或缺工作投影当作目标已完成。相同终态重复通知幂等，后续新的偷停仍须提醒，不因之前已经 nudge 过一次而永久静默。无 idle 许可时等待真实闲置，不抢占正在运行的工具。严禁对 Engineer 或 DevOps 发送完成催促 nudge。
@@ -265,14 +265,14 @@ Plan 角色与各阶段使用的指导文档必须在资源目录中中英双语
   - `resources/provider/tool/review/`
   - `resources/provider/tool/deliver/`
   上述目录名是资源路径，不是生命周期阶段。系统提示转换器在 `experimental.chat.system.transform` 挂钩中真正装配 Plan 提示：`catalogPrompt` 对 `Role.Plan` 返回 Plan 的 role law（`PlanSystemPrompt` 进入 PromptCatalog），`activeRoles` 包含 `Plan`，替换逻辑与其它 office 角色同规则（字节识别自己的段落、按当前全局语言本地化）。在 Plan 会话的系统提示中，按当前里程碑以稳定字节幂等追加对应方法说明：事实与取舍、理解与路径、流程与伪代码。里程碑变化时下一次请求呈现新的方法说明。
-- 禁止后果：任何资源缺失单侧语言文件均属于非法状态。`resources/provider/tool/resume/` 与 `resources/provider/tool/handoff/` 不再属于 Plan 工具面，不得保留为可加载的工具资源。系统不得在 Plan 提示缺失时静默降级为无提示或单侧语言。严禁在 system transform 之外用消息注入代替系统提示装配。
+- 禁止后果：任何资源缺失单侧语言文件均属于非法状态。`resources/provider/tool/resume/` 不在 Plan 工具面（Plan 经 `this.devops` 委派，续办文案服务固定 DevOps 线）；`resources/provider/tool/handoff/` 已不存在。系统不得在 Plan 提示缺失时静默降级为无提示或单侧语言。严禁在 system transform 之外用消息注入代替系统提示装配。
 - 失败后果：装载期发现任何双语不对等或缺失，系统必须在 Boot 阶段触发致命失败（fail fast），拒绝启动。
 
 ## [032] 非 Plan 路径行为不变
 
 Plan 的里程碑与任期机制不得污染其他角色；[027] 明确规定的长程连续性与豁免除外。
 
-- 允许后果：Orchestrator 的既有角色合同不变。Engineer 与 DevOps 在工作完成后以有正文的自然终态交回材料（context-compression [037]），但无正文无工具的空终态仍须 nudge；Manager 与 Plan 保持长程连续性，严禁静默停止，并只用宿主生命周期 `review` 驱动里程碑、接力、启动与结案（[003]、[025]、[026]）。internal 末梢 Advisor/Bookkeeper 沿专用提交事实收敛。Manager 的空账询问走 review，`review` 的业务判断不变。
+- 允许后果：Orchestrator 的既有角色合同不变。Engineer 与 DevOps 在工作完成后以有正文的自然终态交回材料（context-compression-037），但无正文无工具的空终态仍须 nudge；Manager 与 Plan 保持长程连续性，严禁静默停止，并只用宿主生命周期 `review` 驱动里程碑、接力、启动与结案（[003]、[025]、[026]）。internal 末梢 Advisor/Bookkeeper 沿专用提交事实收敛。Manager 的空账询问走 review，`review` 的业务判断不变。
 - 禁止后果：非 Plan 角色严禁获取 `todowrite-for-plan` 或 `ask`；宿主注册工具面已无 `devops` 这一名称，DevOps 调查只以编程面成员 `this.devops(intent)` 形态承载，不构成任何角色的宿主工具面。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
 - 失败后果：任何非 Plan 回归测试失败均表明破坏了全局不变量，改动必须判定为不合格。
 
@@ -288,7 +288,7 @@ work lifecycle 的唯一 durable owner 是 wanxiangli：Work 负责规则和规�
 
 ## [034] 任期接力与 resetScope 上下文管理
 
-发往模型的请求按已提交 Context Barrier 裁切，规则同 [008]。resetScope 仍按 context-compression [033] 管理 scope，不改它的状态，也不用它代替屏障。
+发往模型的请求按已提交 Context Barrier 裁切，规则同 [008]。resetScope 仍按 context-compression-033 管理 scope，不改它的状态，也不用它代替屏障。
 
 - 允许后果：OpenCode 的 provider 请求在原消息数组里替换元素。OMP 的 context 钩子在 scope 提醒之前裁切一份视图。库存原文与另一份数组都不被改写。没有屏障时两处都不裁。
 - 禁止后果：严禁无条件保留屏障前的 user、assistant、reasoning、工具调用和工具结果。严禁注入机器物化的合成前任记录。规划底稿的正文严禁直接拼装入消息集。
@@ -339,8 +339,8 @@ Plan 与 Manager 的评审都是同一个 review。updates 按键覆盖、新增
 
 - 允许后果：只有首次 Committed 的 DeliveryRequested 才创建会话一次。顺序是持久预留、创建 Session、持久绑定 Session ID、发送底稿全文、确认真实受理。底稿字节在发送前再核对。受理写成 DeliveryAdmitted，不写成 Plan 退休。
 - 允许后果：底稿即这次 review 的 note。`review` 工具的 `note` 参数与编程面 `this.review(findings, note)` 的第二参是同一份 note，原样成为 Manager 的会话标题与发送的底稿；编程面缺省或空白时读取规范路径上已保存的底稿全文，缺失或为空则在创建会话前拒绝。非字符串 note 在写入前拒绝，不预留、不启动。
-- 禁止后果：Replayed、Observed、Unknown、NotWritten 与 Conflict 不得再次创建。创建结果未知时不得发送底稿。不得摘要或改写底稿。execSessionId 不得进入 provider 可见面。不得用异常本身证明没有启动。
-- 失败后果：确切的创建前拒绝写 DeliveryRejected。无法证明是否承接时保留原预留，恢复只观察该 operation。待执行保持可再次接受另一个有效调用。
+- 禁止后果：Replayed、Observed、Unknown、NotWritten 与 Conflict 不得再次创建。创建结果未知时不得发送底稿。不得摘要或改写底稿。execSessionId 不得进入 provider 可见面。不得把抛异常本身当作未启动的依据。
+- 失败后果：确切的创建前拒绝写 DeliveryRejected。无法确认是否承接时保留原预留，恢复只观察该 operation。待执行保持可再次接受另一个有效调用。
 
 ## [040] 唯一活跃任期
 
@@ -354,7 +354,7 @@ Plan 与 Manager 的评审都是同一个 review。updates 按键覆盖、新增
 
 Work 首次绑定一个逻辑 DevOps 后持久化，之后只可 resume，不可 fork 第二个。初始化、晚到结果、接收未知和崩溃恢复均保持唯一性与幂等。不支持并发 Manager 共享 DevOps。
 
-## [043] 三问与 pairs
+## [043] updates 的形状与空账语义
 
 review 的 updates 是 `{ key, value | null }` 数组。空数组不删除已有键，也不是晋级资格。非空写入 Reviewed。不得使用数值或总评分，不得把空账记成 Promoted 或 Stayed。
 
@@ -370,7 +370,7 @@ provider 上下文由物理历史、用户原文与显式资源构成。后任�
 
 work host 观察 durable 执行结果时原样保留调用方传入的 requestId，replay 沿用原 id，不铸造替代。物理启动只对 committed 的 DeliveryRequested 为真；Committed 的其它 kind、Replayed、Unknown、NotWritten 与 Conflict 一律不得启动。work journal 固定位于 `<主工作树>/.Herdchestra/wanxiangshu/work.sqlite`，不在事件流目录内。
 
-Manager 开立的 root 取 Git 证明的当前工作树根目录，不取插件进入时的任意子目录。同一工作树的多个入口必须指向同一 root；不同 linked worktree 即使共用 git-common-dir，也不能因此冒充同一工作根。无法确认工作树根时拒绝开立，不以路径猜测替代。
+Manager 开立的 root 取 Git 拓扑给出的主工作树根目录，不取插件进入时的任意子目录。同一工作树的多个入口必须指向同一 root；不同 linked worktree 即使共用 git-common-dir，也不能因此冒充同一工作根。无法确认工作树根时拒绝开立，不以路径猜测替代。
 
 ## [047] lifecycle SQLite 宿主边界
 
@@ -402,8 +402,6 @@ DeliveryRequested 首次 Committed 之后，外部效果按持久身份分步确
 - 只有同一逻辑运行的新真实人类输入才追加 `UserQuestionAnswered` 并解除等待。导致 ask 的旧输入、内部提示、插件 continuation、通知和 provider 文本都不算答复。原提问者的终态即使晚于用户答复到达，仍不得关闭或重催新一轮。
 - 用户答复沿既有 HumanMessage 准入继续同一任期，不强制新建会话，也不让用户另行调用恢复工具。若显示、存储或 interrupt 失败，必须明确报告实际完成到哪一步，不伪造“正在等待/已经继续”的事实。
 
-[027]、[049] 的宿主行为由 `tests/027.test.mjs` 与 `tests/049.test.mjs` 以真实插件/日志组合的行为断言承载：工具结果先落地、再 interrupt 的实际顺序、无关与迟到事件不作暂停见证、重复终态幂等、用户回复与旧终态交错时的恢复行为。Long Stroke 级真实宿主验收按 verification-system [014] 归发布验证执行。
-
 ## [050] js.ask：Plan 编程面的提问成员
 
 Plan 的编程面（`todowrite-for-plan`）携带 `js.ask(question)`：程序内调用即登记 durable 问题并通知用户，然后经统一 park 通道挂起，工具返回 parked 载荷；程序不继续执行，直到恢复。这次 park 不写 Reviewed，不推进里程碑，也不锁定晋级资格。等待期间的新调用受既有等待门禁拒绝，只有真实用户输入解锁。真实用户输入解除等待后，提交新名字的控制程序，在工具顶层提供必填 intent，在程序内调用 `unpark(name, value?)` 继续原现场；恢复使用控制请求准入时确定的剩余期限，不重跑原程序，恢复控制者不隐式再次唤醒目标。放弃通过新控制程序的 `abandon(name)`。parked 载荷携带完整程序与执行点 source 标记（与生成面同规）。
@@ -412,12 +410,9 @@ Plan 的编程面（`todowrite-for-plan`）携带 `js.ask(question)`：程序内
 
 初任空账的 review 不得写成 Reviewed，也不得推进里程碑。问句是「我需要干什么？」。连续三次空账、三次真实答复，产生三次询问、零次 Reviewed、零次接力。答复之后仍是同一任期。第一次非空账才进入工作期。问询失败时不得假装 Reviewed，也不得伪造用户答复。
 
-证明：`wanxiangli/src/lifecycle/tests/002.test.mjs` 核对三次询问与同一任期。宿主物理 park 仍按 [049] 取证。
-
 ## [052] Manager 交付之后的正常新循环与末任收尾
 
-收尾空账且真实资源阻塞已解除时结案，不另开验收任期。已完成之后，只有新的真实操作员消息重开执行恰好一次。Advisor steer 与其他代理答复重开零次。旧退休记录不删除，同一消息重放不再造第三任。
+收尾空账且真实资源阻塞已解除时结案，不另开任期。已完成之后，只有新的真实操作员消息重开执行恰好一次。Advisor steer 与其他代理答复重开零次。旧退休记录不删除，同一消息重放不再造第三任。
 
 工作期的 Manager 不因某次空账获得或失去资格。任期仍活跃、且没有真实资源阻塞时，Fork、Resume、Join 与后续 review 保持可用。收尾仍有真实阻塞时不得结案。已完成后再 review 拒绝。
 
-证明：`wanxiangli/src/lifecycle/tests/006.test.mjs` 与 `tests/007.test.mjs` 核对阻塞、结案与一次操作员重开。

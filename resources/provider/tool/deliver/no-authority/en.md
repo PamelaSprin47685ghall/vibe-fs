@@ -1,1 +1,1 @@
-This review requires a verified active Manager or Plan authority.
+This call requires an established Manager or Plan tenure.

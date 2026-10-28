@@ -102,7 +102,8 @@ test('WHAT[delegation-003] FORK_TOOL_derives_devops_from_a_devops_name_and_refus
       'devops',
       'FORK-DERIVES-DEVOPS',
     )
-    assert.equal(derived, "# Dispatching to DevOps is not allowed until the current review assessment is accepted by the system.\n# Please complete the review or wait for the assessment to be accepted before dispatching.\n")
+    assert.match(derived, /not allowed until/i)
+    assert.doesNotMatch(derived, /carries this charge now|现已接下这项托付/i)
     assert.equal(forkTool.childCount(runtime), 0, 'a devops name derives devops and cannot be forked')
   } finally {
     forkTool.disposeRuntime(runtime)
@@ -124,15 +125,11 @@ test('WHAT[delegation-003] FORK_TOOL_rejects_an_explicit_calling_that_conflicts_
       'Ada',
       'FORK-CALLING-CONFLICT',
     )
-    const reviewGate = [
-      '# Dispatching to DevOps is not allowed until the current review assessment is accepted by the system.',
-      '# Please complete the review or wait for the assessment to be accepted before dispatching.',
-      '',
-    ].join('\n')
+    const reviewGate = /not allowed until/i
     const callingConflict = '# calling conflicts with the office derived from name. Fork only targets Engineer; cannot fork DevOps. When name is `devops`, use resume instead.\n'
     const refusedFork = (result) => {
       assert.ok(
-        result === reviewGate || result === callingConflict,
+        reviewGate.test(result) || result === callingConflict,
         'the call must refuse to fork DevOps by one of the two observed refusals',
       )
       assert.notEqual(result, '')

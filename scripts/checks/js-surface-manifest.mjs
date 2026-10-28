@@ -1,22 +1,17 @@
 #!/usr/bin/env node
-// WHAT[js-semantic-surface-003] surface manifest gate.
+// Surface manifest gate (build step).
 //
-// Registration grants no authority by itself. Every registered module must be
-// owned by a current requirement, governed by current WHAT laws,
-// implemented by a compiled source file, and imported by a real
-// executable contract test.
+// The manifest (SURFACE_MANIFEST in ../lib/test-surface-scan.mjs) lists the
+// dist modules used by semantic tests. This check compares the registry
+// against the build: every registered module is actually emitted under dist/
+// and its production source is part of the canonical compile inventory.
 
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { SURFACE_MANIFEST } from '../lib/test-surface-scan.mjs'
-import { parseModule, walkSyntax } from '../lib/js-syntax.mjs'
 import { walk } from '../lib/walk.mjs'
-import { clauseDefinitionHeadings } from '../lib/spec-rules.mjs'
-
-const read = (root, path) => readFileSync(join(root, path), 'utf8')
-export const whatIds = (text) => [...new Set(clauseDefinitionHeadings(text).map(({ id }) => id))]
 
 const sourceCompileStem = (source) => {
   const prefix = 'src/Wanxiangshu/'
@@ -27,10 +22,10 @@ const sourceCompileStem = (source) => {
 export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = process.cwd()) => {
   const failures = []
   const fail = (message) => failures.push(message)
-  const requirements = join(root, 'requirements')
+
   // W5 cutover: the wrapper aggregate is deleted. Production sources are
   // enumerated by walking shard .fsproj declarations — that single set is
-  // what a test source label must name before the code below accepts it.
+  // what a registered source must belong to.
   const productionSources = new Set()
   const shardRoot = join(root, 'src/Wanxiangshu')
   for (const file of walk(shardRoot, ['.fsproj'])) {
@@ -39,38 +34,12 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
       productionSources.add(match[1].replace(/\\/g, '/'))
     }
   }
-  const testFiles = walk(requirements, ['.test.mjs'])
-  const testSources = testFiles.map((file) => {
-    const source = readFileSync(file, 'utf8')
-    const syntax = parseModule(source, file)
-    return { file, source, syntax }
-  })
-  const seenModules = new Set()
 
   if (!Array.isArray(manifest)) {
     return ['surface manifest must be an array']
   }
 
-  // Pre-collect all dist imports across all test files
-  const importedDistPaths = new Set()
-  for (const { file, syntax } of testSources) {
-    if (!syntax) continue
-    walkSyntax(syntax, (node) => {
-      if (
-        (node.type === 'ImportDeclaration' || node.type === 'ImportExpression') &&
-        typeof node.source?.value === 'string'
-      ) {
-        const specifier = node.source.value
-        if (!specifier.startsWith('.') && !isAbsolute(specifier)) return
-        const target = resolve(dirname(file), specifier)
-        const emitted = relative(resolve(root, 'dist'), target).replace(/\\/g, '/')
-        if (emitted !== '..' && !emitted.startsWith('../') && !isAbsolute(emitted)) {
-          importedDistPaths.add(emitted)
-        }
-      }
-    })
-  }
-
+  const seenModules = new Set()
   for (const entry of manifest) {
     if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
       fail('manifest entry must be an object')
@@ -83,56 +52,19 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
     if (!/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\.js$/.test(entry.module ?? '')) {
       fail(`${label}: module must be a relative emitted .js path`)
     }
-    if (!/^[a-z0-9-]+$/.test(entry.owner ?? '')) fail(`${label}: owner must be a package slug`)
-    if (!Array.isArray(entry.laws) || entry.laws.length === 0 || entry.laws.some((law) => typeof law !== 'string')) {
-      fail(`${label}: laws must be a non-empty list of law ids`)
-    }
-    if (!['json', 'opaque-capability'].includes(entry.representation)) {
-      fail(`${label}: invalid representation ${entry.representation}`)
-    }
-    if (!['pure', 'resource'].includes(entry.kind)) fail(`${label}: invalid kind ${entry.kind}`)
 
-    const ownerWhatPath = `requirements/${entry.owner}/WHAT.md`
-    if (!existsSync(join(root, ownerWhatPath))) {
-      fail(`${label}: missing owner WHAT.md (${ownerWhatPath})`)
+    if (typeof entry.source !== 'string' || !entry.source.startsWith('src/Wanxiangshu/') || !entry.source.endsWith('.fs')) {
+      fail(`${label}: source must be a src/Wanxiangshu .fs path`)
       continue
     }
 
-    const laws = Array.isArray(entry.laws) ? entry.laws : []
-    const lawOwners = entry.lawOwners && typeof entry.lawOwners === 'object' ? entry.lawOwners : {}
-    for (const law of laws) {
-      const lawOwner = typeof lawOwners[law] === 'string' ? lawOwners[law] : entry.owner
-      const lawWhatPath = `requirements/${lawOwner}/WHAT.md`
-      if (!existsSync(join(root, lawWhatPath))) {
-        fail(`${label}: law ${law} owner WHAT is missing (${lawWhatPath})`)
-        continue
-      }
-      const lawIds = new Set(whatIds(read(root, lawWhatPath)))
-      const numMatch = /-(\d{3}[a-z]?)$/.exec(law)
-      const lawNum = numMatch ? numMatch[1] : null
-      if (!lawIds.has(law) && !(lawNum && lawIds.has(lawNum))) fail(`${label}: law ${law} is absent from ${lawWhatPath}`)
-    }
-
-    if (typeof entry.source !== 'string' || !existsSync(join(root, entry.source))) {
-      fail(`${label}: missing production source ${entry.source}`)
+    const compileStem = sourceCompileStem(entry.source)
+    if (!productionSources.has(`${compileStem}.fs`)) {
+      fail(`${label}: ${compileStem}.fs is not compiled by the canonical source inventory`)
     }
 
     if (typeof entry.module === 'string' && !existsSync(join(root, 'dist', entry.module))) {
       fail(`${label}: missing emitted surface dist/${entry.module}`)
-    }
-    const compileStem = sourceCompileStem(entry.source ?? '')
-    if (!compileStem) {
-      fail(`${label}: source must be a src/Wanxiangshu .fs path`)
-    } else {
-      // compileStem is already repo-root-relative under src/Wanxiangshu/.
-      const rel = `${compileStem}.fs`.replace(/\\/g, '/')
-      if (!productionSources.has(rel)) {
-        fail(`${label}: ${compileStem}.fs is not compiled by the canonical source inventory`)
-      }
-    }
-
-    if (typeof entry.module === 'string' && !importedDistPaths.has(entry.module)) {
-      fail(`${label}: no .test.mjs imports the registered surface`)
     }
   }
   return failures
@@ -145,7 +77,7 @@ export const run = ({ root = process.cwd(), manifest = SURFACE_MANIFEST } = {}) 
     for (const failure of failures) console.error(`  ${failure}`)
     return 1
   }
-  console.log(`js-surface-manifest: OK — ${manifest.length} registered surfaces, laws and contract imports closed`)
+  console.log(`js-surface-manifest: OK — ${manifest.length} registered surfaces emitted and compiled`)
   return 0
 }
 

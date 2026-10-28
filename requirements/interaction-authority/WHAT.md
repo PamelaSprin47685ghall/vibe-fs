@@ -2,11 +2,11 @@
 
 ## [001] 物理用户消息不等于 authority turn
 
-物理 `role=user` 消息仅是传输层形态。物理消息标识符必须经由唯一的显式提升通道在物理接收已确立（`PhysicalAccepted`）后方可升级为 `AuthorityRoot`。不存在从传输收据直接转换为 AuthorityRoot 的通道。
+物理 `role=user` 消息仅是传输层形态。物理消息标识符必须经由唯一的显式提升通道，在物理接收已确立（`PhysicalAccepted`）后方可升级为 `AuthorityRoot`。不存在从传输收据直接转换为 AuthorityRoot 的通道。
 
-## [002] 形态不是 authority 证据
+## [002] 形态不是 authority 依据
 
-零宽字符、空白排版、固定模板、时间戳、文本长度或合成配置中的注释/字段形态均不能作为 Authority 身份证明。消息的权威性仅能由系统内建的 typed 来源机制判定。
+零宽字符、空白排版、固定模板、时间戳、文本长度或合成配置中的注释/字段形态均不能作为 Authority 身份依据。消息的权威性仅能由系统内建的 typed 来源机制判定。
 
 ## [003] Root 独占权
 
@@ -17,7 +17,7 @@
 4. 重置 Interaction Repair 预算；
 5. 成为后续 execution binding 的延续基准。
 
-`AuthorityRootAccepted { SessionId; LogicalRunId; AuthorityRootId; RootKind; ParticipantIdentityEvidence; initial per-physical target/lease }` 是 root acceptance 与 identity installation 的唯一 durable fact payload，必须以一次原子 append 接受或拒绝。Authority 不得先持久化 identity 再接受 root，也不得依据显式 agent 文本自行推导或拥有 participant、Role、Persona 或 provenance/version；它只校验 evidence 的 exact key/owner witness 并保管 payload。append 成功后的同一 fold 原子建立新 active root、绑定 exact evidence、清空已关闭 prior run 的 claims/continuation 映射/序列号；append 未提交则两者均不存在。
+`AuthorityRootAccepted { SessionId; LogicalRunId; AuthorityRootId; RootKind; ParticipantIdentityEvidence; initial per-physical target/lease }` 是 root acceptance 与 identity installation 的唯一 durable fact payload，必须以一次原子 append 接受或拒绝。Authority 不得先持久化 identity 再接受 root，也不得依据显式 agent 文本自行推导或拥有 participant、Role、Persona 或 provenance/version；它只校验 evidence 的 exact key/owner 并保管 payload。append 成功后的同一 fold 原子建立新 active root、绑定 exact evidence、清空已关闭 prior run 的 claims/continuation 映射/序列号；append 未提交则两者均不存在。
 
 ## [004] Continuation 禁区
 
@@ -33,11 +33,11 @@
 
 ## [007] UnknownOrigin fail-closed
 
-`UnknownOrigin` 绝对禁止更新执行 Profile、启用 Fallback 或发起任何 Continuation。无法证明来源合法性的请求必须立即阻断。
+`UnknownOrigin` 绝对禁止更新执行 Profile、启用 Fallback 或发起任何 Continuation。来源无法确认合法的请求必须立即阻断。
 
 ## [008] 来源解析优先级
 
-消息来源按固定优先级严格判定：已确认的 Host 消息 > 已 Claim 的 agent-free PromptKey > Host 内部 Compaction/Synthetic > 已注册的 AgentOwnerRoot > 外部证明合法的 HumanRoot > UnknownOrigin。优先级顺序本身构成安全边界，避免真实业务消息被内部机制降级或冒充。
+消息来源按固定优先级严格判定：已确认的 Host 消息 > 已 Claim 的 agent-free PromptKey > Host 内部 Compaction/Synthetic > 已注册的 AgentOwnerRoot > 外部确认合法的 HumanRoot > UnknownOrigin。优先级顺序本身构成安全边界，避免真实业务消息被内部机制降级或冒充。
 
 ## [009] 纯函数永不推断 HumanRoot
 
@@ -56,7 +56,8 @@
 同一 LogicalRun 下的强类型 continuation 推进属于权限连续演进：仅 execution binding 的 per-physical target/lease 可按规则变化；participant、Root、identity evidence 与 Profile 关联全部保持不变。SessionId 相同但 LogicalRun 不同不构成 continuity。新物理目标的路由绝不改变 participant。
 
 ## [013A] 既有受管子代理委托延续
-已承接委托并在 Durable Authority 投影中保持活跃 LogicalRun 的受管子会话（Managed Child Session），宿主再度指派后续任务或复用时必须使用 `ManagedDelegationAssignment` continuation 延续该活跃运行，绝对禁止在已有活跃运行的情况下重复派发新的 `AgentOwnerRoot`。仅当受管子会话无活跃运行或已合规终结后，方允许创建并准入新的 `AgentOwnerRoot`。
+
+已承接委托并在 Durable Authority 投影中保持活跃 LogicalRun 的受管子会话（Managed Child Session），宿主再度指派后续任务或复用时必须使用 `ManagedDelegationAssignment` continuation 延续该活跃运行，禁止在已有活跃运行的情况下重复派发新的 `AgentOwnerRoot`。仅当受管子会话无活跃运行或已合规终结后，方允许创建并准入新的 `AgentOwnerRoot`。
 
 ## [014] Nudge 与 JoinGuard 是 Continuation
 
@@ -76,39 +77,36 @@ Continuation 只能挂靠当前活跃的 `ActiveLogicalRun`，绝对禁止回退
 
 ## [018] 每种 AuthorityRoot lifecycle 都收敛为 exact durable closure
 
-每个 `AuthorityRootAccepted` 必须原子记录唯一 `ExpectedClosureKind`。闭集合为 `HumanRootManagerLife`、`HumanRootManagedRun`、`AgentOwnerChildWork`、`AgentOwnerAttachedWork`、`AgentOwnerInternalLeaf`；前两种按 HumanRoot 的实际 lifecycle 穷尽，InternalLeaf 无论物理 Ownership 为 Root 或 Attached 都只能使用最后一种。各 kind 唯一合法 source witness 分别是 exact Manager `LifeCompleted(LifeId, FactId)`、`ManagedLogicalRunTerminal(LogicalRunId, FactId)`、`ChildLogicalRunTerminal(OwnerLogicalRunId, ChildLogicalRunId, FactId)`、`AttachedLogicalRunTerminal(OwnerLogicalRunId, ChildLogicalRunId, AttachmentKind, AssociationGeneration, FactId)`、`InternalLeafTerminal(OwnerLogicalRunId, LeafLogicalRunId, DecisionOrTransactionId, FactId)`。每个 `*Terminal` 是该 lifecycle 对 `Completed | Cancelled | Failed` 合法结果的 durable closed outcome，不包含 request、signal 或 observation。任一 HumanRoot 或 AgentOwnerRoot 缺少或无法唯一归入该闭集合时不得被接受。
+每个 `AuthorityRootAccepted` 必须原子记录唯一 `ExpectedClosureKind`。闭集合为 `HumanRootManagerLife`、`HumanRootManagedRun`、`AgentOwnerChildWork`、`AgentOwnerAttachedWork`、`AgentOwnerInternalLeaf`；前两种按 HumanRoot 的实际 lifecycle 穷尽，InternalLeaf 无论物理 Ownership 为 Root 或 Attached 都只能使用最后一种。各 kind 唯一合法的关闭来源（source witness）分别是 exact Manager `LifeCompleted(LifeId, FactId)`、`ManagedLogicalRunTerminal(LogicalRunId, FactId)`、`ChildLogicalRunTerminal(OwnerLogicalRunId, ChildLogicalRunId, FactId)`、`AttachedLogicalRunTerminal(OwnerLogicalRunId, ChildLogicalRunId, AttachmentKind, AssociationGeneration, FactId)`、`InternalLeafTerminal(OwnerLogicalRunId, LeafLogicalRunId, DecisionOrTransactionId, FactId)`。每个 `*Terminal` 是该 lifecycle 对 `Completed | Cancelled | Failed` 合法结果的 durable closed outcome，不包含 request、signal 或 observation。任一 HumanRoot 或 AgentOwnerRoot 缺少或无法唯一归入该闭集合时不得被接受。
 
-Authority 的 durable terminal interpreter 校验 source witness 与 accepted root 的 kind、owner、SessionId、LogicalRunId、AuthorityRootId 全部精确匹配后，幂等追加唯一 `AuthorityLogicalRunClosed { SessionId; LogicalRunId; AuthorityRootId; RootKind; ClosureWitness }`。append 成功后的同一 fold 清空对应 `ActiveLogicalRun` 与 run-scoped mappings，释放 active identity-evidence binding并归档历史 Profile；重复相同 closure 幂等，冲突 closure fail-closed。source terminal 已 durable 但 closure append 尚未确认时，reconciliation 只能重放该 typed source 并重试相同 closure append；不得释放 binding 或允许 SessionId 复用。lifecycle terminal 本身、association removal、cancel request、idle/timeout、wall clock、Host observation 或旧 Profile 均不得推断 closure。
+Authority 的 durable terminal interpreter 校验 source witness 与 accepted root 的 kind、owner、SessionId、LogicalRunId、AuthorityRootId 全部精确匹配后，幂等追加唯一 `AuthorityLogicalRunClosed { SessionId; LogicalRunId; AuthorityRootId; RootKind; ClosureWitness }`。append 成功后的同一 fold 清空对应 `ActiveLogicalRun` 与 run-scoped mappings，释放 active identity-evidence binding 并归档历史 Profile；重复相同 closure 幂等，冲突 closure fail-closed。source terminal 已 durable 但 closure append 尚未确认时，reconciliation 只能重放该 typed source 并重试相同 closure append；不得释放 binding 或允许 SessionId 复用。lifecycle terminal 本身、association removal、cancel request、idle/timeout、wall clock、Host observation 或旧 Profile 均不得推断 closure。
 
 ## [019] gate nudge admission、飞行态与 fresh-terminal re-arm 必须分型
 
-`InteractionRepair` 的 claim/Submitted/PhysicalAccepted 只建立一次 gate-nudge attempt 的 admission/物理落地证据，不建立 gate completion，更不建立“提醒预算耗尽”。当前 nudge attempt 仍为 `finish=None`、`tool-calls` 或其它明确 in-progress 观测时，重复 idle/reconcile 必须保持等待，禁止并发发送第二次 nudge。若该 attempt 自身到达新的稳定但仍不满足 gate 的 terminal（例如空/XML-only `stop` 或 `length`），该 fresh `ProviderRunIdentity` 必须重新获得一次 nudge 资格；同一 terminal 的重复观测仍严格幂等。普通旧 turn 在后续 nudge 已 admitted 后再次被观察，只能幂等吸收，不能替 fresh terminal 消耗提醒资格。普通 gate nudge 不发布 `INTERACTION_REPAIR_EXHAUSTED`。
+`InteractionRepair` 的 claim/Submitted/PhysicalAccepted 只建立一次 gate-nudge attempt 的 admission 与物理落地事实，不建立 gate completion，更不建立「提醒预算耗尽」。当前 nudge attempt 仍为 `finish=None`、`tool-calls` 或其它明确 in-progress 观测时，重复 idle/reconcile 必须保持等待，禁止并发发送第二次 nudge。若该 attempt 自身到达新的稳定但仍不满足 gate 的 terminal（例如空/XML-only `stop` 或 `length`），该 fresh `ProviderRunIdentity` 必须重新获得一次 nudge 资格；同一 terminal 的重复观测仍严格幂等。普通旧 turn 在后续 nudge 已 admitted 后再次被观察，只能幂等吸收，不能替 fresh terminal 消耗提醒资格。普通 gate nudge 不发布 `INTERACTION_REPAIR_EXHAUSTED`。
 
-## [020] repair fatal绑定exact claim settlement与注入fuse
+## [020] repair fatal 绑定 exact claim settlement 与注入边界
 
-只有typed repair invariant incident可以请求fatal；当前 agent-free PromptKey claim、Submitted/PhysicalAccepted与fresh terminal判定必须先形成exact settlement evidence。InteractionRepair不得直接引用fatal physical adapter、optional/default/global fallback；composition注入mandatory capability。同一incident只允许一次report与kill，普通exhaustion或可恢复send failure不得升级为fatal。
+只有 typed repair invariant incident（journal/authority/transport 层的不变量破坏）可以请求 fatal；请求前，当前 agent-free PromptKey claim、Submitted/PhysicalAccepted 与 fresh terminal 判定必须先形成 exact settlement。InteractionRepair 不得直接引用 fatal physical adapter，也不得走 optional/default/global fallback；composition 侧注入固定能力。同一 incident 只允许一次 report 与 kill；普通 exhaustion 或可恢复 send failure 不得升级为 fatal。
 
 ## [021] 历史事件不可变与旧身份不升权
 
 历史 EventStore 事实保持原样，历史事件中记录的旧身份（Coder、Inspector、Browser、Inquiry、Distiller）仅用于历史审计、会话回溯与不变重放，严禁重写事件日志。
-历史旧身份解码严格隔离在历史边界，严禁在活跃权限计算或执行准入中将旧 Inspector/Coder 静默升级为新 Engineer 权限；新交互只接纳当前合法身份集合（Engineer、DevOps、Manager、Orchestrator、Plan）。Blogger、Predictor 与只读副本不是合法身份。非法或遗留身份的交互请求必须 fail-closed 阻断。
+
+历史旧身份解码严格隔离在历史边界，严禁在活跃权限计算或执行准入中将旧 Inspector/Coder 静默升级为 Engineer 权限；新交互只接纳当前活跃身份集合（Manager、Orchestrator、Engineer、DevOps、Plan、Advisor，见 participant-identity 的身份定义）。非法或遗留身份的交互请求必须 fail-closed 阻断。
 
 ## [022] DevOps 恢复与续行保持固定模型与执行权威
 
-DevOps 的固定绑定由道路初始化确立，其模型配置与 Persona 在生命周期内不可变。
-后续所有的 resume 与 continuation 必须严格沿用既有绑定，严禁借 resume 动态切换模型或切换到非绑定模型；多次物理尝试或崩溃恢复均必须收束为同一逻辑执行权威，严禁形成多个并行生效的 DevOps 权威。
+DevOps 的固定绑定由道路初始化确立，其模型配置与 Persona 在生命周期内不可变。后续所有的 resume 与 continuation 必须严格沿用既有绑定，严禁借 resume 动态切换模型或切换到非绑定模型；多次物理尝试或崩溃恢复均必须收束为同一逻辑执行权威，严禁形成多个并行生效的 DevOps 权威。
 
 ## [023] ProviderRetryAttempt 的 repair 抑制随 attempt 终结而失效
 
 `missing-final-report` 与 `interaction-repair` 对 `ProviderRetryAttempt` continuation 的抑制，只在该 continuation 自身的 attempt 尚未终结时成立：观测仍为 `TurnUnknown`（finish=None）或 `TurnInProgress`（tool-calls）且没有已落地的 exact terminal 时，idle/reconcile 必须保持等待，禁止并发 nudge 抢夺该 attempt 正在生成的响应。
 
-该 attempt 一旦终结，抑制立即失效：稳定 terminal 观测（`TurnCompleted`、`TurnFailed`、`TurnAborted`，以及 `TurnNeedsContinuation` 的来源——`length`、没有 provider error 的空/XML-only `stop`）或 exact durable `ChatExecution` Terminal 任一成立，本次 `ProviderRunIdentity` 就按 [019] 重新获得 nudge 资格；gate 未满足时，此后每个新的合法 terminal occasion 都必须重新获得资格。两类终结证据相互独立，先到者即解除抑制，不等待另一侧追平。解除抑制不改变结局归属：completed-with-error 属于 `TurnFailed`，即使输出为空也必须等待 exact typed failure，由 provider recovery 处理，不得转成 missing-final-report。
+该 attempt 一旦终结，抑制立即失效：稳定 terminal 观测（`TurnCompleted`、`TurnFailed`、`TurnAborted`，以及 `TurnNeedsContinuation` 的来源——`length`、没有 provider error 的空/XML-only `stop`）或 exact durable `ChatExecution` Terminal 任一成立，本次 `ProviderRunIdentity` 就按 [019] 重新获得 nudge 资格；gate 未满足时，此后每个新的合法 terminal occasion 都必须重新获得资格。两类终结判据相互独立，先到者即解除抑制，不等待另一侧追平。解除抑制不改变结局归属：completed-with-error 属于 `TurnFailed`，即使输出为空也必须等待 exact typed failure，由 provider recovery 处理，不得转成 missing-final-report。
 
-抑制判据只能是 attempt 的在途/终结状态，严禁使用 durable physical 身份、continuation kind、Session/LogicalRun 或 ledger 条目本身的存在作为永久压制条件：凡凭“该 physical 曾被接受为 ProviderRetryAttempt”压掉后续 fresh terminal 的实现均为 RED。同一 exact terminal occasion 的重复观测仍由既有 publish/dedupe 幂等吸收，不因解除抑制而重复发送。
-
+抑制判据只能是 attempt 的在途/终结状态，严禁使用 durable physical 身份、continuation kind、Session/LogicalRun 或 ledger 条目本身的存在作为永久压制条件。同一 exact terminal occasion 的重复观测仍由既有 publish/dedupe 幂等吸收，不因解除抑制而重复发送。
 
 ## [024] 全角色空终态必须继续，无最大次数
 
-任何角色（包括 Advisor、Distiller、Engineer、DevOps、Plan、Manager，以及未映射角色）的自然 `finish=stop`，若没有有效正文也没有真实工具调用，不构成有效会话终止。仅推理内容不是正文，不能当作已经回复。必须沿既有 InteractionRepair 的 exact-terminal gate nudge 接续同一会话；同一个终止的重复观察只发一次，不同新回合连续空终止则每次继续请求，**暂不设最大 nudge 次数**。已经有真实工具调用的回合不是“无正文无工具”；已确认的真实人工取消仍按取消处理，不自动抢回。
-
-验收：`requirements/interaction-authority/tests/024.test.mjs` 覆盖全部角色、无文本／只有 reasoning／真实工具调用及连续空终止不耗尽；`requirements/host-boundary/tests/omp-scope-seam.test.mjs` 的 `interaction-authority-024` 通过真实注册的 OMP `turn_end` hook 连续触发 35 个新空回合，确认每回合一条 agent-attributed nudge、同回合重放不重复、真实工具/正文/人工取消不误触发。
+任何角色（包括 Advisor、Distiller、Engineer、DevOps、Plan、Manager，以及未映射角色）的自然 `finish=stop`，若没有有效正文也没有真实工具调用，不构成有效会话终止。仅推理内容不是正文，不能当作已经回复。必须沿既有 InteractionRepair 的 exact-terminal gate nudge 接续同一会话；同一个终止的重复观察只发一次，不同新回合连续空终止则每次继续请求，不设最大 nudge 次数。已经有真实工具调用的回合不是「无正文无工具」；已确认的真实人工取消仍按取消处理，不自动抢回。

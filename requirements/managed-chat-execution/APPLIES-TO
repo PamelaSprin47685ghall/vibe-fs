@@ -1,5 +1,5 @@
 # Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
-# requirements/managed-chat-execution/**, including planned executable proofs, is covered implicitly.
+# requirements/managed-chat-execution/** is covered implicitly.
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/Execution/Session/ChatExecution/**

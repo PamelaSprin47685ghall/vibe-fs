@@ -12,5 +12,5 @@ async call(command) {
 
   async send(name, input) {
     // Send input without resuming the target; append a missing newline.
-    // Acceptance does not prove the command processed it.
+    // The receipt only records that input was written; whether the command consumed it is not yet known.
   }

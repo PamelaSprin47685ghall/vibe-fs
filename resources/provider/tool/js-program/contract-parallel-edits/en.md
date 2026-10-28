@@ -1,1 +1,1 @@
-- Parallel {{toolName}} calls are absolutely safe for same-file and cross-file edits.
+- Parallel {{toolName}} calls are safe for same-file and cross-file edits: each mutation commits atomically, so concurrent programs do not corrupt each other's work.

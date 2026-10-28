@@ -2,7 +2,7 @@
 
 > 本目录收录万象术各领域的**功能说明书与行为边界**。
 > 一切机制皆为产品唯一总流程服务：**用户提出需求 → 合理交互与调查 → 稳妥修改代码 → 真实做成结束**。
-> 说明书（SPEC）是功能浪花的描述，用于指导工程实现与日常自保测试，**不是凌驾于用户意志之上的唯一真理，不搞 proof ownership 证明宗教，亦不搞 AI 包办验收**。若说明书与当前实现存在差距，以文中标注的【程序待改】为准。
+> 说明书（SPEC）是功能浪花的描述，用于指导工程实现与日常自保测试。若说明书与当前实现存在差距，以文中标注的【程序待改】为准；验收由真实用户走总流程，文档不代行。
 
 ## 目录结构约定
 
@@ -23,7 +23,6 @@ APPLIES-TO  （可选）该包关心的源码文件路径参考
 ### 1. 规范与消融
 | Package | 职责说明 |
 |---|---|
-| [requirement-system](requirement-system/WHAT.md) | 说明书组织规则与包结构约定。 |
 | [verification-system](verification-system/WHAT.md) | 分层测试调度（单元测试、集成测试与端到端回归）。 |
 | [feature-ablation](feature-ablation/WHAT.md) | 功能消融与模块开关，支持渐进式关闭未审机制。 |
 | [js-semantic-surface](js-semantic-surface/WHAT.md) | JS 语义入口约定，提供稳定的测试与调用表面。 |
@@ -51,8 +50,8 @@ APPLIES-TO  （可选）该包关心的源码文件路径参考
 | [capability-enforcement](capability-enforcement/WHAT.md) | 门禁与权限投影，确保模型看见的工具与运行时权限严格一致。 |
 | [participant-horizon](participant-horizon/WHAT.md) | 视界管理，只传递会改变行动的关键上下文。 |
 | [cognitive-environment](cognitive-environment/WHAT.md) | 长期认知背景与瞬时执行隔离。 |
-| [cognitive-workspace](cognitive-workspace/WHAT.md) | 负向边界说明（旧画板与 TodoSink 已退役）。 |
-| [attention-regulation](attention-regulation/WHAT.md) | 注意力调节边界（旧 enough/abandon 已退役，收拢至 assume 与 scope 文本）。 |
+| [cognitive-workspace](cognitive-workspace/WHAT.md) | 认知边界：什么进持久状态（待办、事实），什么只留在对话里（assume）。 |
+| [attention-regulation](attention-regulation/WHAT.md) | 注意力调节：assume 与 scope 文本各管什么。 |
 | [action-affordance](action-affordance/WHAT.md) | 动作可行性与参数语义说明。 |
 | [provider-language](provider-language/WHAT.md) | 自然语言一致性（单会话语言固定，协议标识符不翻译）。 |
 | [provider-projection](provider-projection/WHAT.md) | 语义意图向模型视角的投影呈现。 |
@@ -60,7 +59,7 @@ APPLIES-TO  （可选）该包关心的源码文件路径参考
 ### 5. 交互、持久化与因果
 | Package | 职责说明 |
 |---|---|
-| [concern-routing](concern-routing/WHAT.md) | 交互路由边界（旧邮箱已退役，统一归入编程面委托）。 |
+| [concern-routing](concern-routing/WHAT.md) | 交互路由边界：用户关切如何进入编程面委托。 |
 | [interaction-authority](interaction-authority/WHAT.md) | 交互权限与逻辑任期推进规则。 |
 | [managed-chat-execution](managed-chat-execution/WHAT.md) | 单物理消息的受理、执行与终态管理。 |
 | [dispatch-protocol](dispatch-protocol/WHAT.md) | 消息派发协议，避免网络与宿主不稳定导致逻辑重复。 |
@@ -91,6 +90,7 @@ APPLIES-TO  （可选）该包关心的源码文件路径参考
 | [provider-attempt-recovery](provider-attempt-recovery/WHAT.md) | 模型调用失败后的换绑与重试机制。 |
 | [host-provider-failure-ownership](host-provider-failure-ownership/WHAT.md) | 接管宿主错误弹窗，统一故障处置所有权。 |
 | [crash-reconciliation](crash-reconciliation/WHAT.md) | 进程意外崩溃后的事件重放与现场调和。 |
+| [latency-degeneration](latency-degeneration/WHAT.md) | 按 session 的请求耗时看门狗：超阈值中断一次并续跑。 |
 
 ### 9. 任务与里程碑
 | Package | 职责说明 |

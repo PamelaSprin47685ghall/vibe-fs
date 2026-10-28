@@ -1,1 +1,1 @@
-Join is unavailable until the caller's authority is established.
+Join is unavailable: the caller's authority cannot be resolved.

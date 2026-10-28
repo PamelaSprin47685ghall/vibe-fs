@@ -30,19 +30,6 @@ class Js extends JsProgram {
         const firstError = result.stdout.split("\n").find((l) => /error:/i.test(l));
         this.failureReason = `build_failed:exit_${result.exitCode}${firstError ? ": " + firstError.trim() : ""}`;
       }
-
-      // 自证 thunk，先跑在独立实例上。只拨状态、返回参数数组；宿主调用
-      // next/watch。「全部完成」（越过构建步）→ next 返回 null；「出了问题」
-      // （有失败记录）→ watch 否决。写它们就是在设计出口。
-      sanity() {
-        return {
-          nextDone: () => [{ root: "/", step: 1 }],
-          watchVeto: async () => {
-            this.failureReason = "prove: 模拟构建失败";
-            return [{ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }];
-          },
-        };
-      }
     });
   }
 }
@@ -77,15 +64,6 @@ class Js extends JsProgram {
       onExit(result) {
         testExitCode = result.exitCode;
       }
-
-      // 自证：越过最后一步，宿主调用 next 得到 null；观察窗里 srv 崩溃，
-      // 宿主调用 watch 得到否决。thunk 只返回参数数组。
-      sanity() {
-        return {
-          nextDone: () => [{ root: "/", step: 4 }],
-          watchVeto: () => [{ root: "/", step: 2, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }],
-        };
-      }
     });
     return { ...outcome, testExitCode };
   }
@@ -106,7 +84,7 @@ class Js extends JsProgram {
       reaped = false;
 
       // 事件驱动：读实例状态再决定。发下一行；全部行发完就收割子进程；
-      // 收割之后返回 null——出口存在，sanity() 会展示它。
+      // 收割之后返回 null。
       next(ctx) {
         if (this.reaped) return null;
         if (this.sent >= this.lines.length) {
@@ -125,16 +103,6 @@ class Js extends JsProgram {
         }
         if (ctx.stdout.trim()) answers.push(ctx.stdout.trim());
         return null; // 观察过了，没有异常——继续
-      }
-
-      sanity() {
-        return {
-          nextDone: () => {
-            this.reaped = true;
-            return [{ root: "/", step: 9 }];
-          },
-          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "py", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 30000 }],
-        };
       }
     });
     return { ...outcome, answers };

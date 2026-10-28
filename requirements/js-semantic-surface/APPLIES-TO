@@ -3,7 +3,6 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/**/*Surface.fs
-/scripts/checks/js-boundary-gate.mjs
 /scripts/checks/js-surface-manifest.mjs
 /scripts/checks/js-module-linkage.mjs
 /scripts/lib/test-surface-scan.mjs

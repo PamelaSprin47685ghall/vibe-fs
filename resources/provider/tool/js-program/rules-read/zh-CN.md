@@ -2,10 +2,10 @@
 
 用 `where` / `whereAll` 定位：
 
-- `whereAll(content, needle, from = 0)` 返回全部规范化匹配 `[[begin, end], ...]`。
+- `whereAll(content, needle, from = 0)` 返回全部匹配 `[[begin, end], ...]`。
 - `where(content, needle, from = 0)` 返回单个 span。零个或多个匹配时经与 `park` 相同的通道挂起，载荷为 `{ needle, candidates, nearest }`；恢复时注入选中的 span。
 
-规范化把每一段空白折叠成一个空格并裁掉 needle 首尾空白；下标始终指向原字符串。`where` 永不抛定位错误，也永不静默挑一个匹配：唯一匹配是机械的，歧义归你。
+匹配是字面的：needle 与原文按写出来的样子逐字比较——不折叠空白、不裁剪首尾；下标始终指向原字符串。`where` 永不抛定位错误，也永不静默挑一个匹配：唯一匹配是机械的，歧义归你。
 
 用切片重组——已经定位到的内容不要重新搜索：
 

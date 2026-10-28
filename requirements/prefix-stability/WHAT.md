@@ -8,17 +8,17 @@
 
 Epoch 只由 Host compaction 重锚（`ContextReanchored`）、Plan tenure 交接重锚（`TenureReanchored`）或显式 scope 重置重锚（`ScopeReanchored`）推进，且每次恰好加一。不得按容量或 Token 数由宿主主动估算切换。
 
-- Scope 重锚：模型调用 `resetScope` 产生 `ScopeReanchored` 事实（context-compression [035]），epoch 加一、清除旧 wire 快照；同一 `toolCallId` 不重锚两次。
+- Scope 重锚：模型调用 `resetScope` 产生 `ScopeReanchored` 事实（context-compression-035），epoch 加一、清除旧 wire 快照；同一 `toolCallId` 不重锚两次。
 - Plan tenure 交接重锚：Planner 任期交接触发 `TenureReanchored` 事件，epoch 加一、清除旧快照；同一 incumbencyId 不重锚两次。
 - Host compaction 重锚：Host compaction 触发 `ContextReanchored` 事件，epoch 加一、清除旧快照；同一 compaction 不重锚两次。
 
-## [003] 废除 Y 候选 probe 与 FrozenRecordPrefix
+## [003] 历史快照由显式声明选定
 
-系统已彻底取消 Y 轴、`FrozenRecordPrefix`、`MemoryPreamble` 与 prefix probe 候选机制。历史按显式声明选择，当前回合按请求快照划界并保留，不另设独立的 Y 覆盖证明或 `PrefixRebaseCommitted` 候选流。
+历史按显式声明选择，当前回合按请求快照划界并保留。前缀直接使用已提交快照，不设独立的候选探测或前缀试探流。
 
 ## [004] 唯一 epoch 真相源
 
-`ActivePrefixEpoch` 是唯一持久化的前缀 epoch 合同，不另设阶段 epoch 或旁路状态机。
+`ActivePrefixEpoch` 是唯一持久化的前缀 epoch，不设阶段 epoch 或旁路状态机。
 
 ## [006] Host compaction 与 Plan tenure 重锚
 
@@ -39,7 +39,7 @@ Plan tenure 交接通过 `TenureReanchored` 收容：epoch 加一、清除旧快
 
 所有 provider 共用统一呈现注入，不生成 synthetic skill 消息。
 
-1. **工具结果倒计时后缀**：附于每个 terminal 工具结果（completed/error）的末尾，使用 `\0\uFEFF` 分隔拼接 `[Remaining turnBudget: N]`（context-compression [034]）。每条结果在同一 epoch 的首次请求呈现时**锁定自身的后缀字节**，不因后续请求的剩余预算变动而改变；同次首次呈现的多结果使用同一当时预算，不同时首次呈现的结果可不同。已呈现结果的后缀必须原样重放，不能重复拼接。
+1. **工具结果倒计时后缀**：附于每个 terminal 工具结果（completed/error）的末尾，使用 `\0\uFEFF` 分隔拼接 `[Remaining turnBudget: N]`（context-compression-034）。每条结果在同一 epoch 的首次请求呈现时**锁定自身的后缀字节**，不因后续请求的剩余预算变动而改变；同次首次呈现的多结果使用同一当时预算，不同时首次呈现的结果可不同。已呈现结果的后缀必须原样重放，不能重复拼接。
 2. **用户消息尾巴提醒**：发往模型的请求副本中，每条 operator 用户消息末尾均拼接 scope 初始化提醒（`[System: Estimate the turnBudget...]`），同一消息已带该尾巴时不重复，持久化用户消息不改写。最新 operator 用户消息后尚未发生 reset 时，非 reset 工具结果重复该初始化提醒。
 3. **零预算弱提醒**：在活跃 scope 内且预算为 0 时追加弱提醒用户消息（`steering: true`，仅存在于请求副本，不持久化）。
 
@@ -51,21 +51,20 @@ Plan tenure 交接通过 `TenureReanchored` 收容：epoch 加一、清除旧快
 
 ## [012] 已提交前缀事实不可逆
 
-合法提交的 `ScopeReanchored`、`ContextReanchored` 与 `TenureReanchored` 不因后续 provider Failed 或 Aborted 而撤销。
+合法提交的 `ScopeReanchored`、`ContextReanchored` 与 `TenureReanchored` 不因后续 provider 失败或中断而撤销。
 
 ## [013] prefix identity 的比较范围
 
 比较覆盖 provider、model、variant、完整 tools、system prompt 及 message 序列。身份、工具、system 或历史 message 的变更均不能视为追加；冷边界仍须满足 [002]。
 
-唯一例外是全局语言变化（provider-language-002/013）：语言不同导致的 system prompt 与 message 语言整体差异不按前缀漂移处理，不要求 epoch 推进或冷边界声明；语言不变期间本条款照常强制。
+唯一例外是全局语言变化（provider-language-002 与 provider-language-013）：语言不同导致的 system prompt 与 message 语言整体差异不按前缀漂移处理，不要求 epoch 推进或冷边界声明；语言不变期间本条款照常强制。
 
 ## [014] 标记后缀正文不进入业务 trace
 
 工具结果倒计时后缀（`[Remaining turnBudget: N]`）与辅助提示标记后缀只参与 provider 请求呈现，不进入业务消息快照、TOML 视图渲染或 compaction 输入。仅其 durable occurrence 投影参与恢复。
 
-
 ## [016] Scope 后缀不能随剩余预算回写历史前缀
 
 同一 `ActivePrefixEpoch` 内，工具结果首次进入 provider 请求副本时确定的提示后缀必须以工具调用身份（无 ID 时以同 epoch 中稳定的消息／part 位置）固定并逐字重放。后续 `turnBudget` 递减、新 operator steer、重复 provider transform、甚至同一输出之后新增工具结果，均不得重新计算已呈现结果的字节。新结果首次呈现时才使用当次剩余预算；agent side-request 不能提前冻结正常请求尚未呈现的结果。
 
-只有确已提交的 `ScopeReanchored` 允许在新 epoch 重新生成保留的历史 reset 调用／结果后缀。不能因需要新预算而把单一历史工具结果从 `N` 改为 `N-1`：这会让前缀缓存从那条结果起失效，违反 [001]，不是合法的追加。此条保证请求热修正的重复呈现字节稳定，不声称独立进程重启后的冻结状态恢复已获证明，也不替代真实 provider 命中率观察。
+只有确已提交的 `ScopeReanchored` 允许在新 epoch 重新生成保留的历史 reset 调用／结果后缀。不能因需要新预算而把单一历史工具结果从 `N` 改为 `N-1`：这会让前缀缓存从那条结果起失效，违反 [001]，不是合法的追加。此条保证请求修正期间的重复呈现字节稳定。

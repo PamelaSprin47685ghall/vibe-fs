@@ -3,12 +3,19 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/Repository/Programming/**
-/src/Wanxiangshu/Process/JsSandbox.fs
-/src/Wanxiangshu/Process/JsCallLoop.fs
 /src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
+/src/Wanxiangshu/OpenCode/Tools/StaticTools.fs
+/src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs
+/src/Wanxiangshu/OpenCode/Host/PluginSessionScope.fs
+/src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs
+/src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs
+/src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs
 /resources/provider/tool/js-program/**
 /resources/provider/tool/js-bookkeeper/**
+/resources/provider/tool/js-plan/**
 /scripts/checks/js-surface-gate.mjs
+/wanxiangli/src/program/**
+/wanxiangli/src/runtime/**
 /src/Wanxiangshu/Repository/Programming/Js/Anchor.fs
 /src/Wanxiangshu/Repository/Programming/Js/AnchorFs.fs
 /src/Wanxiangshu/Repository/Programming/Js/Capability.fs

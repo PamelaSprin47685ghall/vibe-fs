@@ -1,1 +1,1 @@
-在调用方的 authority 确立之前，join 不可用。
+join 不可用：无法识别调用方的 authority。

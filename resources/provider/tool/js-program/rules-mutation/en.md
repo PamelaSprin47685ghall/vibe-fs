@@ -15,21 +15,21 @@ rough line/length scale, required headings or sentinels, expected number of
 critical sections. If an ordinary reorganization turns roughly 8k lines into
 roughly 31k lines, do not inspect the first fifty lines, decide they look fine,
 and continue guessing. throw before return. Because mutations are staged, that
-failure leaves zero committed mutations. A ridiculous number is a signal; treat
-it as a signal before you create a second problem to repair the first.
+failure leaves zero committed mutations. A number that far out of range is a
+fact; respect it before you create a second problem to repair the first.
 
-Precommitment matters: decide the cheap invariants before you mutate. Once the
-program has stated what must remain true, it does not get to renegotiate those
-rules after seeing an inconvenient result. "The first screen looks fine" is not
-proof. "One more replace will probably clean it up" is not a signal. Numbers,
-required sentinels, and section counts outrank the story you are tempted to tell
-yourself after a bad transformation.
+Decide the cheap invariants before you mutate, and keep them after you see the
+result: once the program has stated what must remain true, it does not get to
+renegotiate those rules after seeing an inconvenient result. "The first screen
+looks fine" is not a fact. "One more replace will probably clean it up" is not a
+signal. Numbers, required sentinels, and section counts outrank the story you
+are tempted to tell yourself after a bad transformation.
 
 STOP SIGNAL: if size, section count, sentinel count, or another cheap invariant
-is wildly outside the expected range, the current program has lost the right to
-commit. Fail it. Do not reward a suspicious result with another speculative
-transformation. The fastest path after a red flag is back to facts, not
-forward into cleanup.
+is wildly outside the expected range, stop this program instead of committing
+it. Fail it. Do not answer a suspicious result with another speculative
+transformation. The fastest path after a red flag is back to facts, not forward
+into cleanup.
 
 The generated class has no commit, rollback, snapshot, or transaction methods.
 run() returning normally → Host preflight → prepare → commit. run() throwing or

@@ -2,7 +2,7 @@
 
 ## [001] 容器分类与参与者身份分离
 
-managed session 分类只描述物理容器的执行能力与归属，不表示 logical participant run 或 `ParticipantIdentity`。
+managed session 分类只描述物理容器的执行能力与归属，不表示 logical participant run 或 `ParticipantIdentity`。`SessionId` 只命名可复用的物理容器，身份作用域与复用准入遵循 participant-identity-009；容器分类和关联不缓存或解析身份、不发布 run closure。移除关联、detach/attach、分类变化、idle/timeout 或 Host 观察都不代表 lifecycle terminal 或 closure。
 
 ## [002] ExecutionClass 与 Ownership 为穷尽正交组合
 
@@ -50,8 +50,4 @@ Bookkeeper attachment 显式绑定目标 transactionId，只用于该事务的�
 
 ## [014] 单一平坦拓扑与合法角色边界
 
-系统运行拓扑严格限定于当前合法角色集合及其正交的执行类；任何解析、映射及运行时均严格保证拓扑平坦与单一职责，拒绝任何未预期的分层或复合拓扑。
-
-## [015] SessionId 是可复用物理容器，不是 identity scope
-
-`SessionId` 只命名可复用的物理容器，身份作用域与复用准入遵循 participant-identity-009。容器分类和关联不缓存或解析身份、不发布 run closure；移除关联、detach/attach、分类变化、idle/timeout 或 Host 观察均不代表 lifecycle terminal 或 closure。
+运行拓扑只有 family root 与其直接子节点一层：managed child 一律直接挂在 family root 下，不出现中间层或复合容器。合法会话种类限于当前角色集合与 `ExecutionClass × Ownership` 组合，解析与映射不得发明新的种类。

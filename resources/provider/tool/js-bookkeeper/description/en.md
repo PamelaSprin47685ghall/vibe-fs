@@ -6,4 +6,4 @@ The Case is already frozen for this transaction. question(matches = []) and answ
 
 setQuestion(newText) and setAnswer(newText) each stage the complete next side and may each be called at most once. Zero mutation is legal. A thrown program or invalid mutation changes neither side.
 
-The program has no outside-world capability. Decide what the Case should mean before the call; use this program only to carry out the coherent mechanical reshaping already justified by that decision.
+The program has no outside-world capability. Decide what the Case should mean before the call; use this program only to carry out the coherent mechanical reshaping required by that decision.

@@ -8,7 +8,7 @@
 `AbortSession`（它还会摘除并中止子代理）。但 OpenCode 没有单次 Provider attempt 的中断，
 `InterruptAttempt` 在宿主侧就是对该 session 的 abort：它停止整个 Session 循环（含正在执行的工具），
 子会话本身保留。所以中断一旦受理，续跑由看门狗负责到底（见 [011]、[012]）。
-中断真实获接纳后在同一个 Session 发起 continuation，保持已产生的思考与输出。该动作以 `PromptDispatcher.AwaitMode.Detached` fire-and-forget 提交，并注册 `ContinuationAcceptanceObserver`；调用端不等待 SDK promise 或物理接受，只有 Host 的 `PhysicalAccepted` 回调能宣布已续跑。已明确拒绝或抛错则向原受管子会话的 `TerminalOutcome.Failed` 返回，供父 Join 收到失败；单纯排队不是成功。原请求的中断回执也由独立 callback 处理，不串行阻塞事件 hook。不设置第二个任意的恢复超时。`requirements/latency-degeneration/tests/002.test.mjs` 通过真实 SQLite/AgentJournal 验证 Detached 返回与物理确认的因果区别。
+中断真实获接纳后在同一个 Session 发起 continuation，保持已产生的思考与输出。该动作以 `PromptDispatcher.AwaitMode.Detached` fire-and-forget 提交，并注册 `ContinuationAcceptanceObserver`；调用端不等待 SDK promise 或物理接受，只有 Host 的 `PhysicalAccepted` 回调能宣布已续跑。已明确拒绝或抛错则向原受管子会话的 `TerminalOutcome.Failed` 返回，供父 Join 收到失败；单纯排队不是成功。原请求的中断回执也由独立 callback 处理，不串行阻塞事件 hook。不设置第二个任意的恢复超时。
 
 统计、阈值与样本语义（完整样本、右删失样本、遗忘）由 wanxiangli/degeneration
 的 RequestLatencyDetector 拥有；本域只承诺宿主侧状态机与接线行为。阈值是 p99、**无先验**，
@@ -41,7 +41,7 @@ session 的一次中断。重复的请求开始不重置起算点，也不重复
 提示，要求保留已经产生的思考与输出并从中断处继续。续行提示的确定拒绝
 不回滚已成立的删失观测，须向受管子会话发布失败终局并返回给父方，不得只记诊断。
 中断回执尚未返回时收到 idle，不得丢弃该次中断；接受回执到达后仍须发送
-续行提示。会话删除或已证明的正常完成仍可取消该次续行。
+续行提示。会话删除或已确认的正常完成仍可取消该次续行。
 
 ## [005] 只有受管 session 生效
 
@@ -55,35 +55,30 @@ session 的一次中断。重复的请求开始不重置起算点，也不重复
 中断未被接受时同样不再重排，避免中断风暴。迟到或代际不符的定时器
 回调不产生任何效果。
 
-## 接线缺口（如实记录，非承诺）
-
-宿主 idle 信号（session.status idle / session.idle）由 PluginHooks 观察；
-若宿主未推送 idle，此类既无完成
-事件也无 idle 信号的残缺测量，只能由 session 删除（Cancel）或插件
+**接线缺口（如实记录，非承诺）**：宿主 idle 信号（session.status idle / session.idle）由 PluginHooks 观察；
+若宿主未推送 idle，此类既无完成事件也无 idle 信号的残缺测量，只能由 session 删除（Cancel）或插件
 dispose 收尾。
 
 ## [008] 工具边界终结模型请求计时
 
-**更正（见 [013]）**：OpenCode 1.18.29 在同一个 Provider step 内执行工具，`finish=tool-calls` 与 `time.completed` 要等该步全部工具返回后才写入。所以本条单靠这个事件拦不住长工具，真正的工具边界是 `tool.execute.before`。以下原文保留：
-
 模型返回 `finish=tool-calls` 并带真实 `time.completed` 时，该 **Provider 请求已结束**，虽然整个 Session 仍将在工具执行后继续。按 `SessionId + Assistant ProviderRunId` 精确完成本轮耗时计量，立即撤销定时器；不得把 `resetScope`、其它工具的执行、下一次模型请求累加成旧 Provider 请求的延迟并错误中断 Engineer。确认失败或用户取消亦按同一 ProviderRunId 精确撤销，但不记成功样本；迟到的旧终态不得撤销新回合。
 
-现场依据：工作树 `.Herdchestra/wanxiangshu/events/*.ndjson` 中 2026-10-27 02:38–02:47 UTC 多个 Engineer 的 `ScopeReanchored` 后出现 `ProviderRetryAttempt`，其 payload SHA-256 与 `resources/provider/runtime/latency-degeneration/zh-CN.md` 去尾换行后的文本完全一致，且取消的物理 Provider 用户请求之间持续存在不同 assistant run 的 `XTracePartAppended(tool_result)`，证明看门狗延迟超出了单次模型请求。`requirements/latency-degeneration/tests/003.test.mjs` 验证真实 Codec 工具终态与精确撤销。
+注意：OpenCode 在同一个 Provider step 内执行工具，`finish=tool-calls` 与 `time.completed` 要等该步全部工具返回后才写入，单靠这个事件拦不住长工具；真正的工具边界是 `tool.execute.before`，见 [013]。真机事件流曾显示看门狗把长工具的执行时间算成模型延迟而误伤 Engineer（`ScopeReanchored` 后紧跟 `ProviderRetryAttempt` 续行），这是本条与 [013] 的由来。
+
+`tests/003.test.mjs` 验真实 Codec 工具终态与按 ProviderRunId 的精确撤销。
 
 ## [009] 异步因果接力与 fast-check 无内部等待
 
-中断计时器的回调只尝试为确切 ProviderRun 建立单次接力，随后立即返回，不 await 任意 Host Promise。中断已受理时派发带真实物理接纳观察者的 Detached continuation；物理接纳才确认已续跑，确定拒绝则发布原受管子会话 Failed 终局，同一代际最多结算一次。Provider 真正自行继续、Session 取消、迟到旧回执或新 ProviderRun 启动必须按会话与代际围栏清除旧接力，**同时 Dispose 相应物理接纳观察器**，不能复活或覆盖新运行。 若宿主明确拒绝 InterruptAttempt，原 Provider 保留继续运行的权利；但在没有精确 Provider terminal 的情况下 Session 随后转 idle，或 idle 先抵达然后中断被拒，则原会话已无人继续，必须按本次代际一次性向父方返回 Failed，而不是只注销监测并写诊断。
+中断计时器的回调只尝试为确切 ProviderRun 建立单次接力，随后立即返回，不 await 任意 Host Promise。中断已受理时派发带真实物理接纳观察者的 Detached continuation；物理接纳才确认已续跑，确定拒绝则发布原受管子会话 Failed 终局，同一代际最多结算一次。Provider 真正自行继续、Session 取消、迟到旧回执或新 ProviderRun 启动必须按会话与代际围栏清除旧接力，**同时 Dispose 相应物理接纳观察器**，不能复活或覆盖新运行。若宿主明确拒绝 InterruptAttempt，原 Provider 保留继续运行的权利；但在没有精确 Provider terminal 的情况下 Session 随后转 idle，或 idle 先抵达然后中断被拒，则原会话已无人继续，必须按本次代际一次性向父方返回 Failed，而不是只注销监测并写诊断。
 
-`tests/005.test.mjs` 进一步通过真实 HostSessionNudge、SQLite/AgentJournal 验证首次明确拒绝、迟到 Refused、真实 PhysicalAccepted 与 OutcomeUnknown 都由对应原生回执驱动。
-
-`tests/004.test.mjs` 的 seeded fast-check 使用生产同构 Watchdog，随机交错中断受理／拒绝／抛错、继续提交／拒绝、真实物理接纳／迟到、两种 idle 与拒绝顺序以及新旧回合切换；不使用人为的等待超时给无回执请求制造假成功。外部宿主若永远不发送任何完成或拒绝回执，领域不能伪造其结果；保证的是插件事件循环不等待它，下一次可核验 Host 事件仍能正常前进，并只凭可观察事件判定终局。
+外部宿主若永远不发送任何完成或拒绝回执，领域不能伪造其结果；保证的是插件事件循环不等待它，下一次可核验 Host 事件仍能正常前进，并只凭可观察事件判定终局。`tests/005.test.mjs` 用真实 HostSessionNudge、SQLite/AgentJournal 验首次明确拒绝、迟到 Refused、真实 PhysicalAccepted 与 OutcomeUnknown 均由对应原生回执驱动；`tests/004.test.mjs` 用生产同构 Watchdog 的 seeded fast-check 随机交错中断受理／拒绝／抛错、继续提交／拒绝、真实物理接纳／迟到、两种 idle 与新旧回合切换，且不用人为等待超时给无回执请求制造假成功。
 
 ## [010] 精确物理取消不等待中断 Promise 才开始接力
 
 看门狗已针对一个确切 `SessionId + ProviderRunId` 触发
 `InterruptAttempt` 后，宿主可能先报告该 Provider 的真实
 `UserCancelled` 终态，而 `InterruptAttempt` 的宿主回执 Promise 仍悬而未决。
-这条精确终态已经证明原 Provider 停止，不能再用通常的 `Discard`
+这条精确终态表明原 Provider 已停止，不能再用通常的 `Discard`
 把看门狗的恢复身份删掉并令受管子代理无声停止。
 
 - 中断回执仍待定且终态属于原 Provider 时，由终态事件接力发送
@@ -97,8 +92,7 @@ dispose 收尾。
   借此再派发一次 degeneration 续行。没有任何外部物理回执时继续
   保留未知事实；不增设第二个超时来伪造无死锁。
 
-验收：`tests/010.test.mjs` 的可复现反例和 seeded fast-check
-验证两种回执顺序、未决 Promise、物理接纳幂等及新旧 Provider 的隔离。
+`tests/010.test.mjs` 用可复现反例和 seeded fast-check 覆盖两种回执顺序、未决 Promise、物理接纳幂等及新旧 Provider 的隔离。
 
 ## [011] 中断在途时请求先行结束，已受理的中断仍须续跑
 
@@ -113,12 +107,13 @@ dispose 收尾。
 仍在继续，例如排队消息），受理的中断停下的就是它，仍须续行，且不再记删失样本。看门狗每次触发中断都记一条
 `latency-degeneration-interrupt` 诊断，带阈值，使打断原因可见。
 
-旧实现在上述窗口里只做 `Discard`/`Complete` 并撤销恢复，回执到达时找不到测量即
-静默返回：子会话被 Abort 后无人续跑，父 Join 视 `Aborted` 为观察而继续等待，形成死锁。
+受理的中断停掉的是这个会话循环，无人认领的停放等于把停摆原样留给用户（父 Join 只把 `Aborted` 当观察，会一直等下去）。因此：
 
-回归：`tests/011.test.mjs` 的 seeded fast-check 随机交错工具边界、失败终态、新 run
-启动／取消／丢弃与 idle，断言受理的中断恰好续行或返回一次；旧实现的最小反例为
-`[["step-end"]]`。
+终态事件缺失请求身份（无法与在途测量建立唯一归属）时，样本照旧放弃；但中断已在途
+的测量不随之丢弃，而是与带身份的先行结束同样停放，由中断回执决定续跑或收尾。
+
+`tests/011.test.mjs` 用 seeded fast-check 随机交错工具边界、失败终态、新 run
+启动／取消／丢弃与 idle，断言受理的中断恰好续行或返回一次。
 
 ## [012] 看门狗自己的 Abort 不是 Advisor / SyncDelegate 的答案
 
@@ -134,20 +129,20 @@ Fork 的 Join 本来就把 `Aborted` 当观察，不受影响。
 
 真机事件序（OpenCode 1.18.29，`/event` 实录）：assistant `message.updated`（开始）→ 工具 part
 `pending → running → completed` → **之后**才有同一 assistant 的 `finish=tool-calls` + `time.completed`。
-工具在 Provider step 内执行，[008] 依赖的终态事件要等工具全部返回才到。旧实现因此把 `join`、bash、
-咨询（advisor / askPreviousScope）、`negotiate` 等长工具的执行时间都算成模型延迟；阈值随快速步骤收紧
-（无地板，几秒级）后，长工具几乎必被看门狗 Abort——这就是「经常被打断」「advisor 都被打断」的来源。
+工具在 Provider step 内执行，[008] 依赖的终态事件要等工具全部返回才到。若只按 [008] 计时，
+`join`、bash、咨询（advisor / askPreviousScope）、`negotiate` 等长工具的执行时间都会被算成模型延迟；
+阈值随快速步骤收紧（无地板，几秒级）后，长工具几乎必被看门狗 Abort——这就是「经常被打断」「advisor 都被打断」的来源。
 
 宿主 `tool.execute.before` 一到，就把该 session 的在途测量按工具边界结束（`LatencyWatchdog.ToolStarted`，
 样本是模型自己的耗时）。中断已在途时仍按 [011] 停放、由回执决定续跑。同一步的并行工具、无测量时的
 工具开始均为空操作；下一次模型请求由新的 assistant 开始重新计量。
 
-验收：`tests/013.test.mjs`（状态机 + 生产接线）。真机对照：`tests/support/run-real-host-degeneration.mjs`
-（`REPRO_MODE=slowtool`，配合 `tests/support/slow-tool-plugin.mjs` 让 `negotiate` 在 step 内阻塞）——
-撤掉 `ToolStarted` 时 15s 的工具在 3.3s 被 Abort（`aborted=true`），接上后完整执行（`aborted=false`）。
+`tests/013.test.mjs` 验状态机与生产接线。真机复现：`tests/support/run-real-host-degeneration.mjs`
+以 `REPRO_MODE=slowtool` 运行（配合 `tests/support/slow-tool-plugin.mjs` 让 `negotiate` 在 step 内阻塞），
+对比接上与撤掉 `ToolStarted` 时长工具是否被提前 Abort。
 
 ## [014] 新手保护期不武装定时器
 
 库侧阈值无先验，p99 至少要 100 条观测：之前 `ThresholdMs` 为 +∞。宿主照常测量与记样本（样本本身
 结束保护期），但 +∞ 阈值不调度任何定时器、不中断；这类从未武装的测量在 idle 时也不返回失败。
-验收：`tests/013.test.mjs` 的 `latency-degeneration-014`。
+`tests/013.test.mjs` 的 `latency-degeneration-014` 用例覆盖本条。

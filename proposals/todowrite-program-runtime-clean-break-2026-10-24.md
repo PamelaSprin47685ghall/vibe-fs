@@ -1,22 +1,23 @@
-# todowrite：命名程序、顶层 planB 与 program/runtime clean-break
+# todowrite：命名程序、program/runtime clean-break 与统一请求期限
 
-> 日期：2026-10-24。状态：实现与范围内验收已完成；精确版本与未通过项见第 10 节。
-> 本文记录已批准方案及实施期间的修订：planB 从程序成员移到工具顶层；一次请求只建立一个期限，约束其全部 call、unpark 和恢复目标。
+> 日期：2026-10-24。状态：已实施；程序侧后续把期限字段定名 `intent` 并加入必填的进度自评字段，见第 1 节。
+> 期限文字（原称 planB）从程序成员移到工具顶层，一次请求只建立一个期限，约束其全部 call、unpark 和恢复目标。
 > 构建、测试、干净安装、提交与运行部署分别记账，不互相代替。
 
 ## 1. 公开入口
 
-`todowrite-for-ROLE` 恰好接收三个必填字符串：
+`todowrite-for-ROLE` 接收必填的三个字符串与进度自评字段：
 
 ```ts
 {
   name: string;
   program: string;
-  planB: string;
+  intent: string;
+  remainingScopeTurnsEstimate: number; // 非负实数
 }
 ```
 
-name 与 program 不得为空白，planB 不得为空字符串。模型为每个新运行明确取名；宿主不按物理调用身份偷偷生成名字。程序保持 `class Js extends JsProgram` 和 `async run()`。旧顶层 unpark、abandon、handle、prefixUntil、carry 不构成另一条兼容入口。
+name 与 program 不得为空白，intent 不得为空字符串。`remainingScopeTurnsEstimate` 只作进度自评，不进入 JS 沙箱、不作为预算变量（计费规则见《Scope 进度自评、专席 Advisor 与双重压缩》）。模型为每个新运行明确取名；宿主不按物理调用身份偷偷生成名字。程序保持 `class Js extends JsProgram` 和 `async run()`。旧顶层 unpark、abandon、handle、prefixUntil、carry 不构成另一条兼容入口。
 
 | 成员 | 合同 |
 | --- | --- |
@@ -27,7 +28,7 @@ name 与 program 不得为空白，planB 不得为空字符串。模型为每个
 | `this.signal(name, signal)` | 控制目标当前唯一命令，不恢复程序。 |
 | `this.send(name, input)` | 向目标当前唯一命令提交一行输入，不恢复程序。 |
 
-call 只能传一个参数；unpark 最多两个，第二个仅是显式 park 的恢复值。成员不能接收或创造预算。`const planB = 'x'.repeat(48000)` 只是程序局部变量；将它作为 call 的第二参数或 unpark 的第三参数会在副作用前被拒绝。
+call 只能传一个参数；unpark 最多两个，第二个仅是显式 park 的恢复值。成员不能接收或创造预算。`const intent = 'x'.repeat(48000)` 只是程序局部变量；将它作为 call 的第二参数或 unpark 的第三参数会在副作用前被拒绝。
 
 文件、委派、评审与其他成员仍按唯一角色能力来源投影。Manager reviewOnly、Plan 写前评审和 PLAN_PATH、Ask 的既有业务准入保持。委派 `resume(payload)` 不等于程序恢复；普通 return 不等于业务 deliver。
 
@@ -36,11 +37,11 @@ call 只能传一个参数；unpark 最多两个，第二个仅是显式 park �
 工具完成参数及权限准入时一次计算：
 
 ```text
-budgetMs = UTF8Bytes(planB) × 50
+budgetMs = UTF8Bytes(intent) × 50
 deadline = admissionTime + budgetMs
 ```
 
-按 UTF-8 字节数计价，每 20 字节为 1 秒。planB 是工具参数中的文字，不作为代码执行。wanxiangli 不截短合法预算，不另加隐藏短上限。
+按 UTF-8 字节数计价，每 20 字节为 1 秒。intent 是工具参数中的文字，不作为代码执行。wanxiangli 不截短合法预算，不另加隐藏短上限。
 
 本次所有操作、SDK 排空、连续命令及 unpark 唤醒的目标共享同一个 RequestWindow。目标继续唤醒其他目标时仍使用该窗口。任何 call、命令退出或嵌套恢复都不能刷新、叠加或延长期限。
 
@@ -48,7 +49,7 @@ deadline = admissionTime + budgetMs
 | --- | --- |
 | 程序计算预算 | 等待时停表，恢复计算后使用剩余量，不重新发满。 |
 | 请求期限 | 持续推进；到期暂停活动程序并返回真实暂停回执。 |
-| 命令运行时长 | 可观察；不是由 planB 暗中设定的命令寿命。 |
+| 命令运行时长 | 可观察；不是由 intent 暗中设定的命令寿命。 |
 
 底层 ProcessSession 的显式物理有界执行合同继续存在。它的运行硬顶与模型请求期限不同，不能因迁移而取消。
 
@@ -65,7 +66,7 @@ deadline = admissionTime + budgetMs
 ```json
 {
   "name": "build",
-  "planB": "等待本次构建；窗口到期时保留原命令与程序现场，之后继续领取结果。",
+  "intent": "等待本次构建；窗口到期时保留原命令与程序现场，之后继续领取结果。",
   "program": "class Js extends JsProgram { async run() { return await this.call('node scripts/build.mjs'); } }"
 }
 ```
@@ -79,12 +80,12 @@ deadline = admissionTime + budgetMs
 | 暂停后命令退出 | 保存真实 CallResult，续体仍暂停。 |
 | 新请求显式 unpark | 原现场加入新请求窗口，接着排空、等待或领取已保存结果。 |
 
-新控制程序在顶层提供自己的 planB：
+新控制程序在顶层提供自己的 intent：
 
 ```json
 {
   "name": "continue-build",
-  "planB": "继续等待原构建；如果本次期限用尽，保留相同现场和新增输出。",
+  "intent": "继续等待原构建；如果本次期限用尽，保留相同现场和新增输出。",
   "program": "class Js extends JsProgram { async run() { return await this.unpark('build'); } }"
 }
 ```
@@ -115,7 +116,7 @@ parked.delta 是新增观察，不消费最终 CallResult。退出码、信号�
 
 ## 7. 独立 join 与 DAG 退出
 
-独立 `join()` 无参数、无 name/program/planB，不建立临时 JS 程序。它沿既有工作归属、结果批次、准入与中断规则收拢，不证明全部子工作成功。用户输入或宿主中断只结束这次等待，不顺手取消子工作，不把超时呈现为完成。
+独立 `join()` 无参数、无 name/program/intent，不建立临时 JS 程序。它沿既有工作归属、结果批次、准入与中断规则收拢，不证明全部子工作成功。用户输入或宿主中断只结束这次等待，不顺手取消子工作，不把超时呈现为完成。
 
 编程内 join/dag 的能力投影、生成基类、绑定、资源、示例与专用隐藏执行路径退出。依赖由模型显式安排：程序派工，独立 join 收拢，再提交下一程序。独立工具保持原有散文与结构材料边界，不保留已退役的程序结果包装。
 
@@ -126,7 +127,7 @@ parked.delta 是新增观察，不消费最终 CallResult。退出码、信号�
 | `wanxiangli/program` | Program() 登记入口；ProgramSession 会话内名称、重放与协作；私有 Run 单次运行、窗口、恢复代际和结算；ProgramCatalog 成员投影；Wait 等待控制。 |
 | `wanxiangli/runtime` | Runtime 独立进程、隔离与通信；RuntimeTools 原语和字面锚点；FileSession 读快照与版本；Filesystem、ProcessSession、Terminal、OutputSpool、Time 各自物理资源。 |
 
-program → runtime 是明确的永久单向基础依赖，仅消费公开产物。runtime 不解释 planB，不认识角色、评审或业务 deliver。两包不声明彼此独立，不跨源码编译，不保留转发聚合壳；库根规则已明确这一适用边界。
+program → runtime 是明确的永久单向基础依赖，仅消费公开产物。runtime 不解释 intent，不认识角色、评审或业务 deliver。两包不声明彼此独立，不跨源码编译，不保留转发聚合壳；库根规则已明确这一适用边界。
 
 | 撤销入口 | 当前实现归属 |
 | --- | --- |
@@ -147,21 +148,10 @@ localspace-js 当前公开上限为 `min(UTF8Bytes(planB) × 50ms, 30000ms)`。�
 
 这次 backport 约束 broker 的 call/unpark 准入与回复交付，保留 localspace-js 原有后台 worker 语义：直接在 worker 内执行的计算和文件 API 不因等待到期而被整体冻结。不能把它写成“期限到达后所有代码和文件副作用都停止”。
 
-## 10. 当前验证与交付边界
+## 10. 边界与残留
 
-| 层级 | 已取得的证据 |
-| --- | --- |
-| 程序与运行时行为 | 当前 64 项测试分别在 Node 26.12.0 和 Bun 1.4.2 通过；覆盖真实 SDK 排空、未 await 阻塞、共享到期、控制、收尾、输出和隔离。 |
-| 宿主核心回归 | repository-programming、process-execution、capability-enforcement 共 641 项：622 通过、0 失败、12 跳过、7 TODO；包含新增的真实命令退出、finally 落盘和跨插件隔离反例。跳过和 TODO 不计作通过。 |
-| 干净安装 | program/runtime 新包的 Node、Bun 实际消费及严格 TypeScript 检查通过；旧入口不可导入。 |
-| 库全量基线 | 最终全量 947 项：931 通过、16 失败；全部失败标题与原提交 f553f3ed07c4c0c6d5042d2d8561e66483a1b600 隔离构建的 16 项 Assembly `Missing field: updates` 逐项一致，没有新增失败。 |
-| localspace-js | 最终源码重新执行完整 npm test、typecheck 与临时目录生产构建，全部退出成功；收尾复核发现并修复的重复 RequestWindow 测试导入已提交为 `78e83c4`。包含 8 项共享预算回归，保留 30 秒上限与断连 detach 行为。 |
-| 其他消费者 | 工作、委派、问答、完整 managed-session-lifecycle、Bookkeeper 等共 614 项：564 通过、1 项既有失败、5 跳过、44 TODO。剩余 work-011 温度断言来自未修改的 PluginHooks/ChatParamsHook：两参数调用没有进入柯里化函数的第二层；独立用例和实际编译产物均已确认。 |
-| 构建与源码门禁 | 项目规定的 Fable 构建通过；本任务 88 个 F# 文件格式检查通过，JavaScript 语法检查通过。全仓格式仍有 53 个未修改文件不满足格式，静态检查剩余 25 项位于未修改的 Host/FissionPort、OMP、SecondHost、PluginTransforms。 |
-| 提交 | wanxiangli `b5187fc07d3da16ed14ad097c5bd0c01ecde822d` 已推送 main，宿主本提交以 gitlink 固定该版本；localspace-js 的共享窗口实现为 `42da3a896f1ac322dd7622cf00ffe07779563b99`，参数文档补全为 `03991b87882e3d0974fc95927601eba2ce531a21`，测试导入修复为 `78e83c4073c0950a7b1b091e360c673f1fd7a9ee`，均已在 main。宿主实现 `5e22533250926d82dee34470913ebf18156b2801` 已推送 master，后续验收记录提交不改变运行语义。 |
-
-上述宿主和库回归对应本次实际工作树，其中保留了开始任务前已有的并发修改；这些修改没有纳入本任务提交。干净安装仅证明表中列明的公开包消费范围，不能将工作树结果改称为提交在干净 checkout 中的全仓验证。
-
-本记录不宣称整个仓库所有历史缺口已闭合，不据 Linux 的 Node/Bun 结果宣称 Windows、macOS 或真实模型宿主通过。此次没有主动重启、部署运行服务；源码提交与正在运行进程加载哪个版本分别核对。
-
-正式合同见 repository-programming/WHAT.md、process-execution/WHAT.md 与各业务 WHAT。实际所有权、两仓提交、最终门禁及剩余边界统一登记在根 AGENTS.md 的迁移章节。
+- 当时的轮次计数、提交哈希与门禁通过数不再维护，历史在 git。持续证据是各规范包内的自保测试。
+- 不宣称整个仓库所有历史缺口已闭合；不据 Linux 的 Node／Bun 结果宣称 Windows、macOS 或真实模型宿主通过。
+- 干净安装只证明公开包的消费范围，不等于全仓在干净 checkout 中的完整验证。
+- 正式合同见 `requirements/repository-programming/`、`requirements/process-execution/` 与各业务 WHAT；
+  两仓职责与剩余边界见根目录《两仓现状盘点》与《AGENTS.md》。

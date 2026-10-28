@@ -1,22 +1,22 @@
 # Scope 进度自评、专席 Advisor 与压缩协作 — 定稿
 
-状态：APPROVED FOR IMPLEMENTATION（2026-10-25）；本文件是实施契约。每一阶段需记录真实代码与物理验收，不能把“设计已定稿”误写为已实现。
+状态：已实施（2026-10-26 收口，见根目录 `工作范围报告2.md`）。实施中程序侧把估计放宽为非负实数、降幅判定取 0.08（对外文案 0.1），本文按此修订；与程序再不一致处以程序为准。
 
 ## 1. 唯一进度单位
 
-每个有真实 providerRunId 的 LLM 请求是一个物理回合。这个回合没有调用任何有效 `todowrite-for-*` 时，**进度计费为 0**，不更新估计、不比较、不触发 Advisor。若有一个或多个有效 `todowrite`，**进度计费为 1**，最终估计是同一 providerRunId 所有有效 `remainingScopeTurnsEstimate: integer >= 0` 的 **min**。不依赖工具回调完成顺序。工具调用 ID 去重，调用重放、Provider 事件重放不能再次结算。
+每个有真实 providerRunId 的 LLM 请求是一个物理回合。这个回合没有调用任何有效 `todowrite-for-*` 时，**进度计费为 0**，不更新估计、不比较、不触发 Advisor。若有一个或多个有效 `todowrite`，**进度计费为 1**，最终估计是同一 providerRunId 所有有效 `remainingScopeTurnsEstimate`（非负实数）的 **min**。不依赖工具回调完成顺序。工具调用 ID 去重，调用重放、Provider 事件重放不能再次结算。
 
-必须等同一 LLM 回合的可观察 `todowrite` 工具集合结束（成功、失败或明确中止）后，才把该回合结算为唯一进度事实；不能第一项到达就先触发 Advisor。未被成功受理的工具不贡献估计。每个工具的 Schema 以 OpenCode/OMP 宿主实际入参为权威，`remainingScopeTurnsEstimate` 必填，类型整数、最小值 0，缺少/null/负值拒绝。模型可以一回合不调用 todo，那就完全免费；不额外设“缺报检查”。
+必须等同一 LLM 回合的可观察 `todowrite` 工具集合结束（成功、失败或明确中止）后，才把该回合结算为唯一进度事实；不能第一项到达就先触发 Advisor。未被成功受理的工具不贡献估计。每个工具的 Schema 以 OpenCode/OMP 宿主实际入参为权威，`remainingScopeTurnsEstimate` 必填，非负实数（允许小数），缺少/null/负值拒绝。模型可以一回合不调用 todo，那就完全免费；不额外设“缺报检查”。
 
-每一 Scope 第一条计费估计建立 `oldEstimate` 基线，不触发比较。后续同 Scope 的 `newEstimate < oldEstimate` 更新即可；`newEstimate >= oldEstimate` 自动产生一次 Advisor Process 触发（不审查模型动机）。系统公开规则；模型可以策略性递减，非负整数天然限制这种做法。
+每一 Scope 第一条计费估计建立 `oldEstimate` 基线，不触发比较。后续同 Scope 的 `newEstimate` 至少比 `oldEstimate` 下降 0.1（对外文案；程序判定取 0.08 容差）即可更新；降幅不足、持平、上升，或报零后仍继续计费，自动产生一次 Advisor Process 触发（不审查模型动机）。系统公开规则；模型可以策略性递减，非负实数天然限制这种做法。
 
 若结算值为 0，创建同 epoch 持久 `ResetDue`。从**下一次**正常 Provider 请求起独立 agent-attributed **strong steer** 提示 resetScope，直到确证真实 `ScopeReanchored`。期间新一轮计费回合无论估计多少，都触发 Advisor；若不调用 todowrite，仍持续 reset 提醒，不能悄悄清除 ResetDue。Advisor 回答和非 operator steer 不改变估计和 Scope。
 
 ## 2. todowrite 模型可见参数
 
-名称 `remainingScopeTurnsEstimate`，非负整数，必填。描述逐字如下：
+名称 `remainingScopeTurnsEstimate`，非负实数（允许小数），必填。现行文案见 `resources/provider/tool/js-program/arg-estimate/`；本文保留设计稿原文：
 
-> 预计完成当前 Scope 还需要多少个计费 LLM 回合，从本回合结束后算起。填写非负整数。
+> 预计完成当前 Scope 还需要多少个计费 LLM 回合，从本回合结束后算起。填写非负实数（2.5、4.875 都可以）。
 >
 > 不调用 todowrite 的 LLM 回合免费；一个回合无论调用多少次 todowrite，都只计费一次。如果同一回合提交多个估计，系统取最小值 min(多个估计)。
 >
@@ -70,13 +70,11 @@ compaction 后若需要恢复模型上下文，只呈现自然的工作材料：
 - 未归队提醒：“Scope 已重置。下一 Scope 目标：{newScopeObjective}。以下工作尚未归队，列出各项最近一次实际接受的派出指令全文：{outstandingDelegations}”。无在途时不加空列表。
 - 模型报告规则完全公开；没有劝导“诚实”“不要人为下降”的提示词。系统负责触发时机，不让模型判断条件是否适用。
 
-## 7. 职责分工和真实验收
+## 7. 职责分工
 
 唯一 `wanxiangli` ScopeProgress 拥有报告按 providerRunId 分组、min 聚合、估计/ResetDue、幂等/并发/中止事务；专席队列与持续会话分别由自治 AdvisorProcessQueue 和 AdvisorSeat 拥有。主仓 Host 仅做真实 Tool Schema、Provider 出站和物理 steer 执行；OpenCode/OMP 不维护第二套业务估计/触发判断。
 
-分层逐项通过：① 非 todo 回合免费，同一回合 N 个 todo 的 `min` 不受执行完成先后影响；跨回合升降/零值/重复工具 ID/失败均正确。② 一 Session 一个可恢复专席；四段顺序、最新快照、无工具、队列两项及以上合并、迟到/异常/崩溃 Unknown 均有正反例。③ 双宿主 reset 新 schema 仅两文本；thinking/assistant 完整保留、普通工具配对清理、实际未归队指令全文。④ 真实 OpenCode/OMP 自动 compaction 后的请求、状态与 Advisor/在途工作连续。⑤ npm pack 后 Node/Bun 消费真实库；Fable 编译/链接和全仓静态/相关 WHAT 门禁不新增红项。
-
-只有真实通过的部分标明已实现。代码尚未接入的部分保持未完成，不以 proposal 本身冒充运行证明。
+覆盖这些行为的自保测试在 `requirements/advisor/`、`requirements/context-compression/` 与 `requirements/host-boundary/tests/`；当时的轮次计数与门禁通过数不在此维护，历史在 git。只有真实通过的部分标明已实现，不以 proposal 本身冒充运行证明。
 
 ## 8. 三类咨询共用最新一次 Transform View（2026-10-25 增补定稿）
 
@@ -95,4 +93,4 @@ compaction 后若需要恢复模型上下文，只呈现自然的工作材料：
 
 临时 SDK 结果只有三种：**有效非空 assistant prose** 直接完成；**真实观察到工具执行违规或正常响应正文确为空** 才能在上限内再次询问；**SDK 返回 error 字段、Provider/租约/容量异常或网络错误** 属于宿主失败，立即结算短命问询，不应把报错 JSON 伪装成 user 消息，也不自动追加“刚才的回答不完整”或网络重试指令。对 Advisor 四段流程任意阶段的失败，释放当前 Process 的单飞队列并处理唯一合并等待项；不得把前一段错误当成 `proseN` 传递。
 
-验收：`requirements/host-boundary/tests/scope-hni-physical.test.mjs` 的 `delegation-negotiation-004`（工具 veto 仍有限重问）、`035`（临时 chat 无 managed lease、schema 原样、工具执行拒绝）、`036`（SDK error 中含 PROMPT-006 只发一次）、`037`（SDK Promise 因 CapacityQueueFull 抛错只发一次）；以及 Advisor 递归自身角色拒绝 `advisor-031`。本地 Provider 不等于商业 Provider 端到端真实运维保障。
+对应测试：`requirements/host-boundary/tests/scope-hni-physical.test.mjs` 的 `delegation-negotiation-004`（工具 veto 仍有限重问）、`035`（临时 chat 无 managed lease、schema 原样、工具执行拒绝）、`036`（SDK error 中含 PROMPT-006 只发一次）、`037`（SDK Promise 因 CapacityQueueFull 抛错只发一次）；以及 Advisor 递归自身角色拒绝 `advisor-031`。本地 Provider 不等于商业 Provider 端到端真实运维保障。

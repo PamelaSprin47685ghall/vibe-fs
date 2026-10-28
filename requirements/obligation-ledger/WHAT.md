@@ -1,10 +1,10 @@
 # obligation-ledger — WHAT
 
-本包规定待办义务的消极边界（Negative Boundary）：宿主原生 `todowrite` 已退役，不进入 `StaticTools.knownToolNames`、能力权限矩阵、投机调查分类或 ablation 映射；插件不得维护第二份待办账本。上下文压缩边界唯一由 `resetScope` 宿主工具承接（见 context-compression [033]）。各角色的活规划与工作推进由其 `todowrite-for-<role>` 编程面承担，不得产生压缩 checkpoint，也不得改写或注入压缩协议字段。
+本包规定待办义务的边界：宿主原生 `todowrite` 不进入 `StaticTools.knownToolNames`、能力权限矩阵或 ablation 映射；插件不得维护第二份待办账本。上下文压缩边界唯一由 `resetScope` 宿主工具承接（见 context-compression [033]）。各角色的活规划与工作推进由其 `todowrite-for-<role>` 编程面承担，不得产生压缩 checkpoint，也不得改写或注入压缩协议字段。
 
 ## [001] 宿主原生 todowrite 退役，待办归角色编程面
 
-宿主原生 `todowrite` 已彻底退役，不在 `StaticTools.knownToolNames`、`permissionFor`、`requestToolMap`、`InvestigationEstimateContract.classifyTool` 或 `resources/ablation/tool-map.json` 中登记或放行。各角色的活规划与工作推进由其 `todowrite-for-<role>` 编程面承担；`todowrite-for-*` 调用不得产生任何压缩 checkpoint，也不得改写或注入压缩协议字段。
+宿主原生 `todowrite` 不在 `StaticTools.knownToolNames`、`permissionFor`、`requestToolMap` 或 `resources/ablation/tool-map.json` 中登记或放行。各角色的活规划与工作推进由其 `todowrite-for-<role>` 编程面承担；`todowrite-for-*` 调用不得产生任何压缩 checkpoint，也不得改写或注入压缩协议字段。
 
 ## [002] 编程面调用不产生第二份待办真相与 checkpoint
 
@@ -28,5 +28,4 @@
 
 ## [007] 历史 Magic Todo 只读
 
-旧 TodoWritePrepared、TodoWriteAccepted、LegacyTodoSeedAdopted 等 Magic Todo 协议不得重新成为当前写入口、任务 authority、prefix 切换或 Host 回写依据。现有 legacy 接口可以明确拒绝；若未来提供审计读取，也必须是只读且不激活旧语义。
-
+旧 Magic Todo 协议（TodoWritePrepared/TodoWriteAccepted 一族）不得重新成为当前写入口、任务 authority、prefix 切换或 Host 回写依据：`ObligationJournalSurface` 的 `appendMagicTodo`/`snapshotMagicTodo` 与 `ObligationEnvelopeSurface` 的 legacy envelope decoder 都明确拒绝并返回退役错误。若未来提供审计读取，也必须是只读且不激活旧语义。

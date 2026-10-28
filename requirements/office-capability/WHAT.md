@@ -8,7 +8,7 @@ Office 由其有权产生的后果（Entitled Consequence）及禁止的后果�
 
 同一 Office 的权能与权限集合一致，不随执行档位改变。Role、Persona 及名字解析由 participant-identity 定义，不另设 fast/deep 职位或组合身份。
 
-当前证书、清理阻塞、已接纳评审和退任冻结等事实可按既有门禁收窄具体动作的准入，不扩大 Office 权能。
+在任状态、已接纳评审、清理阻塞等当前事实可以收窄具体动作的准入（见 capability-enforcement-025），只收窄不扩大；收窄后的权能仍属同一 Office，事实解除即恢复。
 
 ## [004] 权限是后果模型的投影
 
@@ -22,7 +22,7 @@ Office 由其有权产生的后果（Entitled Consequence）及禁止的后果�
 
 Engineer 的调查不含真实命令执行，即使只读；只读调研是任务约束，不是新角色。DevOps 可在既定需求内作工程判断，无需唯一机械解法或逐次批准。Manager 区分实现完成、执行与自修后的重新验证、自己的验收判断。
 
-资源中不得保留非当前合法活跃角色的可加载提示词、工具建议、别名或模型池。普通浏览器测试及一般探究用语不因此违规；回归覆盖实际分发资源与调用接点，不止角色目录。
+资源中不得保留非当前合法活跃角色的可加载提示词、工具建议、别名或模型池；一般探究用语不受此限。
 
 ## [006] Office 不可互换
 
@@ -30,9 +30,9 @@ Engineer 不是真实命令执行器；DevOps 不代作架构或产品决定、�
 
 ## [007] Manager 的直接操作边界
 
-Manager 不修改工作树、不执行命令、不使用 Fission；直接文件工具（`read`/`grep`/`glob` 等）已退役且始终拒绝。评审接纳前可通过专用只读工具 `todowrite-for-manager` 直接取证，接纳后关闭；该工具不提供副本语义，当前事实门禁见 capability-enforcement-025。
+Manager 不修改工作树、不执行命令、不使用 Fission。宿主工具面里没有供 Manager 直接使用的文件工具；其 Read/Glob/Grep 只经专用工具 `todowrite-for-manager` 行使。评审接纳前可用该工具直接取证，接纳后这份只读面被收回；该工具不提供副本语义，当前事实的收窄准入见 capability-enforcement-025。
 
-Manager 只能新建 Engineer，续做既有 Engineer 或调用固定 DevOps；续做不得改变已有身份、绑定、控制权或创建替代 DevOps，具体语义见 delegation-003/024。
+Manager 只能新建 Engineer，续做既有 Engineer 或调用固定 DevOps；续做不得改变已有身份、绑定、控制权，也不得创建替代 DevOps，具体语义见 delegation-003 与 delegation-024。
 
 ## [011] Manager 的管理权能
 
@@ -46,7 +46,7 @@ Orchestrator 只委任或接续顶层道路的 Manager，不直接委任其他 O
 
 ## [015] 不另设强度选择职位
 
-不存在为强度降级选择廉价模型的职位。该名字不进入普通调度、Manager 的公开 fork 候选、工具门禁或用户可见接口。
+不存在为强度降级选择廉价模型的职位。这类名字（如 predictor）不进入普通调度、Manager 的公开 fork 候选、工具准入或用户可见接口。
 
 ## [016] Engineer
 
@@ -56,19 +56,20 @@ Engineer 是唯一具有 Fission 角色能力的 Office；Fission 是同一 Engi
 
 ## [017] DevOps
 
-DevOps 具有全部本地工程能力以及真实命令、终端和进程管理能力。执行中遇到非架构级缺陷或测试失败，应自行调查、修改源码、补回归并重新验证；该修复权是角色固有权能，不受逐次授权或 `allowRepair` 开关控制。
+DevOps 具有全部本地工程能力以及真实命令、终端和进程管理能力。执行中遇到非架构级缺陷或测试失败，应自行调查、修改源码、补回归并重新验证；该修复权是角色固有权能，不需要逐次授权，也没有开关可以收回。
 
-DevOps 不发明架构、产品含义、兼容性或安全政策，不削弱断言或绕过门禁，不 fork/resume 其他代理，不使用 Fission。到达架构或产品边界时交回 Manager。
+DevOps 不发明架构、产品含义、兼容性或安全政策，不削弱断言或绕过运行时准入，不 fork/resume 其他代理，不使用 Fission。到达架构或产品边界时交回 Manager。
 
 ## [018] Sphinx
 
-Sphinx 以独立 MCP stdio 服务存在（`Sphinx/V2/ServeEntry` 与 `Hosts/Mcp` 七件套），插件不提供 `sphinx` 原生工具面或对应 capability。程序内部的标准 Engineer 调用遵循 delegation 与 capability-enforcement 的现有资格、authority 检查，不另设只读 profile，不增加真实执行或 DevOps 调度权。
+Sphinx 以独立 MCP stdio 服务存在（`src/Wanxiangshu/Sphinx/V2/ServeEntry.fs` 与 `src/Wanxiangshu/Sphinx/V2/Hosts/Mcp/`），插件不提供 `sphinx` 原生工具面或对应 capability。程序内部的标准 Engineer 调用遵循 delegation 与 capability-enforcement 的现有资格、authority 检查，不另设只读 profile，不增加真实执行或 DevOps 调度权。
 
 Sphinx 不是 Role、Persona 或普通 subagent，不拥有独立 Fission 身份、不增加 session 层级，不设 Inquiry 或其他中间模型驾驶层。
 
 ## [019] Plan
 
-Plan 负责在同一物理会话内以多任期接力推进单一规划底稿 `P`：通过 `todowrite-for-plan` 读写底稿，用编程面成员 `this.devops(intent, carry)` 同步委派固定 DevOps 做只读调查，用与 Manager 共享的 `review` 按已提交义务账完成接力、晋级和进入待执行；需要用户决定时经编程面 `this.ask` 显式暂停。Plan 的工作工具权限集为 `todowrite-for-plan`、`devops`、`review`，但宿主注册的只有 `todowrite-for-plan`、`review` 两个工具名：`devops` 仅以 Plan 编程面成员存活，可选 `carry` 默认 `[]`（见 work [028]/[030]）；`ask` 同样不注册独立宿主工具，`resume` 与 `handoff` 不属于 Plan 的工具面。
+Plan 负责在同一物理会话内以多任期接力推进单一规划底稿 `P`：通过 `todowrite-for-plan` 读写底稿，用编程面成员 `this.devops(intent)` 同步委派本任务绑定的固定 DevOps 做只读调查，用与 Manager 共享的 `review` 按已提交义务账完成接力、晋级和进入待执行；需要用户决定时经编程面 `this.ask(question)` 显式暂停。
 
-Plan 不获得代码仓库与执行工具的权限，不开放任何真实 shell 或命令执行通道（`devops` 委派的调查含 bash，其只读约束由 office 提示词承担，不做运行时门）。所有承担任务的角色（Manager、Orchestrator、Engineer、DevOps、Plan）都不得在目标完成前自然停止，义务范围与 internal 末梢 Advisor/Bookkeeper 的专用提交边界见 work [027]；Plan 可通过成功的 `ask`（编程面 `this.ask`，仅 S1，work-049/050）形成等待用户的暂停，Manager 禁用提问，`join` 只用于临时等待后台工作。其他角色不因这项修订取得 `ask` 或 `devops` 权限。
+Plan 的权能是 `todowrite-for-plan`、`review`，加上只存在于编程面的成员 `devops` 与 `ask`：宿主注册的只有 `todowrite-for-plan`、`review` 两个工具名（见 work-030），`devops` 由 `todowrite-for-plan` 承载（见 work-028），`ask` 是 park 特化成员（见 work-049、work-050）。`resume` 与 `handoff` 不属于 Plan 的工具面。
 
+Plan 不获得代码仓库与执行工具的权限，不开放任何真实 shell 或命令执行通道；`devops` 委派的调查含真实 bash，其只读约束由 office 提示词承担，不做运行时门。所有承担任务的角色（Manager、Orchestrator、Engineer、DevOps、Plan）都不得在目标完成前自然停止，义务范围与 internal 末梢 Advisor/Bookkeeper 的专用提交边界见 work-027。Plan 可通过成功的 `ask` 形成等待用户的暂停；Manager 禁用提问；`join` 只用于临时等待后台工作。其他角色不因本条取得 `ask` 或 `devops` 权限。

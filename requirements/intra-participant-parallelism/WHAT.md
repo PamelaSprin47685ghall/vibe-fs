@@ -44,11 +44,11 @@ group、lane 成员、替换与收敛终结由不可变 durable facts 审计和�
 
 ## [011] 单 active group
 
-同一 logical participant 同时至多一个 active group。活跃 lane 再次裂变须拒绝为 already-fissioned，不递归裂变。
+同一 logical participant 同时至多一个 active group。活跃 lane 再次裂变须拒绝（`FissionRejectReason.AlreadyFissioned`），不递归裂变。
 
 ## [012] 权能单一来源
 
-从 office consequence 同一来源投影模型工具集与运行时门禁，同 office 的不同档位权限相同。只有已证明的 Engineer 且本次授权含 Fission 才具备裂变权能；完整准入条件见 [017]。
+模型工具集与权限判定从 office consequence 同一来源投影，同 office 的不同档位权限相同。只有 CanonicalRole=Engineer 且本次授权含 Fission 才具备裂变权能；完整准入条件见 [017]。
 
 ## [013] Subsession-only origin
 
@@ -60,7 +60,7 @@ nudge 和 provider fallback/AABB 恢复由各自 owner 负责。lane 的 TurnInP
 
 只有稳定 TurnCompleted 可进入 lane 物化或最终接管完成；真正外部 abort 才可终止 group。
 
-takeover 终态准入需独立交付见证：owner 终端发布由 publishOwnerTakeover 按 durable TaskDelivery witness 裁定，最终 lane 的局部交付只作整合材料——经 aggregate 进入接管 prompt，不写入 owner 交付格，也不作见证，不能替代 owner 自己的整合交付；无有效见证的 owner 终态被拒（RejectedUndelivered），不发布 Completed。
+takeover 终态准入需要 owner 自己的交付事实：owner 终端发布由 publishOwnerTakeover 按 durable TaskDelivery 交付事实裁定；最终 lane 的局部交付只作整合材料——经 aggregate 进入接管 prompt，不写入 owner 交付格，不能替代 owner 自己的整合交付。没有 owner 交付事实的 owner 终态被拒（RejectedUndelivered），不发布 Completed。
 
 ## [015] Deterministic ring convergence
 
@@ -68,7 +68,7 @@ V1 按 canonical index 从 lane 0 到 N−1 环行，以 keyed union 合并；�
 
 ## [017] 准入公式与身份边界
 
-准入须同时满足：已证明 CanonicalRole=Engineer、本次授权含 Fission、subsession 来源、无 active group，以及其余现有准入条件。运行时入口与 ToolRegistry 都须拒绝不满足条件的调用，不能只隐藏 schema。
+准入须同时满足：CanonicalRole=Engineer、本次授权含 Fission、subsession 来源、无 active group，以及其余现有准入条件。运行时入口与 ToolRegistry 都须拒绝不满足条件的调用，不能只隐藏 schema。
 
 角色名、Persona 别名、参数、自称身份、附带的会话上下文和附带已交回的 view 均不授予能力。所有非 Engineer 身份（含 Manager 各任期、Orchestrator、DevOps、Bookkeeper 及未知或内部辅助身份）、Engineer 根会话、已有 active group 的 lane、Sphinx 内部只读 Engineer 均拒绝。历史 Manager Fission 只供读取和重放，不重建 lane、恢复执行或扩权。
 

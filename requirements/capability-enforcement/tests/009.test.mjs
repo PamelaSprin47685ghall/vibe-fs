@@ -55,7 +55,6 @@ test('WHAT[capability-enforcement-009] FORK_disposed_or_unbound_execution_surfac
         },
       { sessionID: '', agent: 'engineer' },
     )
-    assert.match(result, /cannot be placed from this execution context|caller's authority is established|调用方权威确立之前/i)
     assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
   })
 

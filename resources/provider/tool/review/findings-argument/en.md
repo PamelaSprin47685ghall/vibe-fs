@@ -1,1 +1,1 @@
-Keyed obligation ledger updates. Each element is `{ key, value }`: `key` names one obligation, `value` is the remaining work for it, or `null` to delete that key. An existing key is overwritten, a missing key is added, and a `null` value deletes it. Item-by-item, not whole-set replacement.
+Keyed updates for remaining work. Each element is `{ key, value }`: `key` names one item, `value` is the remaining work for it, or `null` to delete that key. An existing key is overwritten, a missing key is added, and a `null` value deletes it. Item-by-item, not whole-set replacement.

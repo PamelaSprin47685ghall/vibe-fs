@@ -1,15 +1,31 @@
-# semantic-trace 测试
+# semantic-trace 测试说明
 
-本目录说明实际证据，不增加 WHAT 以外的规则。
+行为规范见 [WHAT.md](../WHAT.md)。本目录包含从 Host wire 解码到 XTrace 持久化日志、工作记录物化与交付记录各环节的测试。
 
-- 001/003/004/006 检查真实投影的 Opening、Terminal、游标、溯源和精确范围。003 另使用真实日志并发捕获，确认游标不重叠；006 覆盖缺失身份、夹入其它身份、游标缺口和半开边界。
-- 002 通过真实 Host 解码与捕获验证 typed retry 被剔除、相同措辞的普通任务被保留、元数据不进入正文，以及缺失/空白/重复身份和 legacy trace 不获得 stable 资格。删除源码字样证明；普通正文中的路径仍是正文，不因词形过滤。
-- 005 证明纯渲染随语义而变、不随溯源而变；验证组合层 C 将 `XTraceRange [start, end)` 与 `RecordCoverage` 精确换算为 `wanxiangli/trace` 的 `(after, through]` `Cut`、保持 SHA-256 哈希链、无损桥接 `reasoning`/`tool-result`/`media` 与 `> 512 KiB` 分片部件、拦截重入与异字节冲突，并通过独立编译消费者负例证明私有状态、游标与区间构造器不可越界访问（CUT-03）。
-- 007 实际追加后关闭并重开同一磁盘日志，核对原文及重复捕获；有界物化也调用生产入口。各下游真实消费链同源仍 TODO，flatten 的次序测试只证明转换本身。
-- 008 原导出成员不存在和源码扫描不能证明推测未入史，改为待补真实候选/探测反例。失败本身可以是真实观察，不能把未生效的候选变更记成事实。
-- 009 现有用例只追加标有新 generation 的部件，没有执行 Host compaction 或重锚；保留局部证据，完整链标 TODO。
-- 010 对比纯裁决与真实捕获，覆盖相同重放、任务正文冲突、权威要求冲突及拒绝后状态不变。
-- 011/012 原 Surface 内自行排序数组、每次游标加十的模型已撤下；它们没有执行 Fission 或 Resume。真实汇聚、区间和消费者证据仍须分别在相应生命周期补齐，GAP-101 记录缺口。
-- 013 驱动真实 journal 与 `hostFactFold`/`facts` 表面：交付见证按 (session, providerRun, toolCallId) 三元组与完整围栏读取，散文、view 声明与物化 view 连同材料摘要原样取回；换围栏得到另一份见证且互不覆盖，同围栏重放不产生第二条，经 `hostFactFold.fold` 的材料冲突被拒且原见证保留，冷重开同一目录可从 durable 事实重放同一见证。散文、view 声明文本与 provider stop 只是材料，被拒的提交不落见证；缺见证的终态由 `TerminalReporter` 判为 RejectedUndelivered 且不发布完成。它不证明 Fission 或 Resume 侧的见证消费。
+## 测试覆盖重点
 
-完成节点先运行正式构建，再通过 `requirements/verification-system/tests/run.mjs` 的 `TESTS_MJS_FILES` 指定本包及受影响调用方。TODO 不计通过；发布节点已同步保留未完成状态。
+- **001**：驱动真实临时目录与日志格式，核对首段（Opening）、交互部件（Parts）与终结（Terminal）的单调写入、跨进程同键幂等与冲突拒绝。
+- **002**：通过真实 Host 解码与捕获验证 typed retry 识别、相同措辞的普通任务保留、元数据不进入正文，以及缺失/空白/重复身份与 legacy trace 时的严格校验。
+- **003**：验证游标（Cursor）单调递增并与 Host 轮次解耦，验证并发写入时的串行分配与回退拒绝。
+- **004**：验证溯源按 ProviderRun 分段，验证重锚后的新 generation 与历史轮次隔离。
+- **005**：验证语义渲染的一致性，验证区间换算为 `wanxiangli/trace` 的 Cut 切片、SHA-256 哈希链维护、分片部件桥接与私有状态隔离。
+- **006**：验证基于 Host 稳定身份与半开区间的连续切片，验证缺失、乱序或游标缺口时的 fail-closed 裁决。
+- **007**：验证日志追加后关闭并重开的原文核对及重复捕获处理。
+- **008**：验证投机候选拒绝与失败探测回退不污染持久 XTrace。
+- **009**：验证上下文压缩与重锚只推进 epoch，不删除已有 XTrace 记录。
+- **010**：验证 Opening 区间不被普通工具材料滤除、重放幂等与冲突改写拒绝。
+- **011**：验证多 lane 并行分流（Fission）溯源部件的因果汇聚与统一终结前沿。
+- **012**：验证跨 Resume 边界的独立 InvocationStartCursor/EndCursor 范围隔离。
+- **013**：驱动真实日志与事实折叠表面，验证交付记录按三元组与完整围栏读取、材料冲突拒绝、终态判定与幂等重放。
+
+## 运行方式
+
+先执行标准构建：
+```sh
+node scripts/build.mjs
+```
+
+运行测试：
+```sh
+TESTS_MJS_FILES="$(rg --files requirements/semantic-trace/tests | rg '/[0-9]{3}\.test\.mjs$' | sort | paste -sd, -)" node requirements/verification-system/tests/run.mjs
+```

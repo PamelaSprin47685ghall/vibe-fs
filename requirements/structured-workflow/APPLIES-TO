@@ -13,6 +13,4 @@
 /scripts/checks/architecture.mjs
 /scripts/checks/subsystems.mjs
 /scripts/checks/subsystems.json
-/scripts/checks/fsharp-control-pyramid.mjs
-/scripts/checks/aggregate-retired.mjs
 /scripts/lib/walk.mjs

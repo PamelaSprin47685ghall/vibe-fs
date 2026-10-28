@@ -9,5 +9,3 @@
 /src/Wanxiangshu/OpenCode/Host/WorkspaceEventStoreSurface.fs*
 /src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs
 /src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs
-/src/Wanxiangshu/Strength/Persistence/**
-/scripts/checks/unified-store-gate.mjs
