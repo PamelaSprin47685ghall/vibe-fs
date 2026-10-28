@@ -7,10 +7,12 @@ import { toolchain, prepare } from './toolchain.mjs'
 import { claim, release, readOwner } from './ownership.mjs'
 import { locations } from './client.mjs'
 import { readReferences, currentReferences, referenceKey, recordReferences } from './references.mjs'
+import { createUsage } from './usage.mjs'
 
 const root = fs.realpathSync(process.argv[2])
 const expected = process.argv[3]
 const places = locations(root)
+const usage = createUsage(path.join(root, '.fable-build/compiler/usage.json'))
 const identity = claim(places.state)
 if (!identity) process.exit(0)
 const setting = (name, fallback) => {
@@ -137,10 +139,15 @@ const server = net.createServer(socket => {
       send(socket, { ok: false, error: error.message })
       return
     }
-    clearTimeout(idle)
-    queued++
+    if (command.op !== 'status') {
+      clearTimeout(idle)
+      queued++
+    }
     queue = queue.then(async () => {
-      active = socket
+      active = command.op === 'compile' ? socket : undefined
+      let finishUsage
+      let result
+      let outcome = 'failure'
       try {
         if (closing) return send(socket, { retry: true })
         if (socket.destroyed) return
@@ -164,7 +171,7 @@ const server = net.createServer(socket => {
         if (worker && referenceState !== referenceKey(referenceInputs)) await retire()
         await launch(current)
         const timer = setTimeout(() => { void retire() }, 540000)
-        let result
+        finishUsage = usage.begin({ workerPid: worker.pid, projects: 1, toolchain: current.key })
         try { result = await compile(command) }
         finally { clearTimeout(timer) }
         if (toolchain(root).key !== expected || readOwner(places.state)?.token !== identity.token) {
@@ -182,14 +189,20 @@ const server = net.createServer(socket => {
         const retired = !result.ok || count >= setting('WXS_CHECKER_BUILD_LIMIT', 32)
           || result.memoryBytes >= setting('WXS_CHECKER_MEMORY_MIB', 1536) * 1048576
         if (retired) await retire()
+        outcome = result.ok ? 'success' : 'failure'
         send(socket, { ...result, retired, servicePid: process.pid })
       } catch (error) {
         await retire()
         send(socket, { ok: false, error: error.message })
       } finally {
+        finishUsage?.({ outcome, reuse: typeof result?.reused === 'boolean'
+          ? { created: result.reused ? 0 : 1, reused: result.reused ? 1 : 0, reusedAcrossBuilds: result.reused ? 1 : 0 }
+          : null, workerMemory: result?.memory ?? null, serviceMemory: process.memoryUsage(), retired: !worker })
         active = undefined
-        queued--
-        if (!closing && queued === 0) armIdle()
+        if (command.op !== 'status') {
+          queued--
+          if (!closing && queued === 0) armIdle()
+        }
       }
     }).catch(error => {
       console.error(error)

@@ -98,3 +98,19 @@ README.md 但仍被声明为打包文件而失败，未修改 upstream 同样失
 没有实际升级 Node 二进制或开展数日的主仓常驻内存试验。
 不把专项测试通过、既有业务失败和部署成功混为一谈。
 详细命令日志、逐次计时、产物摘要和并发日志保留在本工作树 .fable-build/。
+
+2026-10-28：状态查询与使用记录后续
+
+原 PR #66 / 库 #5 已由 upstream 合并。本次基于主仓 06c10f8cd、库 0d86c38，
+保持十分钟，取消状态查询续期，新增有界本地记录；字段定义见 BUILDING.txt。
+常驻主仓测试 9 项通过；库常驻回归 21 项通过，rebase 后记录及延迟测试 29 项通过。
+最新干净全量构建的主仓 753 / 库 49 个 JS 与未修改 upstream 逐字节一致；
+无改动构建、状态查询不修改记录，无改动构建不重写主仓产物。
+
+同步最新 upstream 时额外发现既有增量工程选取问题：1350 项的影响范围工程
+包含 Execution/Fission/OpenCode/Tool.fs，却未包含 Execution/Tool/ToolResultText.fs，
+因而把 ToolResultText 解析到 Host/ToolContext.fs 中的同名模块；全量 1376 项
+工程则解析到 Execution/Tool/ToolResultText.fs。这产生一个 JS 文件的导入差异。
+使用独立 Fable CLI 编译同一份 1350 项工程也复现该选择，不依赖常驻状态。
+本次未改影响范围选取或业务源码，未扩大修复；干净全量一致不代表这个既有
+增量边界已经修复。原始对照保存在 .fable-build/usage-upstream-focused-cli.log。

@@ -6,6 +6,7 @@ import path from 'node:path'
 import { spawn, execFileSync } from 'node:child_process'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { requestCompiler } from '../../../scripts/compiler/client.mjs'
+import { createUsage } from '../../../scripts/compiler/usage.mjs'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -78,6 +79,16 @@ integrationTest('WHAT[structured-workflow-020] independent commands reuse checks
     assert.equal(repaired.ok, true, JSON.stringify(repaired))
     assert.notEqual(repaired.pid, first.pid)
     assert.equal(await value(root), 12)
+    const usage = JSON.parse(fs.readFileSync(path.join(root, '.fable-build/compiler/usage.json')))
+    assert.equal(usage.totals.attempts, 4)
+    assert.equal(usage.totals.success, 3)
+    assert.equal(usage.totals.failure, 1)
+    assert.equal(usage.totals.created, 2)
+    assert.equal(usage.totals.reusedAcrossBuilds, 2)
+    assert.equal(usage.samples[1].intervalMs, usage.samples[1].startedAt - usage.samples[0].startedAt)
+    assert.equal(usage.samples[1].idleMs, usage.samples[1].startedAt - usage.samples[0].finishedAt)
+    assert.ok(usage.samples[1].workerMemory.rss > 0)
+    assert.ok(usage.samples[1].workerMemory.managedHeapBytes > 0)
   } finally { await close(root) }
 })
 
@@ -236,4 +247,65 @@ integrationTest('WHAT[structured-workflow-020] replacing a referenced DLL at the
     assert.equal(changed.reused, false)
     assert.notEqual(changed.pid, first.pid)
   } finally { await close(root) }
+})
+
+integrationTest('WHAT[structured-workflow-020] status polling does not renew idle time and usage survives service restart', { timeout: 180000 }, async () => {
+  const root = fixture()
+  const previous = process.env.WXS_CHECKER_IDLE_MS
+  const alive = pid => {
+    try { process.kill(pid, 0); return true }
+    catch (error) { if (error.code === 'ESRCH') return false; throw error }
+  }
+  try {
+    process.env.WXS_CHECKER_IDLE_MS = '1200'
+    const first = await call(root)
+    assert.equal(first.ok, true, JSON.stringify(first))
+    const file = path.join(root, '.fable-build/compiler/usage.json')
+    const before = fs.readFileSync(file, 'utf8')
+    const deadline = Date.now() + 5000
+    let queries = 0
+    while (alive(first.servicePid) && Date.now() < deadline) {
+      await requestCompiler(root, { op: 'status' }).catch(error => {
+        assert.match(error.message, /disconnected|exited/)
+      })
+      queries++
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+    assert.ok(queries >= 2)
+    assert.equal(alive(first.servicePid), false, 'status polling kept the service alive')
+    assert.equal(alive(first.pid), false)
+    assert.equal(fs.readFileSync(file, 'utf8'), before)
+    const restarted = await call(root)
+    assert.equal(restarted.ok, true, JSON.stringify(restarted))
+    const usage = JSON.parse(fs.readFileSync(file))
+    assert.equal(usage.totals.attempts, 2)
+    assert.equal(usage.totals.created, 2)
+    assert.equal(usage.totals.reused, 0)
+    assert.ok(usage.samples[1].idleMs >= 1200)
+  } finally {
+    if (previous === undefined) delete process.env.WXS_CHECKER_IDLE_MS
+    else process.env.WXS_CHECKER_IDLE_MS = previous
+    await close(root)
+  }
+})
+
+test('WHAT[structured-workflow-020] usage history is bounded, survives interruption and fails independently', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'checker-usage-'))
+  const file = path.join(root, 'usage.json')
+  try {
+    createUsage(file).begin({ projects: 1 })
+    const recorder = createUsage(file)
+    for (let index = 0; index < 260; index++) {
+      recorder.begin({ projects: 1 })({ outcome: 'success', reuse: { created: 0, reused: 1, reusedAcrossBuilds: 1 } })
+    }
+    const usage = JSON.parse(fs.readFileSync(file))
+    assert.equal(usage.samples.length, 256)
+    assert.equal(usage.totals.attempts, 261)
+    assert.equal(usage.totals.unknown, 1)
+    assert.equal(usage.totals.reusedAcrossBuilds, 260)
+    assert.equal(usage.totals.missingReuseReports, 1)
+    fs.writeFileSync(file, 'invalid record')
+    assert.doesNotThrow(() => createUsage(file).begin({ projects: 1 })({ outcome: 'failure', reuse: null }))
+    assert.equal(fs.readFileSync(file, 'utf8'), 'invalid record')
+  } finally { fs.rmSync(root, { recursive: true, force: true }) }
 })
