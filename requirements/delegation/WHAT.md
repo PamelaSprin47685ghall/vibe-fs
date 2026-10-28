@@ -217,3 +217,17 @@ Manager 对仍活跃的 Engineer／DevOps 执行 `resume` 时，已有子会话�
 规则：停机在中断前登记被停的答复（`CompletedContinuationStops`）。reconcile 遇到“最新 assistant 是 abort、其 parent 是已登记的被停答复”时，本次运行的结算对象是该答复之前、本运行物理输入之后那条已完成的收尾回合（按它自己的物理输入构造），走普通完成路径（交付见证、XTrace 捕获、终态发布）。这不是回退到历史 assistant：停机本身就是“报告之后的一切不属于本运行”的登记事实；未登记的 abort（操作员取消、退化打断等）照旧是观察。
 
 现场依据：2026-10-28 Manager `ses_e7fff8f2fffe…`（“大重构指南实施”），join 自 01:11:09 UTC 起挂住。Engineer `review-admission`（`ses_e7fff5477ffe…`）收尾报告 01:08:44–01:10:54，答复 01:09:58 排队，01:10:54 `loop step=21` 后 7 ms `cancel`；DevOps `devops`（`ses_e7fff48b5ffe…`）收尾报告 01:16:27–01:17:09，答复 01:16:50 排队，01:17:09.537 `loop step=20`、.544 `cancel`、.570 才记到报告的 ChatExecution Completed。两者都无 `TerminalOutputCaptured`、无 `HandleWorkCompleted`；同一会话里没有排队答复的 `review-continuation` 正常结算。验收：`requirements/delegation/tests/039.test.mjs`（未修复时 report 终态永不发布，修复后 `CompletedAwaitingJoin` 且 join 拿到报告正文）。
+
+## [040] 空的已完成回合不是收尾报告；迟到咨询停机不得吊销自己造成的静默
+
+[039] 的停机只对“已写完收尾报告”的回合成立。上一个 assistant 虽已完成、无工具调用，但没有任何正文（如 `finish=length` 的空回合）时，它不是收尾报告：排队的答复是唯一还能让本运行继续的输入，按普通工作放行，不得停机。
+
+停机自己造成的 abort（答复已登记在 `CompletedContinuationStops`）不是操作员取消：其 Cancelled 终态不得 `RevokeCurrentAttempt`。否则会话静默状态停在 Revoked，之后每个 idle 铸出的许可都被 `TryConsume` 拒收，被保留回合所需的 missing-final-report 修复只能以 `SupersededBeforePhysicalSend` 放弃，再无任何东西唤醒子代理，`HandleWorkCompleted` 永不写入，父方 join 永远等待。
+
+现场依据：2026-10-28 Manager `ses_e7ed7cdb2ffe…`（“指南.txt 重构指南实施”），join 自 07:05:34 UTC 起挂住，唯一未归的句柄 Engineer `esb1t2`（控制路径，`ses_e7ed78478ffe…`）。回合 `msg_1812ab6c7…` 06:20:22–06:25:13 `finish=length` 且无正文；答复 `msg_1812b4ec9…` 06:21:01 排队；06:25:13.138 `loop step=17`、.144 `cancel`、.165 ChatExecution Completed、.191 答复 Cancelled(PreProvider)、.200/.223 两次 InteractionRepair(missing-final-report) Claimed 后即 Abandoned(SupersededBeforePhysicalSend)，此后该会话再无事实。验收：`requirements/delegation/tests/040.test.mjs`（未修复时答复被停、`abortedIds=[child]`；修复后不停）。
+
+## [041] 长程角色不因迟到咨询而停
+
+Manager、Orchestrator、Plan 负责长程工作。它们无工具调用的自然 stop 不是收尾，只要工作未结束就该被 nudge 续上。[021]／[037]／[039] 的迟到咨询停机只适用于以 prose 收尾的角色（Engineer、DevOps 等）；会话角色是长程角色时，排队的 Advisor／`negotiate`／`askPreviousScope` 答复按普通工作放行，它本身就是续上工作的 nudge，不得 `AbortSession`，不得登记 `CompletedContinuationStops`。角色取答复消息或其前一条 assistant 的 `agent`（缺时取 `mode`）。
+
+现场依据：2026-10-28 Manager `ses_e7ed7cdb2ffe…`（“指南.txt 重构指南实施”）10:56:42 UTC 以 prose、无工具调用结束回合 `msg_18227b36a…`（finish=stop）；同刻 Advisor 答复 `msg_18227b433…` 作为咨询 steer 落地；10:56:51 `loop step=4` 后 13 ms `cancel`，`msg_18227d63d…` 为 `MessageAbortedError`。Manager 就此停住，直到 11:00:36 负责人再发消息。验收：`requirements/delegation/tests/041.test.mjs`（未修复时 manager／orchestrator／plan 的答复被停、`abortedIds=[sid]`；修复后不停；engineer 照旧停）。

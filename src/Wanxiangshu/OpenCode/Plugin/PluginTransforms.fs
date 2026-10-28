@@ -832,11 +832,34 @@ module PluginTransforms =
                 let answeredAlready = messages |> List.skip (index + 1) |> List.exists isAssistant
                 let previous =
                     messages |> List.take index |> List.rev |> List.tryFind isAssistant
-                marked && not answeredAlready && (previous |> Option.exists (fun assistant ->
+                // WHAT[delegation-041]: Manager, Orchestrator and Plan own long
+                // work. Their tool-free stop is no closing report; the answer
+                // is the nudge that carries the work on, never a wake-up to stop.
+                let agentOf item =
+                    let info = ProviderWireDecode.infoObject item
+                    ProviderWireDecode.firstString info [ "agent" ]
+                    |> Option.orElseWith (fun () -> ProviderWireDecode.firstString info [ "mode" ])
+                let longRunning =
+                    message :: Option.toList previous
+                    |> List.exists (fun item ->
+                        agentOf item
+                        |> Option.bind Roles.tryParseRole
+                        |> Option.exists Roles.isLongRunning)
+                marked && not answeredAlready && not longRunning && (previous |> Option.exists (fun assistant ->
                     let info = ProviderWireDecode.infoObject assistant
                     let finished = not (isNull info?time) && not (isNull info?time?completed)
                     let calls = ProviderWireDecode.rawPartsOf assistant |> List.exists (fun part -> ProviderWireDecode.firstString part [ "type" ] = Some "tool")
-                    finished && not calls))
+                    // WHAT[delegation-040]: an empty finished turn (finish=length,
+                    // no prose) is no closing report. The answer is then the only
+                    // thing that keeps the run alive; stopping it left nothing to
+                    // settle and nothing to continue.
+                    let prose =
+                        ProviderWireDecode.rawPartsOf assistant
+                        |> List.exists (fun part ->
+                            ProviderWireDecode.firstString part [ "type" ] = Some "text"
+                            && (ProviderWireDecode.firstString part [ "text" ]
+                                |> Option.exists (fun text -> not (String.IsNullOrWhiteSpace text))))
+                    finished && not calls && prose))
 
         /// 条款 3：本次 attempt 是否存在一次已成立的交付。判据只认真实交付
         /// 事实——交付登记时的物理输入必须仍是当前请求的物理输入，物理输入
