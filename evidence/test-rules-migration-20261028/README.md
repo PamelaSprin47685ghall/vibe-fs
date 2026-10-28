@@ -65,3 +65,7 @@
 4 条 AXIOM、7 条 LEMMA 与 20 个 SPEC 编号保持不变，前提引用均指向已有条目，无循环推导。继续使用 `## SPEC` 与 `### [NNN]`，符合主仓解析约定；不为模仿库侧排版改动稳定 ID。原有验收义务逐项保留，未改运行器、生产代码或测试断言。根 `AGENTS.md`、依赖和两个现有 prompt 均未修改；prompt 继续读取同一 AXIOMS 路径。
 
 验证使用 Node 26.6.0，重跑 requirement-system 全部顶级测试：19 项，18 passed / 1 failed，0 skip / 0 TODO。原始输出见 [refine-requirements.log](refine-requirements.log)，仅去除两处空白行的尾随空格。全树失败仍只包含上文两项既有问题；另直接调用真实扫描器比较完整问题列表，未新增或隐藏问题。20 个条款 ID 与基线一致，AXIOMS 中 30 个本地链接及其标题锚点可解析，`git diff --check` 通过。没有重跑 Fable 构建、完整 unit、integration 或真实发布；本轮不更新业务测试通过状态或性能结论。
+
+原独立分支随后修复了这两处归属问题，详见[当时的归属修复记录](https://github.com/dyx13/vibe-fs/blob/fbed0b763fd7691bcb9b2e833e84141ae26dabf3/evidence/spec-test-ownership-20261028/README.md)。当时未改规范检查器，正式规范套件为 19 passed / 0 failed；本记录保留各次运行当时的结果，不作为变基后上游的测试结果。
+
+随后对照迁移前 WHAT 再次复核适用范围，修正 010 的合同限定及其他过宽措辞，详见[测试规则适用范围复核](../test-rules-scope-review-20261028/README.md)。记录包括 20 条逐项比较、合法替代场景的推理，以及修订后的规范套件结果。
