@@ -49,3 +49,6 @@ module ProviderFailureSurface =
         handle: JournalHandle -> session: string -> physicalMessage: string -> providerRun: string -> bool
 
     val snapshot: handle: JournalHandle -> session: string -> obj
+
+    /// Continuation path a role gets when automatic retry gives up; empty when the turn stops.
+    val longWorkContinuationPath: role: string -> failure: string -> string
