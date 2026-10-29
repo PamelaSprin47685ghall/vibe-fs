@@ -1,6 +1,6 @@
 ## Scope and context
 
-Scope lifecycle rides on the required `scope` annotation on every tool call (injected by the host hook; see common law «Scope»). There is no separate reset tool as the entry; during transition, if the old `resetScope` tool name still appears, it must carry the same annotation.
+Scope lifecycle rides on the required `scope` annotation on every tool call (injected by the host hook; see common law «Scope»). There is **no standalone reset tool**. Archive reanchor is `scope.kind=resetScope` on any tool. In old transcripts the tool name `resetScope` may still act as a PairHint barrier for compatibility only.
 
 `scope.kind` is a flat enum: `resetScope` | `keepLast` | `removeLast` | `meToo`. `newScopeRetentionBudget` is the keep quota (information capacity), not a model-turn count. Any budget observation still appended on tool results is observational only — not proof of completion and not an execution ceiling.
 

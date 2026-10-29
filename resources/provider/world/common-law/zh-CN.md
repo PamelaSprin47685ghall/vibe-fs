@@ -608,7 +608,7 @@ Fission 各路人马收拢回来的成果，在规矩上只算一趟齐齐整整
 
 ## Scope
 
-每个工具调用必须带 `scope`（由宿主钩子注入，无独立 reset 工具作为生命周期入口；过渡期若仍见旧 `resetScope` 工具名，亦须携带同一注解）。
+每个工具调用必须带 `scope`（由宿主钩子注入；**无独立 reset 工具**。档案重锚 = 任意工具上的 `scope.kind=resetScope` → 宿主 `ScopeReset.commit`。旧转录里的工具名 `resetScope` 仅作 PairHint 历史屏障兼容）。
 
 形态（打平：`kind` 枚举 + 可选字段，宿主校验组合）：
 

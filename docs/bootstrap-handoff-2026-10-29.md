@@ -25,3 +25,9 @@
 **过渡已清：** 独立 `resetScope` 工具已物理删除；档案重锚走任意工具 `scope.kind=resetScope` → `ScopeReset.commit`；`remainingScopeTurnsEstimate` schema/驱动力已删；removeLast 投影用 beat 别名（providerRunId/callId）兜底。
 
 **PairHint 屏障：** `latestReset` / `isResetWirePart` / `isAlwaysRetained` / `neutralIsReset` 识别 `scope.kind=resetScope`（含 arguments/state.input 与打平字段），过渡仍兼容旧工具名；带 reset 注解的调用及其结果保留。宿主中立投影透传 `scope`。wx `ce-replay-wt` / 裁定仍不臆造。
+
+## docs-li / docs-shu（本轮）
+- li：capability／pair-hint／scope-retention／scope-progress AGENTS 对齐注解入口；估计路径标退役。
+- shu：共同法／scope-protocol／js-program·bookkeeper 资源去掉 estimate 必填；功能导览、结对指南、fork-child 收尾口径；proposals 两份 Scope 稿打历史条；requirements README 钉现行 Scope 一句。
+- **compat 仍可疑**（供后续 pass，不本轮全库考古）：`requirements/**/WHAT` 里旧 resetScope 工具／turnBudget／estimate 句；`scope-progress` 包内 Stall·ResetDue 测试与 durable 路径；`resources/.../arg-estimate` 路径名残留；旧转录 PairHint 工具名屏障；wx `ce-replay-wt`；proposals 正文未逐段改写（仅条目标记）。
+

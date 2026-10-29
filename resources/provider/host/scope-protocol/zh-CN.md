@@ -1,6 +1,6 @@
 ## Scope 与上下文
 
-Scope 生命周期挂在每一次工具调用的必选注解 `scope` 上（宿主钩子注入；见共同法 «Scope»）。没有单独的 reset 工具作为入口；过渡期旧 `resetScope` 工具名若仍出现，也必须携带同一注解。
+Scope 生命周期挂在每一次工具调用的必选注解 `scope` 上（宿主钩子注入；见共同法 «Scope»）。没有单独的 reset 工具作为入口。旧会话里若仍见工具名 `resetScope`，PairHint 仅把它当作历史屏障兼容；新回合一律用任意工具上的 `scope.kind=resetScope`。
 
 `scope.kind` 为打平枚举：`resetScope`｜`keepLast`｜`removeLast`｜`meToo`。`newScopeRetentionBudget` 是可保留的 keep 额度（信息容量），不是模型回合数。工具结果上若仍见预算观测尾巴，只是观测值，不是任务完成证明，也不是执行上限。
 

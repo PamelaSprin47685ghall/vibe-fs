@@ -609,7 +609,7 @@ There may be many roads open under your feet, but there is only one real world o
 
 ## Scope
 
-Every tool call must carry `scope` (injected by the host hook; there is no separate reset tool as the lifecycle entry. During transition, if the old `resetScope` tool name still appears, it must carry the same annotation).
+Every tool call must carry `scope` (injected by the host hook; **no standalone reset tool**. Archive reanchor = `scope.kind=resetScope` on any tool → host `ScopeReset.commit`. The legacy tool name `resetScope` in old transcripts is PairHint barrier compatibility only).
 
 Shape (flat: `kind` enum + optional fields; the host validates combinations):
 
