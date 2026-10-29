@@ -2,8 +2,8 @@
 
 | 仓 | HEAD | 备注 |
 |---|---|---|
-| vibe-fs | `bb8bcc07` | Scope 续收口 |
-| wanxiangli | `31cc992` | scope-retention 持久 journal + retractions |
+| vibe-fs | `5666ea1e` | 删 resetScope 工具；清 estimate；beat 别名 |
+| wanxiangli | `31cc992` | beat aliases + seed; ResetScope 无独立工具名 |
 
 ## Stash（保留）
 - 主仓 `stash@{0}`：PluginTransforms/managed-chat 半成品（已被 5dd99b87 覆盖）
