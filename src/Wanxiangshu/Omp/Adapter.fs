@@ -2213,11 +2213,29 @@ module Adapter =
             |> Array.map (fun part -> stringOf (fieldValue part "text"))
             |> String.concat "\n"
 
+    let private ompScopeAnnotationOf (part: obj) : obj =
+        let fromBag (bag: obj) =
+            if isNull bag then null else fieldValue bag "scope"
+        let candidates =
+            [ fromBag part
+              fromBag (fieldValue part "arguments")
+              fromBag (fieldValue part "input")
+              fromBag (fieldValue part "parameters") ]
+        candidates |> List.tryFind (fun v -> not (isNull v)) |> Option.defaultValue null
+
     let private ompNeutralPart (part: obj) : obj =
         match optionalString (fieldValue part "type") with
         | Some "toolCall"
         | Some "tool-call"
-        | Some "tool_call" -> createObj [ "id", fieldValue part "id"; "tool", fieldValue part "name" ]
+        | Some "tool_call" ->
+            let scope = ompScopeAnnotationOf part
+            if isNull scope then
+                createObj [ "id", fieldValue part "id"; "tool", fieldValue part "name" ]
+            else
+                createObj
+                    [ "id", fieldValue part "id"
+                      "tool", fieldValue part "name"
+                      "scope", scope ]
         | Some "toolResult"
         | Some "tool-result"
         | Some "tool_result" -> createObj [ "resultFor", fieldValue part "id" ]

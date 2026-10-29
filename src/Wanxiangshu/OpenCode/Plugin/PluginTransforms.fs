@@ -1481,6 +1481,19 @@ module PluginTransforms =
         | "error" when isText errorText -> "errorText"
         | _ -> ""
 
+    /// Pull scope annotation off a tool part for PairHint reset barriers.
+    let private scopeAnnotationOf (part: obj) : obj =
+        let fromBag (bag: obj) =
+            if isNull bag then null else scopeField bag "scope"
+        let state = scopeField part "state"
+        let candidates =
+            [ fromBag part
+              fromBag (scopeField part "arguments")
+              fromBag (scopeField part "input")
+              fromBag (scopeField state "input")
+              fromBag state ]
+        candidates |> List.tryFind (fun v -> not (isNull v)) |> Option.defaultValue null
+
     let private neutralPart (part: obj) : obj =
         let kind = scopeText (scopeField part "type")
 
@@ -1488,7 +1501,15 @@ module PluginTransforms =
             let tool = scopeField part "tool"
             let name = if isNull tool then scopeField part "name" else tool
             let resultField = scopeTerminalField (scopeField part "state")
-            createObj [ "id", scopeToolId part; "tool", name; "terminalField", box resultField ]
+            let scope = scopeAnnotationOf part
+            if isNull scope then
+                createObj [ "id", scopeToolId part; "tool", name; "terminalField", box resultField ]
+            else
+                createObj
+                    [ "id", scopeToolId part
+                      "tool", name
+                      "terminalField", box resultField
+                      "scope", scope ]
         elif kind = "toolResult" || kind = "tool-result" || kind = "tool_result" then
             createObj [ "resultFor", scopeToolId part ]
         else
