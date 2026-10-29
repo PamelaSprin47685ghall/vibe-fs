@@ -1465,3 +1465,32 @@ test('WHAT[delegation-negotiation-038] a normally completed empty SDK reply term
     }
   })
 })
+
+test('WHAT[delegation-negotiation-002] the unlocking call may itself carry resetScope; a same-turn meToo follows it', async () => {
+  const { bindDelegation, askNegotiation, negotiationRequired, clearSessionState } = await import('../../../dist/Context/Scope/Surface.js')
+  const { wrap, apply } = await import('../../../dist/OpenCode/Tools/ScopeAnnotationGate.js')
+  const { HostToolArguments_$ctor_4E60E31B } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+  const recipient = 'ses-neg-self-unlock'
+  clearSessionState(recipient)
+  bindDelegation(recipient, 'ses-neg-self-unlock-parent')
+  assert.equal(negotiationRequired(recipient), true)
+  const reset = { kind: 'resetScope', newScopeGoal: 'parser', newScopeRetentionBudget: 4, oldScopeVerboseVerbatim: 'old' }
+  const ctx = { SessionId: recipient, ToolCallId: ToolCallIdModule_create('call-neg'), ProviderRunId: undefined }
+  let ran = false
+  const gated = wrap('negotiate', () => '0', undefined, null, async () => {
+    ran = askNegotiation(recipient, 'Which parser?').ok
+    return 'negotiate accepted'
+  })
+  const out = await gated(HostToolArguments_$ctor_4E60E31B({ questions: 'Which parser?', scope: reset }))(ctx)
+  assert.equal(ran, true, 'negotiate runs although it carries the reset it unlocks')
+  assert.match(out, /^negotiate accepted/)
+  assert.doesNotMatch(out, /unavailable until/)
+
+  const { ProviderRunIdentityModule_create } = await import('../../../dist/Foundation/Identity.js')
+  const turn = ProviderRunIdentityModule_create('run-1')
+  const run = { SessionId: 'ses-same-turn', ToolCallId: ToolCallIdModule_create('c-reset'), ProviderRunId: turn }
+  assert.equal(apply('bash', HostToolArguments_$ctor_4E60E31B({ scope: reset }), run, () => '0').tag, 0)
+  const sibling = { ...run, ToolCallId: ToolCallIdModule_create('c-sibling') }
+  assert.equal(apply('read', HostToolArguments_$ctor_4E60E31B({ scope: { kind: 'meToo' } }), sibling, () => '0').tag, 0)
+  clearSessionState(recipient)
+})

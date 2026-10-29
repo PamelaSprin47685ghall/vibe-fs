@@ -245,3 +245,28 @@ test('WHAT[work-008] provider barrier: registered OMP context hook keeps user me
     rmSync(workspace, { recursive: true, force: true })
   }
 })
+
+// OpenCode never stamps tenureId and stores a finished call as one `tool` part
+// (call and result together). The successor still has to see the commission,
+// the barrier, and its own later turns; a retired turn of the predecessor that
+// finished after the cut stays hidden.
+test('OpenCode-shaped relay keeps the successor own turns without tenureId', async () => {
+  const { cutVisible } = await import('../../../../dist/Mission/Work/OpenCode/NarrativeTransform.js')
+  const user = (id, body) => ({ info: { id, role: 'user' }, parts: [{ type: 'text', text: body }] })
+  const asst = (id, parentID, parts) => ({ info: { id, role: 'assistant', parentID }, parts })
+  const done = (callID, tool, output) => ({ type: 'tool', callID, tool, state: { status: 'completed', input: {}, output } })
+  const messages = [
+    user('u1', 'commission body'),
+    asst('a1', 'u1', [{ type: 'text', text: 'predecessor talk' }]),
+    // The barrier sits behind a sibling call in the same batch.
+    asst('a2', 'u1', [done('sib-1', 'read', 'sibling'), done('review-1', 'review', 'relay note')]),
+    asst('a3', 'u1', [{ type: 'text', text: 'retired predecessor tail' }]),
+    user('u2', 'successor prompt'),
+    asst('a4', 'u2', [done('t-1', 'bash', 'successor own result')]),
+    asst('a5', 'u2', [{ type: 'text', text: 'successor own text' }]),
+  ]
+  const kept = cutVisible(messages, { BarrierToolCallId: 'review-1', SuccessorTenureId: 'ten-2', ActiveId: 'ten-2' })
+  assert.ok(kept, 'the cut applies')
+  const ids = kept.map((m) => m.info.id)
+  assert.deepEqual(ids, ['u1', 'a2', 'u2', 'a4', 'a5'])
+})
