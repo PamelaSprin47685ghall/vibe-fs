@@ -231,6 +231,24 @@ test('WHAT[process-execution-003] PORT_complete_isolates_failing_senders', () =>
   portComplete(port, pid, { ok: true, value: 'done' })
   assert.deepEqual(got.map((item) => item.kind), ['PtyExited'])
 })
+test('WHAT[process-execution-003] PORT_cleanup_reports_termination_failure_and_still_closes_other_owned_handles', async () => {
+  const ids = new Map()
+  const signalled = []
+  const port = createPtyPort({ handler: (name, command) => {
+    if (command.kind !== 'Signal') return success
+    signalled.push(name)
+    if (name === 'pty-failed') return failure('termination refused')
+    portComplete(port, ids.get(name), { ok: true, value: 'closed by backend' })
+    return success
+  } })
+  ids.set('pty-failed', forkDefault(port, 'pty-failed'))
+  ids.set('pty-healthy', forkDefault(port, 'pty-healthy'))
+  await assert.rejects(portCloseAll(port, 0), /termination refused/)
+  assert.deepEqual(signalled, ['pty-failed', 'pty-healthy'])
+  assert.equal(portExists(port, ids.get('pty-failed')), true, 'unknown exit remains owned')
+  assert.equal(portExists(port, ids.get('pty-healthy')), false)
+})
+
 test('WHAT[process-execution-003] PORT_complete_removes_the_exit_task_entry', async () => {
   const port = createPtyPort({})
   const pid = forkDefault(port, 'pty-et')
