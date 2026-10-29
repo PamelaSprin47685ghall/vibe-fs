@@ -355,6 +355,9 @@ module ToolHostCodec =
     [<Emit("$0.schema.object($1)")>]
     let private rawObjectSchemaOf (tool: obj) (fields: obj) : obj = jsNative
 
+    [<Emit("$0.schema.object($1).describe($2)")>]
+    let private rawObjectSchemaDescribed (tool: obj) (fields: obj) (description: string) : obj = jsNative
+
     [<Emit("$0.schema.object($1).optional()")>]
     let private rawOptionalObjectSchemaOf (tool: obj) (fields: obj) : obj = jsNative
 
@@ -523,6 +526,30 @@ module ToolHostCodec =
             fields |> List.map (fun (name, HostSchema schema) -> name, schema) |> createObj
 
         HostSchema(rawObjectSchemaOf factory fieldsObj)
+
+    /// Required flat Scope annotation on every tool. Semantics: common law «Scope».
+    let scopeAnnotationSchema (HostToolFactory factory) =
+        let hf = HostToolFactory factory
+        let fieldsObj =
+            createObj
+                [ "kind",
+                  schemaValue (
+                      enumSchemaDescribed
+                          [ "resetScope"; "keepLast"; "removeLast"; "meToo" ]
+                          "resetScope | keepLast | removeLast | meToo"
+                          hf
+                  )
+                  "oldScopeVerboseVerbatim", schemaValue (optionalStringSchema hf)
+                  "newScopeGoal", schemaValue (optionalStringSchema hf)
+                  "newScopeRetentionBudget",
+                  schemaValue (
+                      optionalNonNegativeIntegerSchemaDescribed "1..48 keep slots; required with resetScope" hf
+                  )
+                  "replacement", schemaValue (optionalStringSchema hf) ]
+        HostSchema(
+            rawObjectSchemaDescribed factory fieldsObj "Scope lifecycle annotation. See common law «Scope»."
+        )
+
 
     /// Optional object schema: the caller may omit the whole object.
     let optionalObjectSchema fields (HostToolFactory factory) =

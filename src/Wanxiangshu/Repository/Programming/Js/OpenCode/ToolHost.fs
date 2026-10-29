@@ -19,7 +19,7 @@ module JsToolSpec =
     [<Import("scopeProgress", "wanxiangli/scope-progress")>]
     let private scopeProgress: obj = jsNative
 
-    [<Emit("($0 != null && typeof $0 === 'object' && !Array.isArray($0) && Object.keys($0).length === 4 && Object.keys($0).every(k => ['name', 'program', 'intent', 'remainingScopeTurnsEstimate'].includes(k)))")>]
+    [<Emit("($0 != null && typeof $0 === 'object' && !Array.isArray($0) && Object.keys($0).length >= 4 && Object.keys($0).length <= 5 && Object.keys($0).every(k => ['name', 'program', 'intent', 'remainingScopeTurnsEstimate', 'scope'].includes(k)) && ['name','program','intent','remainingScopeTurnsEstimate'].every(k => Object.prototype.hasOwnProperty.call($0, k)))")>]
     let private hasOnlyAllowedArguments (_source: obj) : bool = jsNative
 
     let private progressRefusal (receipt: obj) : string option =

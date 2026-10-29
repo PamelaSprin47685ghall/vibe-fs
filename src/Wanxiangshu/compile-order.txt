@@ -1286,6 +1286,7 @@ Repository/Knowledge/Casebook/FetchSurface.fsi
 Repository/Knowledge/Casebook/FetchSurface.fs
 Repository/Knowledge/Casebook/OpenCode/Tools.fsi
 Repository/Knowledge/Casebook/OpenCode/Tools.fs
+OpenCode/Tools/ScopeAnnotationGate.fs
 OpenCode/Tools/ToolRegistry.fsi
 OpenCode/Tools/ToolRegistry.fs
 OpenCode/Tools/ToolRegistrySurface.fsi
