@@ -2,7 +2,7 @@
 
 | 仓 | HEAD | 备注 |
 |---|---|---|
-| vibe-fs | `afc024f2` | compat-pass WHAT/tests → annotation+retention |
+| vibe-fs | `aa2e16d8` | compat-pass WHAT/tests → annotation+retention |
 | wanxiangli | `e70254c` | compat-pass scope-progress historical + PairHint comment |
 
 ## Stash（保留）
