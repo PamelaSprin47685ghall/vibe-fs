@@ -39,6 +39,9 @@ module Adapter =
     [<Import("scopeProgress", "wanxiangli/scope-progress")>]
     let private scopeProgress: obj = jsNative
 
+    [<Import("scopeRetention", "wanxiangli/scope-retention")>]
+    let private scopeRetention: obj = jsNative
+
     [<Import("Projection", "wanxiangli/projection")>]
     let private createTenureProjection: unit -> obj = jsNative
 
@@ -1060,6 +1063,69 @@ module Adapter =
               )
               "isError", box outcome.IsError ]
 
+
+    let private scopeAnnotationJsonSchema : obj =
+        createObj
+            [ "type" ==> "object"
+              "description" ==> "Scope lifecycle annotation. See common law «Scope»."
+              "properties" ==>
+                  createObj
+                      [ "kind" ==>
+                            createObj
+                                [ "type" ==> "string"
+                                  "enum" ==> [| "resetScope"; "keepLast"; "removeLast"; "meToo" |] ]
+                        "oldScopeVerboseVerbatim" ==> createObj [ "type" ==> "string" ]
+                        "newScopeGoal" ==> createObj [ "type" ==> "string" ]
+                        "newScopeRetentionBudget" ==> createObj [ "type" ==> "integer"; "minimum" ==> 1; "maximum" ==> 48 ]
+                        "replacement" ==> createObj [ "type" ==> "string" ] ]
+              "required" ==> [| "kind" |] ]
+
+    let private withScopeParameter (parameters: obj) : obj =
+        let props =
+            if isNull parameters then createObj []
+            elif isNull parameters?properties then createObj []
+            else
+                // shallow copy properties
+                emitJsExpr parameters?properties "Object.assign({}, $0)"
+        props?scope <- scopeAnnotationJsonSchema
+        let required: obj array =
+            if isNull parameters || isNull parameters?required then [||]
+            else unbox parameters?required
+        let nextRequired =
+            if required |> Array.exists (fun r -> string r = "scope") then required
+            else Array.append required [| box "scope" |]
+        createObj
+            [ "type" ==> "object"
+              "properties" ==> props
+              "required" ==> nextRequired ]
+
+    let private applyOmpScopeAnnotation
+        (toolName: string)
+        (sid: string)
+        (callId: string)
+        (arguments: obj)
+        : Result<unit, string> =
+        let scope = if isNull arguments then null else arguments?scope
+        if isNull scope then
+            Error "scope annotation required on every tool call (see common law «Scope»)"
+        else
+            let st: obj = scopeRetention?status(sid)
+            let epoch =
+                if not (isNull st?epoch) && not (String.IsNullOrWhiteSpace(string st?epoch)) then string st?epoch
+                else "0"
+            scopeRetention?ensureEpoch(sid, epoch) |> ignore
+            let receipt: obj =
+                scopeRetention?apply(sid, epoch, toolName, callId, callId, callId, scope)
+            if isNull receipt || not (unbox<bool> receipt?ok) then
+                Error(if isNull receipt then "scope annotation refused" else string receipt?reason)
+            else
+                let rem = receipt?remaining
+                if not (isNull rem) then
+                    try Surface.setRetentionBudget sid (unbox<int> rem) with _ -> ()
+                if unbox<bool> (receipt?reanchor) = true && not (isNull rem) then
+                    try Surface.resetScopeState sid (unbox<int> rem) with _ -> ()
+                Ok()
+
     /// The omp tool definition for one product tool spec.
     ///
     /// `loadMode: "essential"` is required: omp defaults every tool that
@@ -1069,12 +1135,14 @@ module Adapter =
     /// provider (`src/tools/xdev.ts:85-88`), which is the host default
     /// (`src/tools/settings.ts:961-964`).
     let private toolDefinition (spec: ToolSpec) : obj =
+        let rawParams = parseJson (jsonSchemaOf spec.Schema)
+        let parameters = withScopeParameter rawParams
         createObj
             [ "name", box spec.Name
               "label", box spec.Name
               "description", box spec.Description
               "loadMode", box "essential"
-              "parameters", box (parseJson (jsonSchemaOf spec.Schema))
+              "parameters", box parameters
               "execute",
               box (
                   Func<obj, obj, obj, obj, obj, obj>(fun callId arguments signal onUpdate toolCtx ->
@@ -1109,8 +1177,12 @@ module Adapter =
                             Progress = progress }
 
                       task {
-                          let! outcome = spec.Execute invocation
-                          return toolOutcome outcome
+                          match applyOmpScopeAnnotation spec.Name sid (stringOf callId) arguments with
+                          | Error reason ->
+                              return toolOutcome { Text = reason; Truncated = false; IsError = true; Details = None }
+                          | Ok() ->
+                              let! outcome = spec.Execute invocation
+                              return toolOutcome outcome
                       }
                       |> unbox<obj>)
               ) ]
@@ -1460,19 +1532,21 @@ module Adapter =
         (start: obj -> string -> string -> ArchivedScope -> obj -> bool)
         =
         let schema =
-            createObj
-                [ "type", box "object"
-                  "properties",
-                  box (
-                      createObj
-                          [ "questions",
-                            box (
-                                createObj
-                                    [ "type", box "string"
-                                      "description", box "Clarifying questions to the previous Scope." ]
-                            ) ]
-                  )
-                  "required", box [| "questions" |] ]
+            withScopeParameter (
+                createObj
+                    [ "type", box "object"
+                      "properties",
+                      box (
+                          createObj
+                              [ "questions",
+                                box (
+                                    createObj
+                                        [ "type", box "string"
+                                          "description", box "Clarifying questions to the previous Scope." ]
+                                ) ]
+                      )
+                      "required", box [| "questions" |] ]
+            )
 
         let definition =
             createObj
@@ -1488,7 +1562,14 @@ module Adapter =
                   "execute",
                   box (
                       Func<obj, obj, obj, obj, obj, obj>(fun callId arguments _signal _onUpdate ctx ->
-                          ompPriorExecute journalOpt (stringOf callId) arguments ctx start |> unbox<obj>)
+                          task {
+                              let sid = ctxSessionId ctx
+                              match applyOmpScopeAnnotation "askPreviousScope" sid (stringOf callId) arguments with
+                              | Error reason -> return ompPriorAnswer false reason
+                              | Ok() ->
+                                  return! ompPriorExecute journalOpt (stringOf callId) arguments ctx start
+                          }
+                          |> unbox<obj>)
                   ) ]
 
         registerTool pi definition
@@ -1540,9 +1621,10 @@ module Adapter =
                   "loadMode", box "essential"
                   "approval", box "read"
                   "description",
-                  box "End the current Scope; preserve operator and assistant prose plus critical consultation tool call/results, retire the old Scope's thinking and ordinary tool process, and report outstanding work. Arguments: experience and objective."
+                  box "Transitional archival reanchor. Prefer scope.kind=resetScope on any tool (common law «Scope»). Carry scope annotation on this call too."
                   "parameters",
                   box (
+                      withScopeParameter (
                       createObj
                           [ "type", box "object"
                             "properties",
@@ -1563,53 +1645,64 @@ module Adapter =
                                                 "description", box "The objective for the new scope. The scope must form a self-contained state closed-loop (状态闭环)." ]
                                       ) ]
                             )
-                            "required", box [| "newScopeObjective" |] ]
+                            "required", box [| "newScopeObjective" |] ])
                   )
                   "execute",
                   box (
                       Func<obj, obj, obj, obj, obj, obj>(fun callId arguments signal onUpdate toolCtx ->
                           let ctx = orNull toolCtx
                           let sid = ctxSessionId ctx
-                          let objective =
-                              if not (isNull arguments) && not (isNull arguments?newScopeObjective) then
-                                  stringOf arguments?newScopeObjective
-                              else
-                                  ""
 
-                          let experience =
-                              if
-                                  not (isNull arguments)
-                                  && not (isNull arguments?oldScopeVerboseVerbatimExperience)
-                              then
-                                  Some(stringOf arguments?oldScopeVerboseVerbatimExperience)
-                              else
-                                  None
-
-                          let negotiationPending = Surface.negotiationRequired sid
-                          let previousPending = Surface.isPreviousScopePending sid
-
-                          let pendingMessage =
-                              if negotiationPending then
-                                  "resetScope is unavailable until the first negotiate(questions) call has been accepted. Call negotiate now; once it is accepted, resetScope is available immediately. Do not wait for the delegator's answer."
-                              else
-                                  "resetScope is unavailable until askPreviousScope(questions) has been called by the new scope; ordinary tools remain available."
-
-                          if ompScopeResetReplayed journalOpt sid (stringOf callId) then
-                              task { return ompScopeSuccess objective } |> unbox<obj>
-                          elif negotiationPending || previousPending then
-                              let msg = pendingMessage
-                              let content = box [| createObj [ "type", box "text"; "text", box msg ] |]
-
-                              let details =
-                                  createObj
-                                      [ "objective", box ""
-                                        "archived", box false
-                                        "refused", box true ]
-
-                              task { return createObj [ "content", content; "details", details ] }
+                          match applyOmpScopeAnnotation "resetScope" sid (stringOf callId) arguments with
+                          | Error reason ->
+                              task {
+                                  return
+                                      createObj
+                                          [ "content", box [| createObj [ "type", box "text"; "text", box reason ] |]
+                                            "details", box (createObj [ "refused", box true ]) ]
+                              }
                               |> unbox<obj>
-                          else
-                              ompCommitResetScope journalOpt sid callId objective experience)
+                          | Ok() ->
+                              let objective =
+                                  if not (isNull arguments) && not (isNull arguments?newScopeObjective) then
+                                      stringOf arguments?newScopeObjective
+                                  else
+                                      ""
+
+                              let experience =
+                                  if
+                                      not (isNull arguments)
+                                      && not (isNull arguments?oldScopeVerboseVerbatimExperience)
+                                  then
+                                      Some(stringOf arguments?oldScopeVerboseVerbatimExperience)
+                                  else
+                                      None
+
+                              let negotiationPending = Surface.negotiationRequired sid
+                              let previousPending = Surface.isPreviousScopePending sid
+
+                              let pendingMessage =
+                                  if negotiationPending then
+                                      "resetScope is unavailable until the first negotiate(questions) call has been accepted. Call negotiate now; once it is accepted, resetScope is available immediately. Do not wait for the delegator's answer."
+                                  else
+                                      "resetScope is unavailable until askPreviousScope(questions) has been called by the new scope; ordinary tools remain available."
+
+                              if ompScopeResetReplayed journalOpt sid (stringOf callId) then
+                                  task { return ompScopeSuccess objective } |> unbox<obj>
+                              elif negotiationPending || previousPending then
+                                  let msg = pendingMessage
+                                  let content = box [| createObj [ "type", box "text"; "text", box msg ] |]
+
+                                  let details =
+                                      createObj
+                                          [ "objective", box ""
+                                            "archived", box false
+                                            "refused", box true ]
+
+                                  task { return createObj [ "content", content; "details", details ] }
+                                  |> unbox<obj>
+                              else
+                                  ompCommitResetScope journalOpt sid callId objective experience)
                   ) ]
 
         registerTool pi resetScopeDef
@@ -2249,6 +2342,42 @@ module Adapter =
                 return changed ? { ...$0, content: next } : $0
             })()"""
 
+    let private ompMessageBeatId (message: obj) : string =
+        let candidates =
+            [ fieldValue message "id"
+              fieldValue message "responseId"
+              fieldValue (fieldValue message "info") "id" ]
+        candidates
+        |> List.tryPick (fun v -> if isNull v then None else Some(stringOf v))
+        |> Option.defaultValue ""
+
+    let private ompCollapseRetracted (sessionId: string) (messages: obj array) : obj array =
+        let rows: obj array = unbox (scopeRetention?retractions(sessionId))
+        if isNull (box rows) || rows.Length = 0 then messages
+        else
+            let byBeat =
+                rows
+                |> Array.choose (fun row ->
+                    let id = stringOf (fieldValue row "beatId")
+                    if id = "" then None
+                    else Some(id, stringOf (fieldValue row "replacement")))
+                |> Map.ofArray
+            if Map.isEmpty byBeat then messages
+            else
+                messages
+                |> Array.map (fun message ->
+                    if stringOf (fieldValue message "role") <> "assistant"
+                       && stringOf (fieldValue (fieldValue message "info") "role") <> "assistant" then
+                        message
+                    else
+                        match Map.tryFind (ompMessageBeatId message) byBeat with
+                        | None -> message
+                        | Some replacement ->
+                            let updated = copyScopeObject message
+                            updated?content <-
+                                box [| createObj [ "type", box "text"; "text", box replacement ] |]
+                            updated)
+
     let private ompScopeRequest (sessionId: string) (rawMessages: obj) : obj array =
         let original = Surface.toObjArray rawMessages |> Array.map ompWithoutReceipt
         let neutral = original |> Array.map ompNeutralMessage
@@ -2256,20 +2385,20 @@ module Adapter =
         let staged = Array.copy original
         unbox<obj array> plan?hints |> Array.iter (ompApplyHint staged)
         let scoped = unbox<obj array> plan?slots |> Array.map (ompApplySlot staged)
-        let progress: obj = scopeProgress?status(sessionId)
+        let collapsed = ompCollapseRetracted sessionId scoped
+        let retention: obj = scopeRetention?status(sessionId)
         let last = original |> Array.tryLast |> Option.defaultValue null
         let isSideOnly =
             stringOf (fieldValue last "attribution") = "agent"
             && stringOf (fieldValue last "steering") <> "true"
-        let progressUnknown = not (isNull progress?ok) && not (unbox<bool> progress?ok)
-        if not (unbox<bool> plan?active) || isSideOnly then scoped
-        elif not (isNull plan?strong) then ompScopeSteer scoped (stringOf plan?strong) true
-        elif progressUnknown then scoped
-        elif not (isNull progress?resetDue) && unbox<bool> progress?resetDue then
-            ompScopeSteer scoped (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) "host/scope-steer/reset-due" Map.empty) true
-        elif isNull progress?known || not (unbox<bool> progress?known) then
-            ompScopeSteer scoped (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) "host/scope-steer/missing-estimate" Map.empty) true
-        else scoped
+        if not (unbox<bool> plan?active) || isSideOnly then collapsed
+        elif not (isNull plan?strong) then ompScopeSteer collapsed (stringOf plan?strong) true
+        elif not (isNull retention?known) && unbox<bool> retention?known
+             && not (isNull retention?remaining) && unbox<int> retention?remaining = 0 then
+            ompScopeSteer collapsed (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) "host/scope-steer/reset-due" Map.empty) true
+        elif isNull retention?known || not (unbox<bool> retention?known) then
+            ompScopeSteer collapsed (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) "host/scope-steer/missing-estimate" Map.empty) true
+        else collapsed
 
     let private contextMessagesReply (rawList: obj) (withSteer: obj array) : obj =
         if Surface.isUnchanged withSteer (Surface.toObjArray rawList) then
@@ -2951,6 +3080,8 @@ module Adapter =
             if not (String.IsNullOrWhiteSpace sid) then
                 scopeProgress?bindSessionJournal(sid, Func<string, obj>(progressJournal)) |> ignore
                 scopeProgress?ensureEpoch(sid, scopeEpoch sid) |> ignore
+                scopeRetention?bindSessionJournal(sid, Func<string, obj>(progressJournal)) |> ignore
+                scopeRetention?ensureEpoch(sid, scopeEpoch sid) |> ignore
 
         let advisorPorts =
             let current = Func<string, string>(scopeEpoch)
@@ -3079,14 +3210,18 @@ module Adapter =
                         "AskSeat" ==> seat; "SendSteer" ==> steer ]
         let advisorQueue: obj = emitJsExpr createAdvisorQueue "$0()"
         let advisorFlow: obj = emitJsExpr (createAdvisorFlow, advisorQueue, advisorPorts) "$0($1,$2)"
-        let reportAdvisor (sid: string) (epoch: string) (item: obj) =
-            let receipt = fieldValue item "result"
-            if not (isNull receipt) && isTrue (fieldValue receipt "advisor") then
-                let runId = stringOf (fieldValue item "providerRunId")
-                let key = epoch + ":" + runId
+        let reportRetentionAdvisor (sid: string) (epoch: string) =
+            scopeRetention?ensureEpoch(sid, epoch) |> ignore
+            let st: obj = scopeRetention?status(sid)
+            if not (isNull st?advisorDue) && unbox<bool> st?advisorDue then
+                let streak = if isNull st?removeStreak then 0 else unbox<int> st?removeStreak
+                let trigger =
+                    if streak >= 3 then "IdleSpin"
+                    else "RetentionExhausted"
+                let key = epoch + ":retention:" + trigger + ":" + string streak
                 let questionPath =
-                    match stringOf (fieldValue receipt "trigger") with
-                    | "ResetDue" -> "host/advisor-question/reset-due"
+                    match trigger with
+                    | "RetentionExhausted" -> "host/advisor-question/reset-due"
                     | _ -> "host/advisor-question/stall"
                 let question = ProviderProse.render (ProviderLanguageBinding.forSessionText sid) questionPath Map.empty
                 let launched: Task<obj> = unbox (advisorFlow?trigger(sid, epoch, key, question))
@@ -3095,8 +3230,9 @@ module Adapter =
         let settleProgress (sid: string) =
             bindProgress sid
             let epoch = scopeEpoch sid
-            let items: obj array = unbox (scopeProgress?settlePending(sid, epoch))
-            items |> Array.iter (reportAdvisor sid epoch)
+            // Estimate Stall/ResetDue no longer open Advisor (WP0).
+            let _items: obj array = unbox (scopeProgress?settlePending(sid, epoch))
+            reportRetentionAdvisor sid epoch
 
         let registerScopeProgressTool () =
             let estimateProse =
@@ -3106,8 +3242,8 @@ module Adapter =
                             "properties" ==> createObj [
                                 "remainingScopeTurnsEstimate" ==> createObj [
                                     "type" ==> "number"; "minimum" ==> 0
-                                    "description" ==> estimateProse ]]
-                            "required" ==> [| "remainingScopeTurnsEstimate" |]
+                                    "description" ==> (estimateProse + " Transitional/optional; prefer scope retention.") ]]
+                            "required" ==> [||]
                             "additionalProperties" ==> false ]
             let definition = createObj [
                 "name" ==> "todowrite"
@@ -3120,28 +3256,36 @@ module Adapter =
                 "execute" ==> Func<obj, obj, obj, obj, obj, obj>(fun callId arguments _signal _onUpdate ctx ->
                     task {
                         let sid = ctxSessionId ctx
-                        let rawEstimate = fieldValue arguments "remainingScopeTurnsEstimate"
-                        let value = optionalFloat rawEstimate
                         let cid = stringOf callId
-                        if String.IsNullOrWhiteSpace sid || String.IsNullOrWhiteSpace cid || value.IsNone
-                           || not (isFiniteNumber rawEstimate) || value.Value < 0.0 then
-                            return ompScopeRefused "todowrite requires the real call identity and nonnegative remainingScopeTurnsEstimate"
+                        if String.IsNullOrWhiteSpace sid || String.IsNullOrWhiteSpace cid then
+                            return ompScopeRefused "todowrite requires the real call identity"
                         else
                             bindProgress sid
-                            let run =
-                                match activeProgressRuns.TryGetValue sid with
-                                | true, observed -> observed
-                                | _ -> "detached:" + cid
-                            let receipt: obj = scopeProgress?record(sid, scopeEpoch sid, run, cid, value.Value)
-                            if isNull receipt?ok || not (unbox<bool> receipt?ok) then
-                                return ompScopeRefused ("todowrite durable record refused: " + stringOf receipt?reason)
-                            else
-                                let text = "Scope estimate accepted: " + string value.Value
+                            let rawEstimate = fieldValue arguments "remainingScopeTurnsEstimate"
+                            let value = optionalFloat rawEstimate
+                            // Estimate is transitional/optional (WP0). Prefer scope retention.
+                            match value with
+                            | None ->
                                 return createObj [
-                                    "content" ==> [| createObj [ "type" ==> "text"; "text" ==> text ] |]
-                                    "details" ==> createObj [ "estimate" ==> value.Value
-                                                              "minimum" ==> receipt?minimum
-                                                              "providerRun" ==> run ]]
+                                    "content" ==> [| createObj [ "type" ==> "text"; "text" ==> "Scope progress noted (no estimate; use scope retention)." ] |]
+                                    "details" ==> createObj [ "estimate" ==> null ] ]
+                            | Some estimate when estimate < 0.0 || not (isFiniteNumber rawEstimate) ->
+                                return ompScopeRefused "todowrite estimate must be a nonnegative number when provided"
+                            | Some estimate ->
+                                let run =
+                                    match activeProgressRuns.TryGetValue sid with
+                                    | true, observed -> observed
+                                    | _ -> "detached:" + cid
+                                let receipt: obj = scopeProgress?record(sid, scopeEpoch sid, run, cid, estimate)
+                                if isNull receipt?ok || not (unbox<bool> receipt?ok) then
+                                    return ompScopeRefused ("todowrite durable record refused: " + stringOf receipt?reason)
+                                else
+                                    let text = "Scope estimate accepted: " + string estimate
+                                    return createObj [
+                                        "content" ==> [| createObj [ "type" ==> "text"; "text" ==> text ] |]
+                                        "details" ==> createObj [ "estimate" ==> estimate
+                                                                  "minimum" ==> receipt?minimum
+                                                                  "providerRun" ==> run ]]
                     } |> unbox<obj>) ]
             registerTool pi definition
 
@@ -3695,6 +3839,8 @@ module Adapter =
                 for sid in sessionContexts.Keys do
                     scopeProgress?unbindSessionJournal(sid) |> ignore
                     scopeProgress?clear(sid) |> ignore
+                    scopeRetention?unbindSessionJournal(sid) |> ignore
+                    scopeRetention?clear(sid) |> ignore
                     outboundViewStore?clearSession (sid) |> ignore
 
                 sessionContexts.Clear()

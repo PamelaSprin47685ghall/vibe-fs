@@ -19,7 +19,7 @@ module JsToolSpec =
     [<Import("scopeProgress", "wanxiangli/scope-progress")>]
     let private scopeProgress: obj = jsNative
 
-    [<Emit("($0 != null && typeof $0 === 'object' && !Array.isArray($0) && Object.keys($0).length >= 4 && Object.keys($0).length <= 5 && Object.keys($0).every(k => ['name', 'program', 'intent', 'remainingScopeTurnsEstimate', 'scope'].includes(k)) && ['name','program','intent','remainingScopeTurnsEstimate'].every(k => Object.prototype.hasOwnProperty.call($0, k)))")>]
+    [<Emit("($0 != null && typeof $0 === 'object' && !Array.isArray($0) && Object.keys($0).every(k => ['name', 'program', 'intent', 'remainingScopeTurnsEstimate', 'scope'].includes(k)) && ['name','program','intent'].every(k => Object.prototype.hasOwnProperty.call($0, k)))")>]
     let private hasOnlyAllowedArguments (_source: obj) : bool = jsNative
 
     let private progressRefusal (receipt: obj) : string option =
@@ -48,11 +48,11 @@ module JsToolSpec =
         : ToolSpec =
         let readCheck = JsToolPolicy.defaultReadCheck surface.RoleName readCheck
 
-        let inputOf (args: HostToolArguments) : (obj * float) option =
+        let inputOf (args: HostToolArguments) : (obj * float option) option =
             if not (hasOnlyAllowedArguments args.Raw) then None
             else
             match args.OptionalText "name", args.OptionalText "program", args.OptionalText "intent", args.OptionalNonNegativeNumber "remainingScopeTurnsEstimate" with
-            | Some name, Some program, Some intent, Ok(Some estimate) ->
+            | Some name, Some program, Some intent, Ok estimate ->
                 Some(createObj [ "name" ==> name; "program" ==> program; "intent" ==> intent ], estimate)
             | _ -> None
 
@@ -122,9 +122,14 @@ module JsToolSpec =
                 return JsToolPolicy.renderCommitted ctx.SessionId callIdentity declaration outcome
             }
 
-        let launchAccepted ctx input estimate =
-            match recordProgress ctx estimate with
-            | Some reason -> Task.FromResult reason
+        // remainingScopeTurnsEstimate is transitional/optional (WP0): Scope retention
+        // is the lifecycle. When present, still record into scope-progress for cold logs.
+        let launchAccepted ctx input (estimate: float option) =
+            match estimate with
+            | Some value ->
+                match recordProgress ctx value with
+                | Some reason -> Task.FromResult reason
+                | None -> runProgramCall ctx input null
             | None -> runProgramCall ctx input null
 
         { Name = surface.ToolName
@@ -133,8 +138,10 @@ module JsToolSpec =
             [ "name", ToolHostCodec.stringSchemaDescribed (JsToolPolicy.argNameProse ()) factory
               "program", ToolHostCodec.stringSchemaDescribed (JsToolPolicy.argProgramProse ()) factory
               "intent", ToolHostCodec.stringSchemaDescribed (JsToolPolicy.argIntentProse ()) factory
-              "remainingScopeTurnsEstimate", ToolHostCodec.nonNegativeNumberSchemaDescribed
-                  (JsToolPolicy.argEstimateProse ()) factory ]
+              "remainingScopeTurnsEstimate",
+              ToolHostCodec.optionalNonNegativeNumberSchemaDescribed
+                  "Transitional optional estimate; prefer scope.kind retention (common law «Scope»)."
+                  factory ]
           Execute =
             fun args ctx ->
                 match inputOf args with

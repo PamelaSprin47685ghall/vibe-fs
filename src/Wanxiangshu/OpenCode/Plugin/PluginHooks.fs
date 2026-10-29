@@ -115,6 +115,9 @@ module PluginHooks =
     [<Import("scopeProgress", "wanxiangli/scope-progress")>]
     let private scopeProgress: obj = jsNative
 
+    [<Import("scopeRetention", "wanxiangli/scope-retention")>]
+    let private scopeRetention: obj = jsNative
+
     [<Import("advisorProcessQueue", "wanxiangli/scope-progress")>]
     let private advisorProcessQueue: obj = jsNative
 
@@ -632,16 +635,20 @@ module PluginHooks =
                         reraise ())
                 progressJournalFactory <- Some(box makeJournal)
                 scopeProgress?configureJournal(makeJournal) |> ignore
+                scopeRetention?configureJournal(makeJournal) |> ignore
             | None ->
                 let unavailable = Func<string, obj>(fun _ -> failwith "ScopeProgress requires a verified durable workspace")
                 scopeProgress?configureJournal(unavailable) |> ignore
+                scopeRetention?configureJournal(unavailable) |> ignore
 
             let bindProgressJournal (sessionId: string) =
                 match progressJournalFactory with
                 | Some factory when not (String.IsNullOrWhiteSpace sessionId) ->
                     scopeProgress?bindSessionJournal(sessionId, factory) |> ignore
+                    scopeRetention?bindSessionJournal(sessionId, factory) |> ignore
                 | None when not (String.IsNullOrWhiteSpace sessionId) ->
                     scopeProgress?unbindSessionJournal(sessionId) |> ignore
+                    scopeRetention?unbindSessionJournal(sessionId) |> ignore
                 | _ -> ()
 
             let roleFor (sessionId: SessionId) =
@@ -1472,7 +1479,9 @@ module PluginHooks =
             let advisorIssue (sessionId: string) (receipt: obj) =
                 let question =
                     match string receipt?trigger with
-                    | "ResetDue" -> "host/advisor-question/reset-due"
+                    | "RetentionExhausted" -> "host/advisor-question/reset-due"
+                    | "IdleSpin" -> "host/advisor-question/stall"
+                    | "ResetDue" -> "host/advisor-question/reset-due" // legacy estimate path; still render if somehow fired
                     | _ -> "host/advisor-question/stall"
                 ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) question Map.empty
 
@@ -1497,15 +1506,33 @@ module PluginHooks =
                     let started: Task<obj> = unbox (advisorFlow?trigger(sessionId, epoch, id, question))
                     observeAdvisorTask sessionId started
 
-            let observeSettledProgress (sessionId: string) (epoch: string) (item: obj) =
-                let receipt = item?result
-                if not (isNull receipt?advisor) && unbox<bool> receipt?advisor then
-                    dispatchAdvisor sessionId epoch item
+            let observeSettledProgress (_sessionId: string) (_epoch: string) (_item: obj) =
+                // Estimate-based Stall/ResetDue no longer opens Advisor (WP0).
+                // Retention advisorDue is polled below after settlement.
+                ()
+
+            let maybeRetentionAdvisor (sessionId: string) (epoch: string) =
+                if not (String.IsNullOrWhiteSpace sessionId || String.IsNullOrWhiteSpace epoch) then
+                    scopeRetention?ensureEpoch(sessionId, epoch) |> ignore
+                    let st: obj = scopeRetention?status(sessionId)
+                    if not (isNull st?advisorDue) && unbox<bool> st?advisorDue then
+                        let streak = if isNull st?removeStreak then 0 else unbox<int> st?removeStreak
+                        let remaining = st?remaining
+                        let trigger =
+                            if streak >= 3 then "IdleSpin"
+                            elif not (isNull remaining) && unbox<int> remaining = 0 then "RetentionExhausted"
+                            else "IdleSpin"
+                        let item =
+                            createObj
+                                [ "providerRunId" ==> ("retention:" + trigger + ":" + string streak)
+                                  "result" ==> createObj [ "advisor" ==> true; "trigger" ==> trigger ] ]
+                        dispatchAdvisor sessionId epoch item
 
             let settlePriorProgress (sessionId: string) =
                 let durableScope = scopeEpochForAdvisor sessionId
                 if not (String.IsNullOrWhiteSpace durableScope) then
                     scopeProgress?ensureEpoch(sessionId, durableScope) |> ignore
+                    scopeRetention?ensureEpoch(sessionId, durableScope) |> ignore
                 let active: obj = scopeProgress?status(sessionId)
                 if not (isNull active?ok) && not (unbox<bool> active?ok) then
                     failwith ("Cannot settle Provider round without reliable Scope progress: " + string active?reason)
@@ -1514,6 +1541,10 @@ module PluginHooks =
                     if String.IsNullOrWhiteSpace epoch then [||]
                     else unbox (scopeProgress?settlePending(sessionId, epoch))
                 settled |> Array.iter (observeSettledProgress sessionId epoch)
+                // Prefer journal epoch for retention; fall back to progress epoch.
+                let retentionEpoch =
+                    if not (String.IsNullOrWhiteSpace durableScope) then durableScope else epoch
+                maybeRetentionAdvisor sessionId retentionEpoch
 
             let tryRecoverAdvisor (sessionId: string) =
                 if not (isNull advisorFlow) && not (String.IsNullOrWhiteSpace sessionId) then
@@ -1703,6 +1734,8 @@ module PluginHooks =
                         Surface.clearSessionState (SessionId.value sessionId)
                         scopeProgress?clear(SessionId.value sessionId) |> ignore
                         scopeProgress?unbindSessionJournal(SessionId.value sessionId) |> ignore
+                        scopeRetention?clear(SessionId.value sessionId) |> ignore
+                        scopeRetention?unbindSessionJournal(SessionId.value sessionId) |> ignore
                         advisorProcessQueue?clear(SessionId.value sessionId) |> ignore
                         calibration?clearSession(SessionId.value sessionId) |> ignore
                         PluginTransforms.negotiationForgetSession (SessionId.value sessionId)

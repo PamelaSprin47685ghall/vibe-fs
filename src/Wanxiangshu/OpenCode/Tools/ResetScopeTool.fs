@@ -198,7 +198,7 @@ module ResetScopeTool =
     let spec (factory: HostToolFactory) (journal: AgentJournal option) (snapshotPort: ISessionSnapshotPort option) : ToolSpec =
         { Name = Surface.ResetScopeTool
           Description =
-            "End the current Scope, preserve operator and available assistant prose plus critical consultation calls/results, retire the old Scope's thinking and ordinary tool process, and return accepted outstanding delegation prompts. Never call it after you have written your closing report in prose: it opens a next Scope with a new objective, and the final-turn prose is what your Commissioner receives."
+            "Transitional archival reanchor. Prefer scope.kind=resetScope on any tool (common law «Scope»). This tool still writes the durable ScopeReanchored archive when a clean break needs verbatim handoff. Always carry scope annotation on this call too."
           Arguments =
             [ "oldScopeVerboseVerbatimExperience",
               ToolHostCodec.optionalStringSchemaDescribed

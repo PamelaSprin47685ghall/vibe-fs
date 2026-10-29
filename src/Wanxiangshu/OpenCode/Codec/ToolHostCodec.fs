@@ -313,6 +313,9 @@ module ToolHostCodec =
     [<Emit("$0.schema.number().min(0).describe($1)")>]
     let private rawNonNegativeNumberSchemaDescribed (tool: obj) (description: string) : obj = jsNative
 
+    [<Emit("$0.schema.number().min(0).describe($1).optional()")>]
+    let private rawOptionalNonNegativeNumberSchemaDescribed (tool: obj) (description: string) : obj = jsNative
+
     [<Emit("$0.schema.number().int().nonnegative().describe($1).optional()")>]
     let private rawOptionalNonNegativeIntegerSchemaDescribed (tool: obj) (description: string) : obj = jsNative
 
@@ -514,6 +517,9 @@ module ToolHostCodec =
 
     let nonNegativeNumberSchemaDescribed description (HostToolFactory factory) =
         HostSchema(rawNonNegativeNumberSchemaDescribed factory description)
+
+    let optionalNonNegativeNumberSchemaDescribed description (HostToolFactory factory) =
+        HostSchema(rawOptionalNonNegativeNumberSchemaDescribed factory description)
 
     let optionalStringArraySchema (HostToolFactory factory) =
         HostSchema(rawOptionalStringArraySchema factory)

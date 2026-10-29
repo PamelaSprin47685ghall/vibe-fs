@@ -58,6 +58,9 @@ module PluginTransforms =
     [<Import("scopeProgress", "wanxiangli/scope-progress")>]
     let private scopeProgress: obj = jsNative
 
+    [<Import("scopeRetention", "wanxiangli/scope-retention")>]
+    let private scopeRetention: obj = jsNative
+
 
     // The real Host session contains ONLY its negotiation question. This
     // process-live view is what the model receives instead, reusing the last
@@ -1629,22 +1632,67 @@ module PluginTransforms =
 
         Array.append messages [| steer |]
 
+    /// Collapse a retracted beat's assistant message to one text part (removeLast projection).
+    /// Matching key: info.id / responseId / message id equals BeatRetracted.beatId (provider run id).
+    let private messageBeatId (message: obj) : string =
+        let info = scopeField message "info"
+        let candidates =
+            [ scopeField info "id"
+              scopeField message "id"
+              scopeField message "responseId"
+              scopeField info "responseId" ]
+        candidates
+        |> List.tryPick (fun v -> if isNull v then None else Some(scopeText v))
+        |> Option.defaultValue ""
+
+    let private collapseRetracted (sessionId: string) (messages: obj array) : obj array =
+        let rows: obj array = unbox (scopeRetention?retractions(sessionId))
+        if isNull (box rows) || rows.Length = 0 then messages
+        else
+            let byBeat =
+                rows
+                |> Array.choose (fun row ->
+                    let id = scopeText (scopeField row "beatId")
+                    if id = "" then None
+                    else Some(id, scopeText (scopeField row "replacement")))
+                |> Map.ofArray
+            if Map.isEmpty byBeat then messages
+            else
+                messages
+                |> Array.map (fun message ->
+                    if scopeRole message <> "assistant" then message
+                    else
+                        let beat = messageBeatId message
+                        match Map.tryFind beat byBeat with
+                        | None -> message
+                        | Some replacement ->
+                            let info = scopeField message "info"
+                            createObj
+                                [ "info", box info
+                                  "parts",
+                                  box
+                                      [| createObj
+                                             [ "type", box "text"
+                                               "text", box replacement ] |] ])
+
     let private prepareNeutralScope (sessionId: string) (raw: obj array) : obj array =
         let normal = raw |> Array.map neutralScopeMessage
         let plan = Surface.planRequest sessionId (box normal)
         let staged = Array.copy raw
         unbox<obj array> plan?hints |> Array.iter (applyNeutralHint staged)
         let selected = unbox<obj array> plan?slots |> Array.map (applyNeutralSlot staged)
-        let progress: obj = scopeProgress?status(sessionId)
-        let progressUnknown = not (isNull progress?ok) && not (unbox<bool> progress?ok)
-        if not (unbox<bool> plan?active) then selected
-        elif not (isNull plan?strong) then openCodeScopeSteer selected (scopeText plan?strong) true
-        elif progressUnknown then selected
-        elif not (isNull progress?resetDue) && unbox<bool> progress?resetDue then
-            openCodeScopeSteer selected (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) "host/scope-steer/reset-due" Map.empty) true
-        elif isNull progress?known || not (unbox<bool> progress?known) then
-            openCodeScopeSteer selected (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) "host/scope-steer/missing-estimate" Map.empty) true
-        else selected
+        let collapsed = collapseRetracted sessionId selected
+        let retention: obj = scopeRetention?status(sessionId)
+        if not (unbox<bool> plan?active) then collapsed
+        elif not (isNull plan?strong) then openCodeScopeSteer collapsed (scopeText plan?strong) true
+        elif not (isNull retention?known) && unbox<bool> retention?known
+             && not (isNull retention?remaining) && unbox<int> retention?remaining = 0 then
+            openCodeScopeSteer collapsed (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) "host/scope-steer/reset-due" Map.empty) true
+        elif isNull retention?known || not (unbox<bool> retention?known) then
+            // No retention scope yet — nudge resetScope via initialize path (reuse reset-due prose is wrong);
+            // prefer missing-estimate resource until dedicated retention-init resource exists.
+            openCodeScopeSteer collapsed (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) "host/scope-steer/missing-estimate" Map.empty) true
+        else collapsed
 
     let private purgeAndSuffixSession (sessionId: string) (rawMessages: obj array) (outObj: obj) : unit =
         let sideRequest =
