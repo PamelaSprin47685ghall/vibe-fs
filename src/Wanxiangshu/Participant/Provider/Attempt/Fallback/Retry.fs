@@ -31,13 +31,11 @@ type RetryPorts =
 module Retry =
 
     let verdictUnlessContinuing (alreadyAdmitted: bool) (stopWait: string) : RetryVerdict option =
-        if alreadyAdmitted then
-            Some RetryVerdict.Superseded
-        else
-            match stopWait with
-            | "Stopped" -> None
-            | "Denied" -> Some RetryVerdict.WaitDenied
-            | _ -> Some RetryVerdict.ReceiptUnknown
+        match stopWait with
+        | "Stopped" ->
+            if alreadyAdmitted then Some RetryVerdict.Superseded else None
+        | "Denied" -> Some RetryVerdict.WaitDenied
+        | _ -> Some RetryVerdict.ReceiptUnknown
 
     let observeDelegateRetry (verdict: RetryVerdict) : Result<unit, string> =
         match verdict with
