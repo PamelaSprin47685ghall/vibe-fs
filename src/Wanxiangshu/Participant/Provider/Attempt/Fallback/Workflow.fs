@@ -78,6 +78,18 @@ module ProviderRecoveryWorkflow =
         | WaitDenied
         | NotSent of reason: string
 
+    /// A context-window overflow is not a gateway-style transient: resending the
+    /// same oversized input cannot succeed, so it never earns a continuation nudge.
+    let isContextOverflowReason (reason: string) : bool =
+        let text = if isNull reason then "" else reason.ToLowerInvariant()
+
+        text.Contains "input_too_large"
+        || text.Contains "context_length_exceeded"
+        || text.Contains "contextoverflow"
+        || text.Contains "context window"
+        || text.Contains "prompt is too long"
+        || text.Contains "maximum context length"
+
     let private sendLongWorkContinuation
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
@@ -136,6 +148,7 @@ module ProviderRecoveryWorkflow =
         task {
             match longWorkContinuationPath turn.Role failure with
             | None -> notifyFailure eventPort turn reason
+            | Some _ when isContextOverflowReason reason -> notifyFailure eventPort turn reason
             | Some path ->
                 match! sendLongWorkContinuation sessionPort rootWorkspace durable turn path with
                 | LongWorkAfterStop.Continued -> ()

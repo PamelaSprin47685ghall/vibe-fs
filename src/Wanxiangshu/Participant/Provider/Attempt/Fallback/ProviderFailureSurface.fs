@@ -821,3 +821,9 @@ module ProviderFailureSurface =
 
         ProviderRecoveryWorkflow.longWorkContinuationPath (Roles.tryParseRole role) failureKind
         |> Option.defaultValue ""
+
+    /// Same as `longWorkContinuationPath`, but a context-window overflow reason
+    /// never earns a continuation: resending the oversized input cannot succeed.
+    let longWorkContinuationPathForReason (role: string) (failure: string) (reason: string) : string =
+        if ProviderRecoveryWorkflow.isContextOverflowReason reason then ""
+        else longWorkContinuationPath role failure

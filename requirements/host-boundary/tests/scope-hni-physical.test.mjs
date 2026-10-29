@@ -232,6 +232,34 @@ test('WHAT[context-compression-047] OpenCode previous-Scope consultation uses th
   negotiationForgetSession(source)
 })
 
+test('WHAT[context-compression-047] OpenCode previous-Scope consultation projects the sealed equivalent view, not the raw Host history', async () => {
+  const {
+    negotiationRememberMessages, negotiationForgetSession, consultationStartPrevious,
+    negotiationProjectMessages, negotiationFinishTemporary,
+  } = await import('../../../dist/OpenCode/Plugin/PluginTransforms.js')
+  const source = 'ses-previous-view-047'
+  const temporary = 'ses-previous-view-047-temp'
+  negotiationForgetSession(source)
+  const raw = (text, role = 'user') => ({ info: { sessionID: source, role }, parts: [{ type: 'text', text }] })
+  const reset = { info: { sessionID: source, role: 'assistant' }, parts: [{ type: 'tool', id: 'r', tool: 'resetScope', state: { status: 'completed', input: {}, output: 'ok' } }] }
+  negotiationRememberMessages(source, { messages: [raw('RAW_EARLIER_SCOPES_HUGE'), raw('old'), reset, raw('NEW_SCOPE_SECRET')] })
+  const sealed = [raw('SEALED_OLD_VIEW')]
+  const missing = consultationStartPrevious(temporary, source, { system: ['old system'], model: { providerID: 'p', modelID: 'm' } })
+  assert.equal(missing.tag, 1, 'no sealed equivalent view, no consultation')
+  const started = consultationStartPrevious(temporary, source, { system: ['old system'], model: { providerID: 'p', modelID: 'm' }, messages: sealed })
+  assert.equal(started.tag, 0)
+  const question = { info: { sessionID: temporary, role: 'user' }, parts: [{ type: 'text', text: 'What was decided?' }] }
+  const outgoing = { messages: [question] }
+  assert.equal(negotiationProjectMessages(temporary, outgoing), true)
+  const wire = JSON.stringify(outgoing.messages)
+  assert.equal(wire.includes('SEALED_OLD_VIEW'), true, 'previous Scope sees its own sealed view')
+  assert.equal(wire.includes('RAW_EARLIER_SCOPES_HUGE'), false, 'raw Host history is not the previous Scope view')
+  assert.equal(wire.includes('NEW_SCOPE_SECRET'), false)
+  assert.equal(outgoing.messages.at(-1).parts[0].text, 'What was decided?')
+  negotiationFinishTemporary(temporary)
+  negotiationForgetSession(source)
+})
+
 test('WHAT[delegation-negotiation-001] a vetoed temporary tool call keeps its denial visible to the next provider step', async () => {
   const {
     negotiationRememberSystem, negotiationRememberMessages, negotiationRememberModel,

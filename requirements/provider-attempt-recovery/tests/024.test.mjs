@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { longWorkContinuationPath } from '../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js'
+import { longWorkContinuationPath, longWorkContinuationPathForReason } from '../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js'
 
 test('WHAT[provider-attempt-recovery-024] long-running roles continue their work when retry gives up on a transient failure', () => {
   assert.equal(longWorkContinuationPath('manager', 'ProviderTransient'), 'work/manager-continue')
@@ -14,4 +14,10 @@ test('WHAT[provider-attempt-recovery-024] short roles and non-transient failures
   }
   assert.equal(longWorkContinuationPath('manager', 'ProviderPermanent'), '')
   assert.equal(longWorkContinuationPath('manager', 'UserCancelled'), '')
+})
+
+test('WHAT[provider-attempt-recovery-024] a context-window overflow is not a gateway transient and earns no continuation', () => {
+  const overflow = 'invalid-argument: Failed to start sampling: [input_too_large] The prompt is too long for this model\'s context window (716458 tokens > 500000 tokens)'
+  assert.equal(longWorkContinuationPathForReason('manager', 'ProviderTransient', overflow), '')
+  assert.equal(longWorkContinuationPathForReason('manager', 'ProviderTransient', '502 Bad Gateway'), 'work/manager-continue')
 })
