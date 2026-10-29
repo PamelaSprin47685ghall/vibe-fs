@@ -179,7 +179,7 @@ async function activateSession(env, sid) {
   return sessionCtx
 }
 
-test('WHAT[context-compression-034] resetScope registration carries the new protocol texts', async () => {
+test.skip('WHAT[context-compression-034] resetScope registration carries the new protocol texts [PRODUCT-RETIRED estimate/standalone-resetScope]', async () => {
   const env = createOmpTestEnvironment()
   await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
   await activateSession(env, 'ses_test_reg')
@@ -765,12 +765,14 @@ test('WHAT[delegation-034] OMP delegated assignment requires negotiate before fi
   bindDelegation(child, parent)
   assert.equal(negotiationRequired(child), true, 'new delegated assignment requires negotiate first')
 
-  // Calling resetScope tool prematurely returns refusal explanation
-  const resetDef = env.registeredTools.find((t) => t.name === 'resetScope')
-  assert.ok(resetDef)
-  const prematureOutcome = await resetDef.execute(
+  // Current contract: no standalone resetScope tool; any product tool carries
+  // scope.kind=resetScope. A premature reset annotation is refused before the tool body runs.
+  assert.equal(env.registeredTools.find((t) => t.name === 'resetScope'), undefined, 'no standalone resetScope tool')
+  const carrier = env.registeredTools.find((t) => t.name !== 'negotiate' && t.parameters?.properties?.scope)
+  assert.ok(carrier, 'a product tool carries the scope annotation')
+  const prematureOutcome = await carrier.execute(
     'call_premature_1',
-    { newScopeObjective: 'too early', newScopeTurnBudget: 5 },
+    { scope: { kind: 'resetScope', newScopeGoal: 'too early', newScopeRetentionBudget: 5 } },
     null,
     null,
     ctx,
