@@ -659,7 +659,7 @@ test('WHAT[execution-model-routing-010] EMR_010_borrowing_complexity_is_owned_on
   const binding = await source('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs')
   const transform = await source('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
-  const scheduler = await source('resources/wanxiangshu.mjs')
+  await assert.rejects(source('resources/wanxiangshu.mjs'), { code: 'ENOENT' })
 
   assert.match(capacity, /type internal BorrowingCapacity<'target>/)
   // CUT-10: the ledger, token states and route decision are owned by wanxiangli/borrowing; the host
@@ -679,7 +679,6 @@ test('WHAT[execution-model-routing-010] EMR_010_borrowing_complexity_is_owned_on
   for (const main of [sessions, binding, transform, host]) {
     assert.doesNotMatch(main, /routeDecision|recordRoutedCredit|ownedTokenByExecution|creditSourceByExecution|CapacityCreditState|CapacityStepDemand/)
   }
-  assert.doesNotMatch(scheduler, /borrow|recall|lineage|parentSession|childSession/i)
 })
 }
 

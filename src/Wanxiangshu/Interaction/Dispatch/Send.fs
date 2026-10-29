@@ -218,6 +218,7 @@ module PromptDispatcherSend =
         : Task<Result<PromptKey, string> * bool> =
         // The verdict travels with the result: a Host that refused before
         // accepting anything must stay `NotSent`, not decay into `Failed`.
+        // DSL-MUTABLE: resource — physical send receipt controls cancellation cleanup
         let mutable definitelyNotSent = false
         let settle =
             task {

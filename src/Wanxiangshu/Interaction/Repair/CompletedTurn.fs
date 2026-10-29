@@ -102,20 +102,23 @@ module CompletedTurnClassifier =
             upstreamAbort |> not && plainAbort
         | None -> false
 
+    let private classifyStoppedText (parts: MessagePart array) : obj =
+        match TerminalValidity.check (partsText parts) with
+        | Ok() -> box ReconcileProgram.TurnCompleted
+        | Error rejection ->
+            box (
+                ReconcileProgram.TurnNeedsContinuation(
+                    sprintf "assistant stop with %s" (TerminalValidity.describe rejection)
+                )
+            )
+
     /// CTX-004: stop is completed only when formal text passes the shared
     /// terminal validity gate; otherwise the turn earns interaction repair.
     let private classifyStopped (parts: MessagePart array) : obj =
         if hasRealToolCall parts then
             box ReconcileProgram.TurnCompleted
         else
-            match TerminalValidity.check (partsText parts) with
-            | Ok() -> box ReconcileProgram.TurnCompleted
-            | Error rejection ->
-                box (
-                    ReconcileProgram.TurnNeedsContinuation(
-                        sprintf "assistant stop with %s" (TerminalValidity.describe rejection)
-                    )
-                )
+            classifyStoppedText parts
 
     /// Content validity alone cannot prove a provider failure.
     let formalContentUnusable (parts: MessagePart array) : bool =
@@ -126,8 +129,7 @@ module CompletedTurnClassifier =
     /// (HOST-004 Clean Break — must not mint TurnOutcome.TurnUnknown).
     let private classifyNormalFinish parts =
         function
-        | Some(value: string) when value.Equals("stop", StringComparison.OrdinalIgnoreCase) ->
-            classifyStopped parts
+        | Some(value: string) when value.Equals("stop", StringComparison.OrdinalIgnoreCase) -> classifyStopped parts
         | Some(value: string) when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) ->
             box ReconcileProgram.TurnInProgress
         | Some(value: string) when value.Equals("length", StringComparison.OrdinalIgnoreCase) ->
@@ -143,11 +145,13 @@ module CompletedTurnClassifier =
         : obj =
         let isAbort =
             isAbortErrorName errorName
-            || (finish |> Option.exists (fun value -> value.Equals("aborted", StringComparison.OrdinalIgnoreCase)))
+            || (finish
+                |> Option.exists (fun value -> value.Equals("aborted", StringComparison.OrdinalIgnoreCase)))
 
         let isError =
             (completed && Option.isSome errorName)
-            || (finish |> Option.exists (fun value -> value.Equals("error", StringComparison.OrdinalIgnoreCase)))
+            || (finish
+                |> Option.exists (fun value -> value.Equals("error", StringComparison.OrdinalIgnoreCase)))
 
         match isAbort, isError with
         | true, _ -> box (ReconcileProgram.TurnAborted(defaultArg errorName "aborted"))

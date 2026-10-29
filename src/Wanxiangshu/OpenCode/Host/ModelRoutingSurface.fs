@@ -492,7 +492,7 @@ module ModelRoutingSurface =
                    physical = null
                    error = reason |}
 
-    /// Initialize the process-shared scheduler runtime used by Host admission.
+    /// Initialize the process-shared capacity runtime used by Host admission.
     let initialize () : Task = ModelRouting.initialize ()
 
     let acquireSharedExecutionAdmission
@@ -502,6 +502,7 @@ module ModelRoutingSurface =
         (participant: string)
         (lenderSessionId: string)
         (purpose: obj)
+        (hostTarget: obj)
         : Task<obj> =
         task {
             let! acquisition =
@@ -518,7 +519,7 @@ module ModelRoutingSurface =
                          None
                      else
                          Some lenderSessionId)
-                    None
+                    (Some(targetOf hostTarget))
 
             let! completed = awaitAdmission acquisition
             return acquireAdmissionObject completed

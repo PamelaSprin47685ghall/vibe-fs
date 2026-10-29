@@ -52,6 +52,8 @@ const first = await routing.acquireSharedExecutionAdmission(
   exact.role,
   exact.participant,
   null,
+  'normal',
+  { model: 'provider/restart', reasoning: 'none' },
 )
 assert.equal(first.kind, 'Acquired')
 const afterAcquire = audit()
@@ -72,6 +74,8 @@ const duplicate = await routing.acquireSharedExecutionAdmission(
   exact.role,
   exact.participant,
   null,
+  'normal',
+  { model: 'provider/restart', reasoning: 'none' },
 )
 assert.equal(duplicate.kind, 'Acquired')
 assert.equal(duplicate.lease, first.lease, 'plugin reload reuses the exact physical admission fence')
@@ -208,6 +212,7 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { default: plugin } = await import("../../../dist/OpenCode/Plugin/Plugin.js");
 const { createEnvironment, managedConfig, routeMessage } = await import("./support/process-shared-routing.mjs");
+const routing = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
 
 
 test('WHAT[execution-model-routing-003] EMR_003_two_plugin_instances_share_one_process_running_multiset', async () => {
@@ -226,8 +231,11 @@ test('WHAT[execution-model-routing-003] EMR_003_two_plugin_instances_share_one_p
     const a = await routeMessage(first, 'ses_shared_a')
     const b = await routeMessage(second, 'ses_shared_b')
 
-    assert.deepEqual([a.providerID, a.modelID, a.variant], ['provider', 'model-a', 'none'])
-    assert.deepEqual([b.providerID, b.modelID, b.variant], ['provider', 'model-b', 'none'])
+    assert.deepEqual(a, { providerID: 'host', modelID: 'selected' })
+    assert.deepEqual(b, a)
+    const snapshot = routing.sharedCapacitySnapshot()
+    assert.deepEqual(snapshot.executions.map(execution => execution.sessionId).sort(), ['ses_shared_a', 'ses_shared_b'])
+    assert.equal(snapshot.tokens.length, 2, 'the two plugin instances contribute to the same process capacity snapshot')
   } finally {
     if (second) await second.dispose()
     if (first) await first.dispose()

@@ -54,7 +54,7 @@ export const messageOutput = (sessionID, agent, messageID = `msg_${sessionID}`) 
     role: 'user',
     sessionID,
     agent,
-    model: { providerID: 'host', modelID: 'placeholder' },
+    model: { providerID: 'host', modelID: 'selected' },
   },
   parts: [],
 })
