@@ -12,16 +12,16 @@ open Wanxiangshu.Foundation
 /// outcome classification are decided there; this adapter keeps the F#
 /// lease handle, maps outcomes and records the shared transition counters.
 type internal ExecutionPermitLibrary =
-    abstract issue: identity: obj * credit: float -> obj
-    abstract target: permit: obj * fence: float -> obj
-    abstract commit: permit: obj * fence: float * observed: obj -> string
-    abstract releaseBeforeProvider: permit: obj * fence: float * observed: obj -> string
+    abstract issue: identity: obj * credit: int64 -> obj
+    abstract target: permit: obj * fence: int64 -> obj
+    abstract commit: permit: obj * fence: int64 * observed: obj -> string
+    abstract releaseBeforeProvider: permit: obj * fence: int64 * observed: obj -> string
     abstract releasePhysical: sessionId: string * physicalUserMessageId: string -> string
-    abstract lifecycle: permit: obj * fence: float -> obj
+    abstract lifecycle: permit: obj * fence: int64 -> obj
     abstract committed: sessionId: string * physicalUserMessageId: string -> obj
 
 type internal SessionLeaseHandlesLibrary =
-    abstract handleFor: sessionId: string * permit: obj * createHandle: Func<float, float, obj> -> obj
+    abstract handleFor: sessionId: string * permit: obj * createHandle: Func<obj, obj, obj> -> obj
     abstract tryGetMatching: sessionId: string * permit: obj -> obj
 
 module internal ExecutionPermitBinding =
@@ -38,7 +38,9 @@ module internal ExecutionPermitBinding =
     let private constructHandles (cls: obj) : SessionLeaseHandlesLibrary = jsNative
 
     let create () = constructPermits permitsClass
-    let createHandles () = constructHandles sessionLeaseHandlesClass
+
+    let createHandles () =
+        constructHandles sessionLeaseHandlesClass
 
     let identity (value: ExecutionAdmissionExactIdentity) : obj =
         createObj
@@ -78,10 +80,10 @@ module internal ExecutionPermitBinding =
             Error(rejection (unbox<string> value?rejection))
 
     [<Emit("{ tag: 0, fields: [BigInt($0)] }")>]
-    let leaseIdFromNumber (value: float) : CapacityLeaseId = jsNative
+    let leaseIdOf (value: obj) : CapacityLeaseId = jsNative
 
     [<Emit("{ tag: 0, fields: [BigInt($0)] }")>]
-    let fenceFromNumber (value: float) : CapacityFence = jsNative
+    let fenceOf (value: obj) : CapacityFence = jsNative
 
 type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
     let permits = ExecutionPermitBinding.create ()
@@ -90,30 +92,26 @@ type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
     let permitOf (lease: ExecutionAdmissionLease) : obj =
         if isNull (box lease) then null else lease.Owner
 
-    let fenceOf (lease: ExecutionAdmissionLease) : float =
+    let fenceOf (lease: ExecutionAdmissionLease) : int64 =
         if isNull (box lease) then
-            0.0
+            0L
         else
-            float (CapacityFence.value lease.Fence)
+            CapacityFence.value lease.Fence
 
     let record (outcome: string) =
         outcome |> ExecutionPermitBinding.outcome |> counters.Record
 
     let createHandle (identity: ExecutionAdmissionExactIdentity) (capacityCredit: CapacityCreditId) (permit: obj) =
-        Func<float, float, obj>(fun leaseId fence ->
-            let lid = ExecutionPermitBinding.leaseIdFromNumber leaseId
-            let f = ExecutionPermitBinding.fenceFromNumber fence
+        Func<obj, obj, obj>(fun leaseId fence ->
+            let lid = ExecutionPermitBinding.leaseIdOf leaseId
+            let f = ExecutionPermitBinding.fenceOf fence
             ExecutionAdmissionLease.Create(permit, capacityCredit, lid, f, identity) :> obj)
 
     member _.Issue(identity: ExecutionAdmissionExactIdentity, capacityCredit: CapacityCreditId) =
         let permit =
-            permits.issue (ExecutionPermitBinding.identity identity, float (CapacityCreditId.value capacityCredit))
+            permits.issue (ExecutionPermitBinding.identity identity, CapacityCreditId.value capacityCredit)
 
-        sessionLeases.handleFor (
-            identity.SessionId,
-            permit,
-            createHandle identity capacityCredit permit
-        )
+        sessionLeases.handleFor (identity.SessionId, permit, createHandle identity capacityCredit permit)
         |> unbox<ExecutionAdmissionLease>
 
     member _.Target(lease: ExecutionAdmissionLease) =
@@ -146,4 +144,4 @@ type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
         match isNull permit, isNull handle with
         | true, _ -> None
         | false, true -> invalidOp "execution-model-routing: committed permit has no host lease handle"
-        | false, false -> Some (unbox<ExecutionAdmissionLease> handle)
+        | false, false -> Some(unbox<ExecutionAdmissionLease> handle)
