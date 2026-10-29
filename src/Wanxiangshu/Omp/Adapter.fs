@@ -1162,11 +1162,6 @@ module Adapter =
                     scopeRetention?apply(sid, epoch, toolName, callId, callId, callId, scope)
                 if isNull receipt || not (unbox<bool> receipt?ok) then
                     Error(if isNull receipt then "scope annotation refused" else string receipt?reason)
-                elif unbox<bool> receipt?provisional = true then
-                    // omp has no provider-run identity here: the call is its own
-                    // turn, so a meToo has no sibling to wait for. All-meToo is refused.
-                    scopeRetention?settle(sid, callId) |> ignore
-                    Error "meToo requires exactly one real scope annotation (resetScope|keepLast|removeLast) in the same turn; this turn carried only meToo and is refused"
                 else
                     let rem = receipt?remaining
                     if not (isNull rem) then

@@ -621,7 +621,7 @@ Fission 各路人马收拢回来的成果，在规矩上只算一趟齐齐整整
   `replacement` 必须写明**教训**；若上一拍已对世界产生副作用，还必须写明影响了什么（对话可收，外部世界不回滚）。
   宿主另在替换正文末加注「这是连续第 N 次空转，不要空转」；N 随连续 `removeLast` 递增，遇 `keepLast` 或 `resetScope` 清零。
   连续 `removeLast` 只抹本拍：更早已经替换留下的那些条仍留在上下文里，不会被后一次 remove 吃掉。
-- `meToo`：同一模型回合 N 个工具调用时，恰 1 个填 `resetScope`／`keepLast`／`removeLast`，其余 N−1 填 `meToo`；同拍最多扣 1。与到达先后无关：`meToo` 先于真注解到达时暂收，真注解到了再定、再执行。仅 `meToo`／全 `meToo`（本拍没有真注解）拒收。
+- `meToo`：同一模型回合 N 个工具调用时，恰 1 个填 `resetScope`／`keepLast`／`removeLast`，其余 N−1 填 `meToo`；同拍最多扣 1，与到达先后无关。仅 `meToo`／全 `meToo` 拒收。
 
 retention 是可保留的 keep 额度（信息容量），不是模型回合数，也不是工具调用次数。
 仅 `keepLast` 扣 1；`removeLast`／`meToo` 不扣。
