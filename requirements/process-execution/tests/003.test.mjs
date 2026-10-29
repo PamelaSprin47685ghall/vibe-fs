@@ -249,6 +249,24 @@ test('WHAT[process-execution-003] PORT_cleanup_reports_termination_failure_and_s
   assert.equal(portExists(port, ids.get('pty-healthy')), false)
 })
 
+test('WHAT[process-execution-003] cleanup preserves each error when several terminals reject termination', async () => {
+  const port = createPtyPort({ handler: (name, command) =>
+    command.kind === 'Signal' ? failure(`cannot terminate ${name}`) : success,
+  })
+  const first = forkDefault(port, 'pty-first')
+  const second = forkDefault(port, 'pty-second')
+  await assert.rejects(portCloseAll(port, 0), error => {
+    assert.ok(error instanceof AggregateError)
+    assert.deepEqual(error.errors.map(item => item.message), [
+      'cannot terminate pty-first',
+      'cannot terminate pty-second',
+    ])
+    return true
+  })
+  assert.equal(portExists(port, first), true)
+  assert.equal(portExists(port, second), true)
+})
+
 test('WHAT[process-execution-003] PORT_complete_removes_the_exit_task_entry', async () => {
   const port = createPtyPort({})
   const pid = forkDefault(port, 'pty-et')

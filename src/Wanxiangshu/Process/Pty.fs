@@ -370,7 +370,9 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
             match Array.choose id outcomes with
             | [||] -> ()
             | [| error |] -> return raise error
-            | errors -> return raise (AggregateException(errors))
+            | errors ->
+                let combined: exn = emitJsExpr errors "new AggregateError($0, 'PTY cleanup failed')"
+                return raise combined
         }
 
     member _.List() : PtyHandle list =
