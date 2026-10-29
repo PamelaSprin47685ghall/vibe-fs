@@ -7,6 +7,8 @@
 
 ## 1. 唯一进度单位
 
+> **现行（2026-10-29）**：无进度计费单位。Scope 生命周期 = 任意工具打平注解 `scope.kind` ∈ {resetScope, keepLast, removeLast, meToo} + `newScopeRetentionBudget`（`scope-retention`）。下文「计费回合／min／ResetDue」仅考古；`remainingScopeTurnsEstimate` 为**废字段**。
+
 每个有真实 providerRunId 的 LLM 请求是一个物理回合。这个回合没有调用任何有效 `todowrite-for-*` 时，**进度计费为 0**，不更新估计、不比较、不触发 Advisor。若有一个或多个有效 `todowrite`，**进度计费为 1**，最终估计是同一 providerRunId 所有有效 `remainingScopeTurnsEstimate: integer >= 0` 的 **min**。不依赖工具回调完成顺序。工具调用 ID 去重，调用重放、Provider 事件重放不能再次结算。
 
 必须等同一 LLM 回合的可观察 `todowrite` 工具集合结束（成功、失败或明确中止）后，才把该回合结算为唯一进度事实；不能第一项到达就先触发 Advisor。未被成功受理的工具不贡献估计。每个工具的 Schema 以 OpenCode/OMP 宿主实际入参为权威，`remainingScopeTurnsEstimate` 必填，类型整数、最小值 0，缺少/null/负值拒绝。模型可以一回合不调用 todo，那就完全免费；不额外设“缺报检查”。
@@ -16,6 +18,8 @@
 若结算值为 0，创建同 epoch 持久 `ResetDue`。从**下一次**正常 Provider 请求起独立 agent-attributed **strong steer** 提示 resetScope，直到确证真实 `ScopeReanchored`。期间新一轮计费回合无论估计多少，都触发 Advisor；若不调用 todowrite，仍持续 reset 提醒，不能悄悄清除 ResetDue。Advisor 回答和非 operator steer 不改变估计和 Scope。
 
 ## 2. todowrite 模型可见参数
+
+> **现行**：工具参数只有 `name`／`program`／`intent`，另由宿主注入 `scope` 注解；**不得**再提交 `remainingScopeTurnsEstimate`（schema 已删，负向断言见 repository-programming 049／064）。下文描述与初次基线强 steer 均已退役，仅考古。
 
 名称 `remainingScopeTurnsEstimate`，非负整数，必填。描述逐字如下：
 
@@ -28,6 +32,8 @@
 初次基线需要时强 steer：“当前 Scope 尚无剩余计费回合估计。在本次 todowrite 中提交 remainingScopeTurnsEstimate。”系统知道条件是否成立才发，不靠模型猜。
 
 ## 3. 专席 Advisor 的四段咨询与持久队列
+
+> **现行**：四段咨询与持久队列（`AdvisorFlow`／`AdvisorProcessQueue`）仍是产品路径，但触发源改为 retention `advisorDue`（`RetentionExhausted`：剩余配额为 0；`IdleSpin`：连续 removeLast ≥3）。下文凡写「估计上升／持平／ResetDue 触发」的句子仅考古。
 
 `AdvisorSeat` 是每个真实 Session **专有、持久可认领、连续同一会话**的高能力模型，**没有工具**；不暴露 `this.advisor(intent)` 或公开 `advisor` 工具。它可以接受系统 compaction，但原始 Advisor 会话记录只能追加，压缩不能作为删历史授权。
 
@@ -49,6 +55,8 @@ prose4 原文通过现有 agent-attributed steer 物理投递工作 Session，�
 
 ## 4. resetScope 及保留规则
 
+> **现行**：**无独立 `resetScope` 宿主工具**。档案重锚 = 任意工具注解 `scope.kind=resetScope`（交接写 `oldScopeVerboseVerbatim`）→ `ScopeReset.commit`；PairHint 以注解为屏障，旧工具名只读兼容旧转录。下文 `newScopeObjective`／`oldScopeVerboseVerbatimExperience` 工具签名、`newScopeTurnBudget`（废字段）与「清除 Progress 基线／ResetDue」仅考古。
+
 `resetScope` 仅有 `oldScopeVerboseVerbatimExperience?: string | null` 与必填 `newScopeObjective: string`。删除 `newScopeTurnBudget`、`kpiCompletion`、旧预算倍率/倒计时及全部旧辅助提醒。真正重锚提交清除当前 epoch 的 Progress 基线/ResetDue，下一次 todo 重新建立基线。第一次 reset 不要求 askPreviousScope；第二次及以后才有独立首问强 steer。
 
 每次历史裁剪**原样保留**所有可取得的 assistant 普通文本和 provider 实际公开的 thinking/reasoning、所有真实 operator 消息、全部 reset 调用和配对结果，以及已指定关键工具 `assume/negotiate/askPreviousScope/askPrevious/advisor` 的完整调用/结果。其余低价值普通工具调用与成对结果从后续 Provider 请求副本中剔除；混合消息按真实 part 身份裁剪，不能误删同消息的 assistant 文本与 reasoning，不能遗留孤儿工具结果。任何私有/未公开的模型内部推理不能编造。
@@ -65,6 +73,8 @@ compaction 后若需要恢复模型上下文，只呈现自然的工作材料：
 
 ## 6. 模型提示词（定稿）
 
+> **现行**：ResetDue 强 steer 与初次估计强 steer 已退役；顾问问题文案为 `host/advisor-question/reset-due`（RetentionExhausted）与 `.../stall`（IdleSpin）。下文「定稿」提示词仅考古，勿复制进资源。
+
 - 顾问初始（仅确需时）：“你擅长分析复杂问题。根据已提供的信息作答；需要补充材料时直接提出问题。”不提专席身份、无工具、持久会话或四阶段机制。无工具权限由宿主实施。
 - A/B/C/D 对话原文：仅采用 §3 的自然聊天问题，不包含 Advisor、专席、prose 字段、阶段或快照身份。
 - 最终回答 steer：原样 `{prose4}`，不添加顾问标题；`attribution: agent` 是宿主内部元数据。
@@ -75,6 +85,8 @@ compaction 后若需要恢复模型上下文，只呈现自然的工作材料：
 
 ## 7. 职责分工和真实验收
 
+> **现行**：宿主（OpenCode PluginHooks／OMP Adapter）不再结算估计，也不因 progress 健康度拒绝回合；`wanxiangli/scope-progress` 仅保留顾问席与 epoch 载体为产品面，`record`／`settle*`／估计为 PACKAGE-HISTORICAL（见包 AGENTS «产品面边界»）。下文职责划分中「估计／ResetDue」部分仅考古。
+
 唯一 `wanxiangli` ScopeProgress 拥有报告按 providerRunId 分组、min 聚合、估计/ResetDue、幂等/并发/中止事务；专席队列与持续会话分别由自治 AdvisorProcessQueue 和 AdvisorSeat 拥有。主仓 Host 仅做真实 Tool Schema、Provider 出站和物理 steer 执行；OpenCode/OMP 不维护第二套业务估计/触发判断。
 
 分层逐项通过：① 非 todo 回合免费，同一回合 N 个 todo 的 `min` 不受执行完成先后影响；跨回合升降/零值/重复工具 ID/失败均正确。② 一 Session 一个可恢复专席；四段顺序、最新快照、无工具、队列两项及以上合并、迟到/异常/崩溃 Unknown 均有正反例。③ 双宿主 reset 新 schema 仅两文本；thinking/assistant 完整保留、普通工具配对清理、实际未归队指令全文。④ 真实 OpenCode/OMP 自动 compaction 后的请求、状态与 Advisor/在途工作连续。⑤ npm pack 后 Node/Bun 消费真实库；Fable 编译/链接和全仓静态/相关 WHAT 门禁不新增红项。
@@ -82,6 +94,8 @@ compaction 后若需要恢复模型上下文，只呈现自然的工作材料：
 只有真实通过的部分标明已实现。代码尚未接入的部分保持未完成，不以 proposal 本身冒充运行证明。
 
 ## 8. 三类咨询共用最新一次 Transform View（2026-10-25 增补定稿）
+
+> **现行**：「真实 `resetScope` 工具边界」读作 reset 屏障——优先 `scope.kind=resetScope` 注解，旧工具名仅兼容旧转录。其余投影规则仍有效。
 
 同一真实工作 Session 在内存**至多有一份当前 LLM transform view**，存于唯一 PairHint owner。其内容包括本次 transform **进入过滤／Scope purge 前的消息 input** 与最终准备发给 Provider 的 **output**，以及实际观测的 system/model 身份。每一次新的、被真实宿主观测的 transform 都原子覆写该槽；不得额外用三个永不失效的 recordedMessages/recordedSystems/recordedModels 或为每一个临时问询冻结复制新的大数组。永久历史／reset 事实的 durable archive 属于另一个持久职责，不能拿进程缓存当耐久证据。
 
