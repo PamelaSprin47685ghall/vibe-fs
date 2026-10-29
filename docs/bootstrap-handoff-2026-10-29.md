@@ -2,8 +2,8 @@
 
 | 仓 | HEAD | 备注 |
 |---|---|---|
-| vibe-fs | `062fc835` | PairHint scope.kind 屏障 + 中立透传 |
-| wanxiangli | `50516d9` | PairHint scope.kind=resetScope 屏障 |
+| vibe-fs | `716d30d8` | docs-shu Scope 口径清理 |
+| wanxiangli | `6421ba8` | docs-li Scope AGENTS 对齐 |
 
 ## Stash（保留）
 - 主仓 `stash@{0}`：PluginTransforms/managed-chat 半成品（已被 5dd99b87 覆盖）
