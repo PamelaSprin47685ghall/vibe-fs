@@ -114,8 +114,13 @@ export const childTurn = async (hooks, runtime, child, run, prose, material, awa
 
 let callSequence = 0
 
+// Scope annotation (common law «Scope»): every call below goes through the
+// `withExecutablePlugin` tool wrapper (verification-system plugin-fixture.mjs),
+// which injects `{ kind: 'keepLast' }` on a seeded retention when the args carry
+// no own `scope` key. Pass an explicit `scope` only to assert the gate itself.
+
 /** `this.fork` through the real plugin surface. Optional `scope` is the flat
- * annotation every tool call carries (common law «Scope»); omitted = legacy call shape. */
+ * annotation every tool call carries; omitted = fixture default (keepLast). */
 export const forkCall = (hooks, owner, name, charge, callID = 'call-fork-' + (++callSequence), scope) =>
   hooks.tool['todowrite-for-manager'].execute(
     {
