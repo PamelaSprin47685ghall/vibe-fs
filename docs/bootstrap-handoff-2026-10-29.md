@@ -2,8 +2,8 @@
 
 | 仓 | HEAD | 备注 |
 |---|---|---|
-| vibe-fs | `388cdfdd` | docs-shu Scope 口径清理 |
-| wanxiangli | `e70254c` | docs-li Scope AGENTS 对齐 |
+| vibe-fs | `afc024f2` | compat-pass WHAT/tests → annotation+retention |
+| wanxiangli | `e70254c` | compat-pass scope-progress historical + PairHint comment |
 
 ## Stash（保留）
 - 主仓 `stash@{0}`：PluginTransforms/managed-chat 半成品（已被 5dd99b87 覆盖）
