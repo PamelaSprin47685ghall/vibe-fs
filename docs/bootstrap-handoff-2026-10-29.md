@@ -2,7 +2,7 @@
 
 | 仓 | HEAD | 备注 |
 |---|---|---|
-| vibe-fs | `331db52a` | PairHint scope.kind 屏障 + 中立透传 |
+| vibe-fs | `062fc835` | PairHint scope.kind 屏障 + 中立透传 |
 | wanxiangli | `50516d9` | PairHint scope.kind=resetScope 屏障 |
 
 ## Stash（保留）
