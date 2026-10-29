@@ -622,7 +622,7 @@ Shape (flat: `kind` enum + optional fields; the host validates combinations):
   `replacement` must state the **lesson**; if the previous beat already affected the world, it must also state what changed (dialogue may shrink; the outside world does not roll back).
   The host also appends “this is idle spin number N; do not spin idle”; N rises with consecutive `removeLast` and resets on `keepLast` or `resetScope`.
   Consecutive `removeLast` only erases the current beat: earlier replacements stay in context and are not eaten by a later remove.
-- `meToo`: in one model turn with N tool calls, exactly one carries `resetScope` / `keepLast` / `removeLast`; the other N−1 are `meToo`. At most one decrement per turn. Arrival order does not matter: a `meToo` that arrives before the real annotation is accepted. A turn of only `meToo` (no real annotation) is charged as one `keepLast` and journaled; a second all-`meToo` turn right after it is refused.
+- `meToo`: in one model turn with N tool calls, exactly one carries `resetScope` / `keepLast` / `removeLast`; the other N−1 are `meToo`. At most one decrement per turn. Arrival order does not matter: a `meToo` that arrives before the real annotation is held and runs once the real annotation arrives. Only-`meToo` / all-`meToo` (no real annotation in the turn) is refused.
 
 retention is the keep quota (information capacity), not model turns and not tool-call count.
 Only `keepLast` decrements by 1; `removeLast` / `meToo` do not.

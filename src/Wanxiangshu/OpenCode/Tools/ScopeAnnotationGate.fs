@@ -31,6 +31,57 @@ module ScopeAnnotationGate =
     let private resetRuns =
         System.Collections.Generic.Dictionary<string, string>()
 
+    // ── Held meToo (common law «Scope»: arrival order inside a turn does not
+    // matter; an all-meToo turn is refused). A meToo that arrives before its
+    // turn's real annotation is not run yet: it waits, unexecuted, until the
+    // real annotation of the same provider run is accepted (then it runs) or
+    // the run goes quiet with none (then the whole turn is refused, nothing
+    // spent). Every gate arrival in the run restarts the quiet window, so a
+    // real sibling still streaming its arguments is waited for.
+
+    [<Emit("(() => { let r; const p = new Promise(x => { r = x; }); return [p, r]; })()")>]
+    let private deferred () : obj = jsNative
+
+    [<Emit("$0[$1]")>]
+    let private at (_value: obj) (_index: int) : obj = jsNative
+
+    [<Emit("$0($1)")>]
+    let private invoke (_fn: obj) (_arg: obj) : unit = jsNative
+
+    [<Emit("setTimeout($0, $1)")>]
+    let private startTimer (_callback: unit -> unit) (_ms: int) : obj = jsNative
+
+    [<Emit("clearTimeout($0)")>]
+    let private stopTimer (_handle: obj) : unit = jsNative
+
+    [<Emit("(typeof process !== 'undefined' && process.env ? process.env.WANXIANGSHU_METOO_HOLD_MS : undefined)")>]
+    let private holdWindowEnv () : obj = jsNative
+
+    /// Quiet window after the run's last gate arrival before an all-meToo
+    /// turn is settled as refused.
+    let private defaultHoldWindowMs = 30000
+
+    type private HeldTurn =
+        { mutable Waiters: obj list
+          mutable Timer: obj option }
+
+    // DSL-MUTABLE: resource — meToo calls held per session+run until the turn is decided.
+    let private heldTurns =
+        System.Collections.Generic.Dictionary<string, HeldTurn>()
+
+    let private heldKey (sessionId: string) (runId: string) =
+        string sessionId.Length + ":" + sessionId + ":" + runId
+
+    /// Resolve every held meToo of the run: "" runs it, any other text is the refusal.
+    let private resolveHeld (key: string) (verdict: string) =
+        match heldTurns.TryGetValue key with
+        | true, held ->
+            heldTurns.Remove key |> ignore
+            held.Timer |> Option.iter stopTimer
+            for resolve in List.rev held.Waiters do
+                invoke resolve (box verdict)
+        | _ -> ()
+
     let private asString (value: obj) : string =
         if isNullish value then "" else string value
 
@@ -40,6 +91,49 @@ module ScopeAnnotationGate =
             match System.Int32.TryParse(string value) with
             | true, n -> n
             | _ -> fallback
+
+    let private holdWindowMs () =
+        let raw = holdWindowEnv ()
+        if isNullish raw then defaultHoldWindowMs
+        else
+            match System.Int32.TryParse(string raw) with
+            | true, n when n >= 0 -> n
+            | _ -> defaultHoldWindowMs
+
+    let private allMeTooRefusal =
+        "meToo requires exactly one real scope annotation (resetScope|keepLast|removeLast) in the same turn; this turn carried only meToo and is refused"
+
+    /// The run went quiet without a real annotation: settle it in retention
+    /// and refuse every held meToo.
+    let private settleHeld (sessionId: string) (runId: string) =
+        let key = heldKey sessionId runId
+        if heldTurns.ContainsKey key then
+            let refused: string array = scopeRetention?settle (sessionId, runId)
+            ignore refused
+            resolveHeld key allMeTooRefusal
+
+    /// Any gate arrival in a run that holds meToo restarts its quiet window.
+    let private touchHeld (sessionId: string) (runId: string) =
+        match heldTurns.TryGetValue(heldKey sessionId runId) with
+        | true, held ->
+            held.Timer |> Option.iter stopTimer
+            held.Timer <- Some(startTimer (fun () -> settleHeld sessionId runId) (holdWindowMs ()))
+        | _ -> ()
+
+    /// Hold one provisional meToo; the task completes with "" (run it) or the refusal.
+    let private holdMeToo (sessionId: string) (runId: string) : Task<string> =
+        let key = heldKey sessionId runId
+        let d = deferred ()
+        let held =
+            match heldTurns.TryGetValue key with
+            | true, held -> held
+            | _ ->
+                let held = { Waiters = []; Timer = None }
+                heldTurns[key] <- held
+                held
+        held.Waiters <- at d 1 :: held.Waiters
+        touchHeld sessionId runId
+        unbox<Task<string>> (at d 0)
 
     /// Apply the required `scope` argument. Returns Error prose on refusal.
     /// For resetScope, validation-only here — durable archive is ScopeReset.commit.
@@ -69,6 +163,7 @@ module ScopeAnnotationGate =
                     let e = epochOf ctx
                     if String.IsNullOrWhiteSpace e then "0" else e
 
+                touchHeld ctx.SessionId runText
                 let kind = asString (field scope "kind")
                 // resetScope: validate fields without mutating retention on the
                 // old epoch — ScopeReset.commit seeds the new epoch.
@@ -82,6 +177,8 @@ module ScopeAnnotationGate =
                         Error "resetScope requires newScopeRetentionBudget in 1..48"
                     else
                         resetRuns[ctx.SessionId] <- runText
+                        // The reset is this turn's real annotation: held siblings run.
+                        resolveHeld (heldKey ctx.SessionId runText) ""
                         Ok(
                             createObj
                                 [ "ok" ==> true
@@ -116,6 +213,9 @@ module ScopeAnnotationGate =
 
                         Error reason
                     else
+                        if unbox<bool> receipt?decided = true then
+                            resolveHeld (heldKey ctx.SessionId runText) ""
+
                         let rem = receipt?remaining
 
                         if not (isNullish rem) then
@@ -204,6 +304,17 @@ module ScopeAnnotationGate =
                             match committed with
                             | Error reason -> return reason
                             | Ok() -> return! inner args ctx
+                    elif unbox<bool> (receipt?provisional) = true then
+                        let runText =
+                            match ctx.ProviderRunId, ctx.ToolCallId with
+                            | Some run, _ -> ProviderRunIdentity.value run
+                            | None, Some call -> ToolCallId.value call
+                            | None, None -> ""
+                        let! verdict = holdMeToo ctx.SessionId runText
+                        if String.IsNullOrEmpty verdict then
+                            return! inner args ctx
+                        else
+                            return verdict
                     else
                         return! inner args ctx
             }

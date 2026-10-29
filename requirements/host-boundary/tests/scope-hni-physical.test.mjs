@@ -1506,3 +1506,43 @@ test('WHAT[delegation-negotiation-002] a same-turn meToo ahead of its real annot
   const real = { ...sibling, ToolCallId: ToolCallIdModule_create('c-reset-late') }
   assert.equal(apply('bash', HostToolArguments_$ctor_4E60E31B({ scope: reset }), real, () => '0').tag, 0)
 })
+
+test('WHAT[delegation-negotiation-002] a held meToo runs only once its real sibling arrives; an all-meToo turn is refused unrun', async () => {
+  const { wrap } = await import('../../../dist/OpenCode/Tools/ScopeAnnotationGate.js')
+  const { HostToolArguments_$ctor_4E60E31B } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+  const { ProviderRunIdentityModule_create } = await import('../../../dist/Foundation/Identity.js')
+  const { scopeRetention } = await import('wanxiangli/scope-retention')
+  const prior = process.env.WANXIANGSHU_METOO_HOLD_MS
+  process.env.WANXIANGSHU_METOO_HOLD_MS = '60'
+  const session = 'ses-metoo-held'
+  scopeRetention.clear(session)
+  scopeRetention.apply(session, '0', 'bash', 'run-open', 'c-open', 'run-open', { kind: 'resetScope', newScopeGoal: 'g', newScopeRetentionBudget: 3 })
+  const ran = []
+  const tool = (name) => wrap(name, () => '0', undefined, null, async () => { ran.push(name); return name + ' ran' })
+  const call = (id, run) => ({ SessionId: session, ToolCallId: ToolCallIdModule_create(id), ProviderRunId: ProviderRunIdentityModule_create(run) })
+  try {
+    // meToo first: held, not run, until the real keepLast of the same run arrives
+    const early = tool('read')(HostToolArguments_$ctor_4E60E31B({ scope: { kind: 'meToo' } }))(call('c-early', 'run-a'))
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.deepEqual(ran, [], 'held meToo has not run')
+    const real = await tool('edit')(HostToolArguments_$ctor_4E60E31B({ scope: { kind: 'keepLast' } }))(call('c-real', 'run-a'))
+    assert.equal(real, 'edit ran')
+    assert.equal(await early, 'read ran', 'released once the real annotation decided the turn')
+    assert.equal(scopeRetention.status(session).remaining, 2, 'one keep for the turn')
+
+    // all-meToo: refused when the run goes quiet; nothing runs, nothing is spent
+    ran.length = 0
+    const a = tool('read')(HostToolArguments_$ctor_4E60E31B({ scope: { kind: 'meToo' } }))(call('c-m1', 'run-b'))
+    const b = tool('grep')(HostToolArguments_$ctor_4E60E31B({ scope: { kind: 'meToo' } }))(call('c-m2', 'run-b'))
+    const [ra, rb] = await Promise.all([a, b])
+    assert.match(ra, /carried only meToo and is refused/)
+    assert.match(rb, /carried only meToo and is refused/)
+    assert.deepEqual(ran, [], 'refused meToo never ran')
+    assert.equal(scopeRetention.status(session).remaining, 2, 'refused, not charged')
+    assert.equal(scopeRetention.journal(session).some((row) => row.kind === 'MeTooOrphan'), false)
+  } finally {
+    if (prior === undefined) delete process.env.WANXIANGSHU_METOO_HOLD_MS
+    else process.env.WANXIANGSHU_METOO_HOLD_MS = prior
+    scopeRetention.clear(session)
+  }
+})
