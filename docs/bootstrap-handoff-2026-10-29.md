@@ -2,7 +2,7 @@
 
 | 仓 | HEAD | 备注 |
 |---|---|---|
-| vibe-fs | 见本轮 push | Scope 续收口 |
+| vibe-fs | `bb8bcc07` | Scope 续收口 |
 | wanxiangli | `0645400` | scope-retention 持久 journal + retractions |
 
 ## Stash（保留）
