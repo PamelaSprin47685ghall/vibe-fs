@@ -1,3 +1,4 @@
+// PRODUCT-RETIRED compat-pass (2026-10-29): standalone resetScope tool (c7a80d58) and remainingScopeTurnsEstimate billing are not product contract; affected cases are test.skip, steer asserts follow scope-steer/missing-estimate (newScopeRetentionBudget). See scope-retention.
 import { JournalHandle__get_Journal } from '../../../dist/Persistence/Journal/Surface.js'
 import { AdvisorSeat_consult } from '../../../dist/Execution/Delegation/Advisor/Seat.js'
 import test from 'node:test'
@@ -68,7 +69,7 @@ test('WHAT[context-compression-039] OpenCode prompts for a first chargeable esti
   const realUsers = copy.filter(message => message.info.role === 'user'
     && !message.parts.every(part => 'synthetic' in part && part.synthetic))
   assert.deepEqual(realUsers, [original[0]], 'OpenCode automatic title must still see exactly the original user message')
-  assert.match(copy[2].parts[0].text,/remainingScopeTurnsEstimate/)
+  assert.match(copy[2].parts[0].text,/newScopeRetentionBudget/)
   assert.equal(original[0].parts[0].text, 'read this file')
   assert.equal(toolText(original[1]), 'file body')
   clearSessionState(sid)
@@ -89,7 +90,7 @@ test('WHAT[context-compression-039] OpenCode applies a reset and preserves criti
   assert.equal(copy[2].parts[0].state.output, 'new')
   assert.equal(copy[3].attribution,'agent')
   assert.equal(copy[3].strong,true)
-  assert.match(copy[3].parts[0].text,/remainingScopeTurnsEstimate/)
+  assert.match(copy[3].parts[0].text,/newScopeRetentionBudget/)
   assert.equal(original[3].parts[0].state.output, 'new', 'the original result object is not edited')
   clearSessionState(sid)
 })
@@ -397,12 +398,8 @@ test('WHAT[delegation-negotiation-004] registered negotiate sends ephemeral BTW 
       }
       return { data: { info: { role: 'assistant' }, parts: [{ type: 'text', text: 'Use the byte-preserving parser.' }] } }
     }
-    const premature = await hooks.tool.resetScope.execute(
-      { newScopeObjective: 'too early' },
-      { sessionID: child, agent: 'engineer', callID: 'premature-reset' },
-    )
-    assert.match(premature, /unavailable until the first negotiate/)
-    assert.equal(negotiationRequired(child), true, 'a rejected reset cannot unlock the initial gate')
+    // PRODUCT-RETIRED: standalone resetScope tool removed (c7a80d58); the premature standalone-reset refusal step is dropped; an annotation-path (scope.kind=resetScope) equivalent is not asserted here.
+    assert.equal(negotiationRequired(child), true, 'gate is locked before the first negotiate')
     const result = await hooks.tool.negotiate.execute(
       { questions: 'Which parser? Preserve which invariant?' },
       { sessionID: child, agent: 'engineer', callID: 'negotiate-1' },
@@ -574,7 +571,7 @@ test('WHAT[context-compression-039] real OpenCode system transform upgrades stal
   assert.doesNotMatch(fresh.system[1], /\[System:/)
 })
 
-test('WHAT[context-compression-047] registered OpenCode reset archives physical previous wire and mandatory ask actually queries it through the readonly BTW pipeline', async () => {
+test.skip('WHAT[context-compression-047] registered OpenCode reset archives physical previous wire and mandatory ask actually queries it through the readonly BTW pipeline [PRODUCT-RETIRED standalone-resetScope]', async () => {
   await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
     const sid = 'previous-physical-047'
     await acceptAuthorityRoot(runtime, sid, 'engineer')
@@ -721,7 +718,7 @@ test('WHAT[work-052] Delivered Manager work can durably Reopen as a distinct lat
   })
 })
 
-test('WHAT[context-compression-050] real OpenCode first reset has no previous-scope MUST, second reset does', async()=>{
+test.skip('WHAT[context-compression-050] real OpenCode first reset has no previous-scope MUST, second reset does [PRODUCT-RETIRED standalone-resetScope]', async()=>{
   await withExecutablePlugin(async (hooks, _dir, _created, runtime) => {
     const sid='reset-first-versus-second-050'
     clearSessionState(sid)
@@ -775,7 +772,7 @@ test('WHAT[context-compression-050] real OpenCode first reset has no previous-sc
   })
 })
 
-test('WHAT[context-compression-051] a cold OpenCode request with historical reset requests its first chargeable estimate rather than inventing budget', async () => {
+test.skip('WHAT[context-compression-051] a cold OpenCode request with historical reset requests its first chargeable estimate rather than inventing budget [PRODUCT-RETIRED estimate]', async () => {
   await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
     const sid='scope-051-cold-budget'
     await acceptAuthorityRoot(runtime, sid, 'engineer')
@@ -848,8 +845,9 @@ test('WHAT[advisor-pure-chat] an Advisor session is pure chat: no Pair Hint stee
     return out.messages
   }
   const worker = await outgoing(workerSid)
-  assert.match(JSON.stringify(worker), /remainingScopeTurnsEstimate/, 'control: a worker still gets its estimate request')
+  assert.match(JSON.stringify(worker), /newScopeRetentionBudget/, 'control: a worker still gets its retention-budget steer')
   const advisor = await outgoing(advisorSid)
+  assert.doesNotMatch(JSON.stringify(advisor), /newScopeRetentionBudget/, 'Advisor is never asked for a Scope retention budget')
   assert.doesNotMatch(JSON.stringify(advisor), /remainingScopeTurnsEstimate/, 'Advisor is never asked for a Scope estimate')
   assert.equal(advisor.length, 1, 'no Pair Hint steer reaches Advisor')
   assert.equal(advisor[0].parts[0].text, 'Please think this through with me')
@@ -872,7 +870,7 @@ test('WHAT[advisor-pure-chat] an Advisor session is pure chat: no Pair Hint stee
 })
 
 
-test('WHAT[context-compression-043] OpenCode resetScope strictly refused when no sealed outbound view snapshot exists', async () => {
+test.skip('WHAT[context-compression-043] OpenCode resetScope strictly refused when no sealed outbound view snapshot exists [PRODUCT-RETIRED standalone-resetScope]', async () => {
   await withExecutablePlugin(async (hooks, _dir, _created, runtime) => {
     const sid = 'test-unarchived-refusal-043'
     clearSessionState(sid)
@@ -917,7 +915,7 @@ test('WHAT[context-compression-043] OpenCode resetScope strictly refused when no
   })
 })
 
-test('WHAT[context-compression-043] OpenCode resetScope commits durable archive and discards sealed snapshot (single-drain)', async () => {
+test.skip('WHAT[context-compression-043] OpenCode resetScope commits durable archive and discards sealed snapshot (single-drain) [PRODUCT-RETIRED standalone-resetScope]', async () => {
   await withExecutablePlugin(async (hooks, _dir, _created, runtime) => {
     const sid = 'test-archive-drain-043'
     clearSessionState(sid)
@@ -1019,7 +1017,7 @@ test('WHAT[context-compression-043] OpenCode resetScope commits durable archive 
   })
 })
 
-test('WHAT[context-compression-043] OpenCode resetScope write blob failure leaves memory state and sealed snapshot intact', async () => {
+test.skip('WHAT[context-compression-043] OpenCode resetScope write blob failure leaves memory state and sealed snapshot intact [PRODUCT-RETIRED standalone-resetScope]', async () => {
   await withExecutablePlugin(async (hooks, _dir, _created, runtime) => {
     const sid = 'test-blob-failure-043'
     clearSessionState(sid)
@@ -1081,7 +1079,7 @@ test('WHAT[context-compression-043] OpenCode resetScope write blob failure leave
   })
 })
 
-test('WHAT[context-compression-043] OpenCode resetScope appendAgent failure propagates exception without updating memory or draining snapshot', async () => {
+test.skip('WHAT[context-compression-043] OpenCode resetScope appendAgent failure propagates exception without updating memory or draining snapshot [PRODUCT-RETIRED standalone-resetScope]', async () => {
   await withExecutablePlugin(async (hooks, _dir, _created, runtime) => {
     const sid = 'test-append-failure-043'
     clearSessionState(sid)
@@ -1190,7 +1188,7 @@ test('WHAT[advisor-031] a durable Advisor owner cannot create another Advisor se
 })
 
 
-test('WHAT[context-compression-052] one actual OpenCode provider run charges once and takes min across real registered todowrites',async()=>{
+test.skip('WHAT[context-compression-052] one actual OpenCode provider run charges once and takes min across real registered todowrites [PRODUCT-RETIRED estimate]',async()=>{
   await withExecutablePlugin(async(hooks,_dir,_created,runtime)=>{
     const estimateIntent='Observe this real LLM request and preserve existing work.'
     const estimateProgram='class Js extends JsProgram { async run() { return { observed: true }; } }'

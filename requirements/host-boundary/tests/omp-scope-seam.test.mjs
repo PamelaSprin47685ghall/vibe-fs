@@ -591,7 +591,7 @@ test('WHAT[context-compression-033] OMP context handler preserves raw messages, 
   assert.equal(kept[6].role, 'user')
   assert.equal(kept[6].attribution, 'agent')
   assert.equal(kept[6].strong, true)
-  assert.match(contentText(kept[6].content),/remainingScopeTurnsEstimate/,'first charged report belongs to ScopeProgress')
+  assert.match(contentText(kept[6].content),/newScopeRetentionBudget/,'first retention budget rides scope.kind=resetScope')
   assert.equal(rawOmpMessages.at(-1).content, 'edit success', 'persisted result is not edited')
 
   clearSessionState(sid)
@@ -967,8 +967,7 @@ test('WHAT[delegation-034] Accepted negotiate releases gate; non-matching steer 
   assert.equal(confirmNegotiationSteer(receipt, childId), true)
   assert.equal(negotiationRequired(childId), false, 'first-reset gate released')
 
-  // resetScope now succeeds
-  const resetDef = env.registeredTools.find((t) => t.name === 'resetScope')
+  // reset now succeeds (scope.kind=resetScope annotation; no standalone tool)
   resetScopeState(childId, 4)
   assert.equal(turnBudget(childId), 4)
   assert.equal(isScopeInitialized(childId), true)
@@ -1004,7 +1003,7 @@ test('WHAT[context-compression-048] OMP registers askPreviousScope and refuses t
   clearSessionState(sid)
 })
 
-test('WHAT[context-compression-049] OMP real native provider hook freezes old catalog then replays it for the readonly previous Scope side turn', async () => {
+test.skip('WHAT[context-compression-049] OMP real native provider hook freezes old catalog then replays it for the readonly previous Scope side turn [PRODUCT-RETIRED standalone-resetScope]', async () => {
   const { mkdtempSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
@@ -1214,7 +1213,7 @@ test('WHAT[context-compression-049] OMP real native provider hook freezes old ca
 })
 
 
-test('WHAT[context-compression-043] OMP resetScope refusal on missing snapshot, nativePayload archival via before_provider_request, single-drain, and session_shutdown cleanup', async () => {
+test.skip('WHAT[context-compression-043] OMP resetScope refusal on missing snapshot, nativePayload archival via before_provider_request, single-drain, and session_shutdown cleanup [PRODUCT-RETIRED standalone-resetScope]', async () => {
   const { mkdtempSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')

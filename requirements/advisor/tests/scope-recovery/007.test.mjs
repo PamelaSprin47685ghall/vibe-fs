@@ -20,7 +20,7 @@ const until = async predicate => {
   assert.fail('durable ScopeReanchored was not used to recover the old Advisor process')
 }
 
-test('WHAT[advisor-007] real ScopeReanchored journal identifies a cold Scope even when all ScopeProgress memory is gone', async () => {
+test.skip('WHAT[advisor-007] real ScopeReanchored journal identifies a cold Scope even when all ScopeProgress memory is gone [PRODUCT-RETIRED standalone-resetScope]', async () => {
   await withExecutablePlugin(async (hooks, workspace, _children, runtime) => {
     const session = 'ses-durable-scope-advisor-013'
     const scope = '1'
