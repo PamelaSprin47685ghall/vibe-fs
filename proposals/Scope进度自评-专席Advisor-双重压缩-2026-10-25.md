@@ -65,6 +65,8 @@ reset 返回值依据**持久化委托台账**列出在 reset 因果截面尚未
 
 ## 5. 系统 compaction 的独立协议
 
+> **现行**：「不修改剩余估计」中的估计为废概念（无估计可改）；compaction 不推进 epoch、不开顾问等其余口径未重裁。
+
 允许开启宿主自动 compaction，它**不推进 Scope epoch**、不收费、不修改剩余估计、不启动 Advisor、不假设业务完成；保留委托义务、专席会话身份和状态机。保留所有原始持久事实与归档，不允许压缩路径直接把唯一权威物理删除。旧 `compaction.auto=false` 和无条件否决 autocontinue 的启动合同需更换为能证明新 Provider run 身份和跨 compaction 的真实测试合同；`prune` 是否开启取决于能否证明不删除唯一路径中的原始行，不能因为需要 auto 就默认允许删历史。
 
 compaction 后若需要恢复模型上下文，只呈现自然的工作材料：“当前任务目标：{currentScopeObjective}\n已确认的背景：{availableWorkSummary}\n尚未结束的工作：{outstandingWorkSummary}\n继续处理。”进度状态、顾问队列、Provider 请求身份只存在宿主账本，不暴露给任一模型。
@@ -73,7 +75,7 @@ compaction 后若需要恢复模型上下文，只呈现自然的工作材料：
 
 ## 6. 模型提示词（定稿）
 
-> **现行**：ResetDue 强 steer 与初次估计强 steer 已退役；顾问问题文案为 `host/advisor-question/reset-due`（RetentionExhausted）与 `.../stall`（IdleSpin）。下文「定稿」提示词仅考古，勿复制进资源。
+> **现行**：基于估计的 ResetDue／初次估计强 steer 已退役；资源路径 `host/scope-steer/missing-estimate`（无 retention 额度时，要求下一工具带 `scope.kind=resetScope` + `newScopeRetentionBudget`）与 `host/scope-steer/reset-due`（retention 耗尽）沿用旧路径名，但内容已改为 retention 口径；顾问问题文案为 `host/advisor-question/reset-due`（RetentionExhausted）与 `.../stall`（IdleSpin）。下文「定稿」提示词仅考古，勿复制进资源。
 
 - 顾问初始（仅确需时）：“你擅长分析复杂问题。根据已提供的信息作答；需要补充材料时直接提出问题。”不提专席身份、无工具、持久会话或四阶段机制。无工具权限由宿主实施。
 - A/B/C/D 对话原文：仅采用 §3 的自然聊天问题，不包含 Advisor、专席、prose 字段、阶段或快照身份。
@@ -107,6 +109,8 @@ compaction 后若需要恢复模型上下文，只呈现自然的工作材料：
 
 
 ## 9. 只读临时 SDK 的准入与结果分类（2026-10-25 实测补充）
+
+> **现行**：准入与三类结果分类仍有效；验收列表中 `delegation-negotiation-004` 已去掉独立 `resetScope` 过早调用一步（工具已删），其余断言照旧。
 
 由 `negotiate`、`askPreviousScope`、Advisor A/C 使用的 SDK 临时 Session 不是新的 Managed Work 回合，也不拥有独立调度容量租约。**只有** PairHint 确认的短命 Session 可在其 `chat.message` / `chat.params` 阶段绕开对真实工作 Session 的 admission/committed lease 结算；任何其它 managed physical message 仍须严格确证其自己的 lease，无凭据则继续拒绝 `PROMPT-006`。临时请求原样携带正常 Provider tool schema 和模型身份，禁止工具在 `tool.execute.before` fail-close，绝不靠删减 tools schema 实现只读。
 
