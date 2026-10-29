@@ -2,7 +2,7 @@
 
 | 仓 | HEAD | 备注 |
 |---|---|---|
-| vibe-fs | `716d30d8` | docs-shu Scope 口径清理 |
+| vibe-fs | `388cdfdd` | docs-shu Scope 口径清理 |
 | wanxiangli | `6421ba8` | docs-li Scope AGENTS 对齐 |
 
 ## Stash（保留）
