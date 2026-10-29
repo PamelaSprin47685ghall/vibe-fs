@@ -3,7 +3,7 @@
 | 仓 | HEAD | 备注 |
 |---|---|---|
 | vibe-fs | `388cdfdd` | docs-shu Scope 口径清理 |
-| wanxiangli | `6421ba8` | docs-li Scope AGENTS 对齐 |
+| wanxiangli | `e70254c` | docs-li Scope AGENTS 对齐 |
 
 ## Stash（保留）
 - 主仓 `stash@{0}`：PluginTransforms/managed-chat 半成品（已被 5dd99b87 覆盖）
@@ -29,5 +29,6 @@
 ## docs-li / docs-shu（本轮）
 - li：capability／pair-hint／scope-retention／scope-progress AGENTS 对齐注解入口；估计路径标退役。
 - shu：共同法／scope-protocol／js-program·bookkeeper 资源去掉 estimate 必填；功能导览、结对指南、fork-child 收尾口径；proposals 两份 Scope 稿打历史条；requirements README 钉现行 Scope 一句。
-- **compat 仍可疑**（供后续 pass，不本轮全库考古）：`requirements/**/WHAT` 里旧 resetScope 工具／turnBudget／estimate 句；`scope-progress` 包内 Stall·ResetDue 测试与 durable 路径；`resources/.../arg-estimate` 路径名残留；旧转录 PairHint 工具名屏障；wx `ce-replay-wt`；proposals 正文未逐段改写（仅条目标记）。
+- **compat-pass（本轮）**：优先 pack WHAT／WHY 加 COMPAT 条；context-compression [033]/[034]/[045] 改注解+retention；scope-progress 测试标 PACKAGE-HISTORICAL；omp-scope-seam 估计／独立 resetScope 注册用例 `test.skip`；049／064 改断言无 estimate；arg-estimate 资源保留退役说明；PairHint 注释注解优先。
+- **compat 仍欠**（不臆造大改）：work／delegation／repo-programming 等夹具里仍可能传入 `remainingScopeTurnsEstimate`（宿主若拒多余键则需再剥）；scope-progress durable 实现未拆包；wx `ce-replay-wt`；proposals 正文仅条目标记未逐段改写；omp 其它仍写 resetScope 工具名的历史用例未全 skip。
 
