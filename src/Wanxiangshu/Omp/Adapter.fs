@@ -2174,7 +2174,11 @@ module Adapter =
             mergeContextPairs rawArray replacements
 
     let private isScopeSection (text: string) : bool =
-        text.Contains("## Scope & Context Management") || text.Contains("## Scope 与上下文")
+        // Current en header is "## Scope and context"; "## Scope & Context Management" is the
+        // legacy header still upgraded in place. Missing the current one re-appended the section.
+        text.Contains("## Scope and context")
+        || text.Contains("## Scope & Context Management")
+        || text.Contains("## Scope 与上下文")
 
     let private replaceLegacyScopeHeader (scopeProtocol: string) (text: string) : string =
         if isScopeSection text then scopeProtocol else text
