@@ -910,8 +910,6 @@ module ToolRegistry =
               yield FissionTool.spec factory runtime
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
-              yield ResetScopeTool.spec factory runtime.Journal runtime.Snapshot
-
               yield! casebookToolSpecs
               yield! generatedJsSpecs () ]
 
@@ -945,7 +943,12 @@ module ToolRegistry =
 
                 { injected with
                     Execute =
-                        ScopeAnnotationGate.wrap injected.Name scopeProgressEpoch (gateExecute injected) })
+                        ScopeAnnotationGate.wrap
+                            injected.Name
+                            scopeProgressEpoch
+                            runtime.Journal
+                            runtime.Snapshot
+                            (gateExecute injected) })
 
         { Tools = ToolHostCodec.registry factory specs
           Runtime = runtime }

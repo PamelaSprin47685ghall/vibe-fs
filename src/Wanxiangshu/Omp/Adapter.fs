@@ -42,6 +42,17 @@ module Adapter =
     [<Import("scopeRetention", "wanxiangli/scope-retention")>]
     let private scopeRetention: obj = jsNative
 
+    [<Import("advisorProcessQueue", "wanxiangli/scope-progress")>]
+    let private advisorProcessQueue: obj = jsNative
+
+    /// Bound when product hooks register; product-tool resetScope annotations
+    /// commit ScopeReanchored through this handle.
+    let mutable private boundScopeJournal: AgentJournal option = None
+
+    /// Set in registerProductHooks once ompCommitResetScope is in scope.
+    let mutable private runScopeReanchor:
+        (string -> obj -> string -> string option -> int -> Task<obj>) option = None
+
     [<Import("Projection", "wanxiangli/projection")>]
     let private createTenureProjection: unit -> obj = jsNative
 
@@ -1104,27 +1115,55 @@ module Adapter =
         (sid: string)
         (callId: string)
         (arguments: obj)
-        : Result<unit, string> =
+        : Result<obj, string> =
         let scope = if isNull arguments then null else arguments?scope
         if isNull scope then
             Error "scope annotation required on every tool call (see common law «Scope»)"
         else
-            let st: obj = scopeRetention?status(sid)
-            let epoch =
-                if not (isNull st?epoch) && not (String.IsNullOrWhiteSpace(string st?epoch)) then string st?epoch
-                else "0"
-            scopeRetention?ensureEpoch(sid, epoch) |> ignore
-            let receipt: obj =
-                scopeRetention?apply(sid, epoch, toolName, callId, callId, callId, scope)
-            if isNull receipt || not (unbox<bool> receipt?ok) then
-                Error(if isNull receipt then "scope annotation refused" else string receipt?reason)
+            let kind =
+                if isNull scope?kind then "" else stringOf scope?kind
+            // resetScope annotation: validate + durable commit via ompCommitResetScope
+            // (caller checks receipt?reanchor). Do not mutate old-epoch retention here.
+            if kind = "resetScope" then
+                let goal = if isNull scope?newScopeGoal then "" else stringOf scope?newScopeGoal
+                let budgetRaw = scope?newScopeRetentionBudget
+                let budget =
+                    if isNull budgetRaw then 0
+                    else
+                        try int (unbox<float> budgetRaw)
+                        with _ ->
+                            try int (stringOf budgetRaw) with _ -> 0
+                let oldV =
+                    if isNull scope?oldScopeVerboseVerbatim then ""
+                    else stringOf scope?oldScopeVerboseVerbatim
+                if String.IsNullOrWhiteSpace goal then
+                    Error "resetScope requires newScopeGoal"
+                elif budget < 1 then
+                    Error "resetScope requires newScopeRetentionBudget in 1..48"
+                else
+                    Ok(
+                        createObj
+                            [ "ok" ==> true
+                              "reanchor" ==> true
+                              "remaining" ==> budget
+                              "goal" ==> goal.Trim()
+                              "oldVerbatim" ==> oldV.Trim() ]
+                    )
             else
-                let rem = receipt?remaining
-                if not (isNull rem) then
-                    try Surface.setRetentionBudget sid (unbox<int> rem) with _ -> ()
-                if unbox<bool> (receipt?reanchor) = true && not (isNull rem) then
-                    try Surface.resetScopeState sid (unbox<int> rem) with _ -> ()
-                Ok()
+                let st: obj = scopeRetention?status(sid)
+                let epoch =
+                    if not (isNull st?epoch) && not (String.IsNullOrWhiteSpace(string st?epoch)) then string st?epoch
+                    else "0"
+                scopeRetention?ensureEpoch(sid, epoch) |> ignore
+                let receipt: obj =
+                    scopeRetention?apply(sid, epoch, toolName, callId, callId, callId, scope)
+                if isNull receipt || not (unbox<bool> receipt?ok) then
+                    Error(if isNull receipt then "scope annotation refused" else string receipt?reason)
+                else
+                    let rem = receipt?remaining
+                    if not (isNull rem) then
+                        try Surface.setRetentionBudget sid (unbox<int> rem) with _ -> ()
+                    Ok receipt
 
     /// The omp tool definition for one product tool spec.
     ///
@@ -1180,7 +1219,68 @@ module Adapter =
                           match applyOmpScopeAnnotation spec.Name sid (stringOf callId) arguments with
                           | Error reason ->
                               return toolOutcome { Text = reason; Truncated = false; IsError = true; Details = None }
-                          | Ok() ->
+                          | Ok receipt when unbox<bool> (receipt?reanchor) = true ->
+                              let goal = if isNull receipt?goal then "" else stringOf receipt?goal
+                              let oldV = if isNull receipt?oldVerbatim then "" else stringOf receipt?oldVerbatim
+                              let budget =
+                                  if isNull receipt?remaining then 0
+                                  else
+                                      try unbox<int> receipt?remaining
+                                      with _ -> 0
+                              if Surface.negotiationRequired sid then
+                                  return
+                                      toolOutcome
+                                          { Text =
+                                                "scope.kind=resetScope is unavailable until the first negotiate(questions) call has been accepted."
+                                            Truncated = false
+                                            IsError = true
+                                            Details = None }
+                              elif Surface.isPreviousScopePending sid then
+                                  return
+                                      toolOutcome
+                                          { Text =
+                                                "scope.kind=resetScope is unavailable until askPreviousScope(questions) has been called."
+                                            Truncated = false
+                                            IsError = true
+                                            Details = None }
+                              else
+                                  match runScopeReanchor with
+                                  | None ->
+                                      return
+                                          toolOutcome
+                                              { Text = "scope.kind=resetScope refused: scope journal not bound yet"
+                                                Truncated = false
+                                                IsError = true
+                                                Details = None }
+                                  | Some commit ->
+                                      let! committed =
+                                          commit
+                                              sid
+                                              callId
+                                              goal
+                                              (if String.IsNullOrWhiteSpace oldV then None else Some oldV)
+                                              budget
+                                      // refused commit returns ompScopeRefused-shaped content
+                                      let refused =
+                                          try unbox<bool> (committed?details?refused)
+                                          with _ -> false
+                                      if refused then
+                                          let text =
+                                              try
+                                                  let content: obj array = unbox committed?content
+                                                  stringOf (content.[0]?text)
+                                              with _ ->
+                                                  "scope.kind=resetScope refused"
+                                          return
+                                              toolOutcome
+                                                  { Text = text
+                                                    Truncated = false
+                                                    IsError = true
+                                                    Details = None }
+                                      else
+                                          let! outcome = spec.Execute invocation
+                                          return toolOutcome outcome
+                          | Ok _ ->
                               let! outcome = spec.Execute invocation
                               return toolOutcome outcome
                       }
@@ -1282,6 +1382,7 @@ module Adapter =
         (toolCallId: ToolCallId)
         (objective: string)
         (experience: string option)
+        (retentionBudget: int)
         (archived: BlobWriteReceipt)
         : Task<obj> =
         task {
@@ -1301,8 +1402,15 @@ module Adapter =
             | Error failure -> raise (JournalAppendException failure)
 
             outboundViewStore?discardSealed(sid) |> ignore
-            Surface.resetScopeState sid 0
-            scopeProgress?reset(sid, string (Set.count epoch.ReanchoredScopes + 1)) |> ignore
+            let nextEpochKey = string (Set.count epoch.ReanchoredScopes + 1)
+            let budget = max 0 retentionBudget
+            Surface.resetScopeState sid budget
+            scopeProgress?reset(sid, nextEpochKey) |> ignore
+            advisorProcessQueue?reset(sid, nextEpochKey) |> ignore
+            scopeRetention?reset(sid, nextEpochKey) |> ignore
+            if budget >= 1 then
+                scopeRetention?seed(sid, budget) |> ignore
+                Surface.setRetentionBudget sid budget
             if not (Set.isEmpty epoch.ReanchoredScopes) then
                 Surface.beginAskPreviousScope sid
 
@@ -1328,6 +1436,7 @@ module Adapter =
         (toolCallId: ToolCallId)
         (objective: string)
         (experience: string option)
+        (retentionBudget: int)
         (previous: obj)
         : Task<obj> =
         task {
@@ -1338,7 +1447,7 @@ module Adapter =
             | Error reason ->
                 return ompScopeRefused ("resetScope refused: durable scope archive write failed: " + reason)
             | Ok archived ->
-                return! ompCommittedArchive journal sid sessionId epoch toolCallId objective experience archived
+                return! ompCommittedArchive journal sid sessionId epoch toolCallId objective experience retentionBudget archived
         }
 
     let private ompScopeResetReplayed (journalOpt: AgentJournal option) (sessionText: string) (callId: string) =
@@ -1566,7 +1675,7 @@ module Adapter =
                               let sid = ctxSessionId ctx
                               match applyOmpScopeAnnotation "askPreviousScope" sid (stringOf callId) arguments with
                               | Error reason -> return ompPriorAnswer false reason
-                              | Ok() ->
+                              | Ok _ ->
                                   return! ompPriorExecute journalOpt (stringOf callId) arguments ctx start
                           }
                           |> unbox<obj>)
@@ -1580,16 +1689,17 @@ module Adapter =
         (callId: obj)
         (objective: string)
         (experience: string option)
+        (retentionBudget: int)
         : obj =
         let toolCallIdStr = stringOf callId
 
         if String.IsNullOrWhiteSpace toolCallIdStr then
-            failwith "resetScope requires an exact tool call id (HOST-011)"
+            failwith "scope reset requires an exact tool call id (HOST-011)"
 
         let journal =
             match journalOpt with
             | Some j -> j
-            | None -> failwith "resetScope requires a durable agent journal for ScopeReanchored prefix epoch advance"
+            | None -> failwith "scope reset requires a durable agent journal for ScopeReanchored prefix epoch advance"
 
         let sessionId = SessionId.create sid
         let toolCallId = ToolCallId.create toolCallIdStr
@@ -1606,106 +1716,14 @@ module Adapter =
             if isNullOrUndefined rawSnap then
                 return
                     ompScopeRefused
-                        "resetScope refused: the preceding real provider request has no complete archived system/messages/model observation"
+                        "scope.kind=resetScope refused: the preceding real provider request has no complete archived system/messages/model observation"
             else
-                return! ompWriteArchivedScope journal sid sessionId epoch toolCallId objective experience rawSnap
+                return! ompWriteArchivedScope journal sid sessionId epoch toolCallId objective experience retentionBudget rawSnap
         }
         |> unbox<obj>
 
-    let private registerResetScopeTool (pi: obj) (journalOpt: AgentJournal option) : unit =
-        let resetScopeDef =
-            createObj
-                [ "name", box "resetScope"
-                  "label", box "Reset Scope"
-                  "concurrency", box "exclusive"
-                  "loadMode", box "essential"
-                  "approval", box "read"
-                  "description",
-                  box "Transitional archival reanchor. Prefer scope.kind=resetScope on any tool (common law «Scope»). Carry scope annotation on this call too."
-                  "parameters",
-                  box (
-                      withScopeParameter (
-                      createObj
-                          [ "type", box "object"
-                            "properties",
-                            box (
-                                createObj
-                                    [ "oldScopeVerboseVerbatimExperience",
-                                      box (
-                                          createObj
-                                              [ "type", box [| "string"; "null" |]
-                                                "description",
-                                                box
-                                                    "Write out your experience and findings from the closing scope, verbosely: everything between the previous resetScope call (or session start) and this call. Any exact text needed in the next scope (such as function signatures, error stack traces, or exact line numbers) MUST be copied VERBATIM here. Null or omitted if there is no prior work." ]
-                                      )
-                                      "newScopeObjective",
-                                      box (
-                                          createObj
-                                              [ "type", box "string"
-                                                "description", box "The objective for the new scope. The scope must form a self-contained state closed-loop (状态闭环)." ]
-                                      ) ]
-                            )
-                            "required", box [| "newScopeObjective" |] ])
-                  )
-                  "execute",
-                  box (
-                      Func<obj, obj, obj, obj, obj, obj>(fun callId arguments signal onUpdate toolCtx ->
-                          let ctx = orNull toolCtx
-                          let sid = ctxSessionId ctx
+    // resetScope standalone tool removed: scope.kind=resetScope on any tool → ompCommitResetScope
 
-                          match applyOmpScopeAnnotation "resetScope" sid (stringOf callId) arguments with
-                          | Error reason ->
-                              task {
-                                  return
-                                      createObj
-                                          [ "content", box [| createObj [ "type", box "text"; "text", box reason ] |]
-                                            "details", box (createObj [ "refused", box true ]) ]
-                              }
-                              |> unbox<obj>
-                          | Ok() ->
-                              let objective =
-                                  if not (isNull arguments) && not (isNull arguments?newScopeObjective) then
-                                      stringOf arguments?newScopeObjective
-                                  else
-                                      ""
-
-                              let experience =
-                                  if
-                                      not (isNull arguments)
-                                      && not (isNull arguments?oldScopeVerboseVerbatimExperience)
-                                  then
-                                      Some(stringOf arguments?oldScopeVerboseVerbatimExperience)
-                                  else
-                                      None
-
-                              let negotiationPending = Surface.negotiationRequired sid
-                              let previousPending = Surface.isPreviousScopePending sid
-
-                              let pendingMessage =
-                                  if negotiationPending then
-                                      "resetScope is unavailable until the first negotiate(questions) call has been accepted. Call negotiate now; once it is accepted, resetScope is available immediately. Do not wait for the delegator's answer."
-                                  else
-                                      "resetScope is unavailable until askPreviousScope(questions) has been called by the new scope; ordinary tools remain available."
-
-                              if ompScopeResetReplayed journalOpt sid (stringOf callId) then
-                                  task { return ompScopeSuccess objective } |> unbox<obj>
-                              elif negotiationPending || previousPending then
-                                  let msg = pendingMessage
-                                  let content = box [| createObj [ "type", box "text"; "text", box msg ] |]
-
-                                  let details =
-                                      createObj
-                                          [ "objective", box ""
-                                            "archived", box false
-                                            "refused", box true ]
-
-                                  task { return createObj [ "content", content; "details", details ] }
-                                  |> unbox<obj>
-                              else
-                                  ompCommitResetScope journalOpt sid callId objective experience)
-                  ) ]
-
-        registerTool pi resetScopeDef
 
     // ------------------------------------------------------------------
     // Host ports over omp
@@ -1828,10 +1846,9 @@ module Adapter =
             |> List.map (fun agent ->
                 let policy =
                     match agent.ToolPolicy with
-                    | None -> Map [ ("resetScope", true); ("negotiate", true); ("askPreviousScope", true) ]
+                    | None -> Map [ ("negotiate", true); ("askPreviousScope", true) ]
                     | Some m ->
                         m
-                        |> Map.add "resetScope" true
                         |> Map.add "negotiate" true
                         |> Map.add "askPreviousScope" true
 
@@ -2342,37 +2359,85 @@ module Adapter =
                 return changed ? { ...$0, content: next } : $0
             })()"""
 
-    let private ompMessageBeatId (message: obj) : string =
-        let candidates =
+    let private ompMessageBeatKeys (message: obj) : string list =
+        let info = fieldValue message "info"
+        let top =
             [ fieldValue message "id"
               fieldValue message "responseId"
-              fieldValue (fieldValue message "info") "id" ]
-        candidates
-        |> List.tryPick (fun v -> if isNull v then None else Some(stringOf v))
-        |> Option.defaultValue ""
+              fieldValue message "providerRunId"
+              fieldValue message "provider_run_id"
+              fieldValue info "id"
+              fieldValue info "responseId"
+              fieldValue info "providerRunId"
+              fieldValue info "runId" ]
+            |> List.choose (fun v -> if isNull v then None else Some(stringOf v))
+            |> List.filter (fun s -> s <> "")
+        let content = fieldValue message "content"
+        let fromContent =
+            if isNull content then []
+            else
+                try
+                    let arr: obj array = unbox content
+                    arr
+                    |> Array.toList
+                    |> List.collect (fun block ->
+                        [ fieldValue block "id"
+                          fieldValue block "callId"
+                          fieldValue block "toolCallId"
+                          fieldValue block "providerRunId" ]
+                        |> List.choose (fun v -> if isNull v then None else Some(stringOf v))
+                        |> List.filter (fun s -> s <> ""))
+                with _ ->
+                    []
+        (top @ fromContent) |> List.distinct
 
     let private ompCollapseRetracted (sessionId: string) (messages: obj array) : obj array =
         let rows: obj array = unbox (scopeRetention?retractions(sessionId))
         if isNull (box rows) || rows.Length = 0 then messages
         else
-            let byBeat =
+            let byKey =
                 rows
-                |> Array.choose (fun row ->
-                    let id = stringOf (fieldValue row "beatId")
-                    if id = "" then None
-                    else Some(id, stringOf (fieldValue row "replacement")))
-                |> Map.ofArray
-            if Map.isEmpty byBeat then messages
+                |> Array.fold
+                    (fun (acc: Map<string, string>) row ->
+                        let replacement = stringOf (fieldValue row "replacement")
+                        let beat = stringOf (fieldValue row "beatId")
+                        let aliasField = fieldValue row "aliases"
+                        let aliases =
+                            let baseKeys = if beat = "" then [] else [ beat ]
+                            if isNull aliasField then baseKeys
+                            else
+                                try
+                                    let arr: obj array = unbox aliasField
+                                    baseKeys
+                                    @ (arr
+                                       |> Array.toList
+                                       |> List.map stringOf
+                                       |> List.filter (fun s -> s <> ""))
+                                with _ ->
+                                    baseKeys
+                        aliases
+                        |> List.distinct
+                        |> List.fold (fun m key -> Map.add key replacement m) acc)
+                    Map.empty
+            if Map.isEmpty byKey then messages
             else
+                let mutable used = Set.empty<string>
                 messages
                 |> Array.map (fun message ->
                     if stringOf (fieldValue message "role") <> "assistant"
                        && stringOf (fieldValue (fieldValue message "info") "role") <> "assistant" then
                         message
                     else
-                        match Map.tryFind (ompMessageBeatId message) byBeat with
+                        let hit =
+                            ompMessageBeatKeys message
+                            |> List.tryPick (fun key ->
+                                match Map.tryFind key byKey with
+                                | Some replacement when not (Set.contains key used) -> Some(key, replacement)
+                                | _ -> None)
+                        match hit with
                         | None -> message
-                        | Some replacement ->
+                        | Some(key, replacement) ->
+                            used <- Set.add key used
                             let updated = copyScopeObject message
                             updated?content <-
                                 box [| createObj [ "type", box "text"; "text", box replacement ] |]
@@ -3032,7 +3097,18 @@ module Adapter =
         (stateRoot: string)
         : (HostSignal -> Task<unit>) =
 
-        registerResetScopeTool pi journalOpt
+        boundScopeJournal <- journalOpt
+        runScopeReanchor <-
+            Some(fun sid callId goal experience budget ->
+                task {
+                    if ompScopeResetReplayed journalOpt sid (stringOf callId) then
+                        return ompScopeSuccess goal
+                    else
+                        return!
+                            unbox<Task<obj>> (
+                                ompCommitResetScope journalOpt sid callId goal experience budget
+                            )
+                })
 
         registerAskPreviousScopeTool pi journalOpt (fun ctx questions receipt archive source ->
             match journalOpt with
@@ -3235,59 +3311,9 @@ module Adapter =
             reportRetentionAdvisor sid epoch
 
         let registerScopeProgressTool () =
-            let estimateProse =
-                ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) "tool/js-program/arg-estimate" Map.empty
-            let schema =
-                createObj [ "type" ==> "object"
-                            "properties" ==> createObj [
-                                "remainingScopeTurnsEstimate" ==> createObj [
-                                    "type" ==> "number"; "minimum" ==> 0
-                                    "description" ==> (estimateProse + " Transitional/optional; prefer scope retention.") ]]
-                            "required" ==> [||]
-                            "additionalProperties" ==> false ]
-            let definition = createObj [
-                "name" ==> "todowrite"
-                "label" ==> "Scope Progress"
-                "loadMode" ==> "essential"
-                "concurrency" ==> "exclusive"
-                "approval" ==> "read"
-                "description" ==> estimateProse
-                "parameters" ==> schema
-                "execute" ==> Func<obj, obj, obj, obj, obj, obj>(fun callId arguments _signal _onUpdate ctx ->
-                    task {
-                        let sid = ctxSessionId ctx
-                        let cid = stringOf callId
-                        if String.IsNullOrWhiteSpace sid || String.IsNullOrWhiteSpace cid then
-                            return ompScopeRefused "todowrite requires the real call identity"
-                        else
-                            bindProgress sid
-                            let rawEstimate = fieldValue arguments "remainingScopeTurnsEstimate"
-                            let value = optionalFloat rawEstimate
-                            // Estimate is transitional/optional (WP0). Prefer scope retention.
-                            match value with
-                            | None ->
-                                return createObj [
-                                    "content" ==> [| createObj [ "type" ==> "text"; "text" ==> "Scope progress noted (no estimate; use scope retention)." ] |]
-                                    "details" ==> createObj [ "estimate" ==> null ] ]
-                            | Some estimate when estimate < 0.0 || not (isFiniteNumber rawEstimate) ->
-                                return ompScopeRefused "todowrite estimate must be a nonnegative number when provided"
-                            | Some estimate ->
-                                let run =
-                                    match activeProgressRuns.TryGetValue sid with
-                                    | true, observed -> observed
-                                    | _ -> "detached:" + cid
-                                let receipt: obj = scopeProgress?record(sid, scopeEpoch sid, run, cid, estimate)
-                                if isNull receipt?ok || not (unbox<bool> receipt?ok) then
-                                    return ompScopeRefused ("todowrite durable record refused: " + stringOf receipt?reason)
-                                else
-                                    let text = "Scope estimate accepted: " + string estimate
-                                    return createObj [
-                                        "content" ==> [| createObj [ "type" ==> "text"; "text" ==> text ] |]
-                                        "details" ==> createObj [ "estimate" ==> estimate
-                                                                  "minimum" ==> receipt?minimum
-                                                                  "providerRun" ==> run ]]
-                    } |> unbox<obj>) ]
-            registerTool pi definition
+            // remainingScopeTurnsEstimate removed (WP0): Scope retention is the lifecycle.
+            // Do not register a todowrite estimate shim that would drive Stall/ResetDue.
+            ()
 
         registerScopeProgressTool ()
 

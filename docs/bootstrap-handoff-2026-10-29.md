@@ -22,4 +22,4 @@
 ## Scope 续收口（本轮）
 **已做：** OMP 全工具 scope 注入+校验；removeLast 出站坍缩（OpenCode+OMP）；Advisor 改挂 retention advisorDue（streak≥3 / remaining=0）；冷启 journal 绑定+ensureEpoch 重放；estimate 改为可选；Stall/ResetDue 不再开顾问；steer 文案改 retention；build gen39。
 
-**仍过渡：** 独立 `resetScope` 工具仍在（仅作档案重锚，描述已标过渡）；`remainingScopeTurnsEstimate` 字段仍可传但非必填；scope-steer/missing-estimate 资源名未改（文案已是 retention）。
+**过渡已清：** 独立 `resetScope` 工具已物理删除；档案重锚走任意工具 `scope.kind=resetScope` → `ScopeReset.commit`；`remainingScopeTurnsEstimate` schema/驱动力已删；removeLast 投影用 beat 别名（providerRunId/callId）兜底。PairHint 过渡期仍只认旧工具名屏障。wx `ce-replay-wt` 仍只记债。

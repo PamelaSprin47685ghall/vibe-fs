@@ -1633,39 +1633,89 @@ module PluginTransforms =
         Array.append messages [| steer |]
 
     /// Collapse a retracted beat's assistant message to one text part (removeLast projection).
-    /// Matching key: info.id / responseId / message id equals BeatRetracted.beatId (provider run id).
-    let private messageBeatId (message: obj) : string =
+    /// Match keys: message/info id, responseId, providerRunId, and any tool-call /
+    /// step id on the message against BeatRetracted.beatId + aliases.
+    let private messageBeatKeys (message: obj) : string list =
         let info = scopeField message "info"
-        let candidates =
+        let top =
             [ scopeField info "id"
               scopeField message "id"
               scopeField message "responseId"
-              scopeField info "responseId" ]
-        candidates
-        |> List.tryPick (fun v -> if isNull v then None else Some(scopeText v))
-        |> Option.defaultValue ""
+              scopeField info "responseId"
+              scopeField message "providerRunId"
+              scopeField info "providerRunId"
+              scopeField message "provider_run_id"
+              scopeField info "runId" ]
+            |> List.choose (fun v -> if isNull v then None else Some(scopeText v))
+            |> List.filter (fun s -> s <> "")
+        let parts = scopeField message "parts"
+        let fromParts =
+            if isNull parts then []
+            else
+                try
+                    let arr: obj array = unbox parts
+                    arr
+                    |> Array.toList
+                    |> List.collect (fun part ->
+                        [ scopeField part "id"
+                          scopeField part "callID"
+                          scopeField part "callId"
+                          scopeField part "toolCallId"
+                          scopeField part "providerRunId"
+                          scopeField (scopeField part "state") "id" ]
+                        |> List.choose (fun v -> if isNull v then None else Some(scopeText v))
+                        |> List.filter (fun s -> s <> ""))
+                with _ ->
+                    []
+        (top @ fromParts) |> List.distinct
 
     let private collapseRetracted (sessionId: string) (messages: obj array) : obj array =
         let rows: obj array = unbox (scopeRetention?retractions(sessionId))
         if isNull (box rows) || rows.Length = 0 then messages
         else
-            let byBeat =
+            // Map every alias → replacement text.
+            let byKey =
                 rows
-                |> Array.choose (fun row ->
-                    let id = scopeText (scopeField row "beatId")
-                    if id = "" then None
-                    else Some(id, scopeText (scopeField row "replacement")))
-                |> Map.ofArray
-            if Map.isEmpty byBeat then messages
+                |> Array.fold
+                    (fun (acc: Map<string, string>) row ->
+                        let replacement = scopeText (scopeField row "replacement")
+                        let beat = scopeText (scopeField row "beatId")
+                        let aliasField = scopeField row "aliases"
+                        let aliases =
+                            let baseKeys = if beat = "" then [] else [ beat ]
+                            if isNull aliasField then baseKeys
+                            else
+                                try
+                                    let arr: obj array = unbox aliasField
+                                    baseKeys
+                                    @ (arr
+                                       |> Array.toList
+                                       |> List.map scopeText
+                                       |> List.filter (fun s -> s <> ""))
+                                with _ ->
+                                    baseKeys
+                        aliases
+                        |> List.distinct
+                        |> List.fold (fun m key -> Map.add key replacement m) acc)
+                    Map.empty
+            if Map.isEmpty byKey then messages
             else
+                let mutable used = Set.empty<string>
                 messages
                 |> Array.map (fun message ->
                     if scopeRole message <> "assistant" then message
                     else
-                        let beat = messageBeatId message
-                        match Map.tryFind beat byBeat with
+                        let keys = messageBeatKeys message
+                        let hit =
+                            keys
+                            |> List.tryPick (fun key ->
+                                match Map.tryFind key byKey with
+                                | Some replacement when not (Set.contains key used) -> Some(key, replacement)
+                                | _ -> None)
+                        match hit with
                         | None -> message
-                        | Some replacement ->
+                        | Some(key, replacement) ->
+                            used <- Set.add key used
                             let info = scopeField message "info"
                             createObj
                                 [ "info", box info
@@ -1689,8 +1739,7 @@ module PluginTransforms =
              && not (isNull retention?remaining) && unbox<int> retention?remaining = 0 then
             openCodeScopeSteer collapsed (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) "host/scope-steer/reset-due" Map.empty) true
         elif isNull retention?known || not (unbox<bool> retention?known) then
-            // No retention scope yet — nudge resetScope via initialize path (reuse reset-due prose is wrong);
-            // prefer missing-estimate resource until dedicated retention-init resource exists.
+            // No retention scope yet — nudge scope.kind=resetScope (resource path name is historical).
             openCodeScopeSteer collapsed (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId) "host/scope-steer/missing-estimate" Map.empty) true
         else collapsed
 
