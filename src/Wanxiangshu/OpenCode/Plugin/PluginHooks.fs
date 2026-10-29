@@ -369,7 +369,7 @@ module PluginHooks =
                     PluginTransforms.negotiationModelFor delegator
                 | ConsultationOrigin.Previous (source, metadata) ->
                     PluginTransforms.consultationStartPrevious tempId source metadata,
-                    (if isNull metadata then null else metadata?model)
+                    PluginTransforms.consultationModelForPrevious source metadata
 
             let questionRun =
                 match linked with

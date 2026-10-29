@@ -218,6 +218,20 @@ test('WHAT[delegation-negotiation-001] the Host records only the question while 
   negotiationForgetSession(parent)
 })
 
+test('WHAT[context-compression-047] OpenCode previous-Scope consultation uses the source session current model, not a stale archived one', async () => {
+  const { negotiationRememberModel, negotiationForgetSession, consultationModelForPrevious } =
+    await import('../../../dist/OpenCode/Plugin/PluginTransforms.js')
+  const source = 'ses-previous-model-047'
+  negotiationForgetSession(source)
+  const archived = { model: { providerID: 'lazy', modelID: 'default' }, system: ['old system'] }
+  assert.deepEqual(consultationModelForPrevious(source, archived), archived.model,
+    'archived model is only a fallback while no current model was observed')
+  negotiationRememberModel({ sessionID: source, model: { providerID: 'xai', modelID: 'grok-4.7' } })
+  assert.deepEqual(consultationModelForPrevious(source, archived), { providerID: 'xai', modelID: 'grok-4.7' },
+    'stale archived upstream must not strand the consultation')
+  negotiationForgetSession(source)
+})
+
 test('WHAT[delegation-negotiation-001] a vetoed temporary tool call keeps its denial visible to the next provider step', async () => {
   const {
     negotiationRememberSystem, negotiationRememberMessages, negotiationRememberModel,
