@@ -1494,3 +1494,15 @@ test('WHAT[delegation-negotiation-002] the unlocking call may itself carry reset
   assert.equal(apply('read', HostToolArguments_$ctor_4E60E31B({ scope: { kind: 'meToo' } }), sibling, () => '0').tag, 0)
   clearSessionState(recipient)
 })
+
+test('WHAT[delegation-negotiation-002] a same-turn meToo ahead of its real annotation is not refused for arriving first', async () => {
+  const { apply } = await import('../../../dist/OpenCode/Tools/ScopeAnnotationGate.js')
+  const { HostToolArguments_$ctor_4E60E31B } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+  const { ProviderRunIdentityModule_create } = await import('../../../dist/Foundation/Identity.js')
+  const turn = ProviderRunIdentityModule_create('run-order-1')
+  const reset = { kind: 'resetScope', newScopeGoal: 'parser', newScopeRetentionBudget: 4, oldScopeVerboseVerbatim: 'old' }
+  const sibling = { SessionId: 'ses-metoo-first', ToolCallId: ToolCallIdModule_create('c-early'), ProviderRunId: turn }
+  assert.equal(apply('read', HostToolArguments_$ctor_4E60E31B({ scope: { kind: 'meToo' } }), sibling, () => '0').tag, 0, 'meToo first is held, not refused')
+  const real = { ...sibling, ToolCallId: ToolCallIdModule_create('c-reset-late') }
+  assert.equal(apply('bash', HostToolArguments_$ctor_4E60E31B({ scope: reset }), real, () => '0').tag, 0)
+})
