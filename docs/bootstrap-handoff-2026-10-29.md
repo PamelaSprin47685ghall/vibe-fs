@@ -76,6 +76,48 @@
 | requirement-system 017 | 需用户 | #70 带入的测无 WHAT 条款：mce 016、dispatch-protocol 016、crash-reconciliation 022、work 056/057（「notify the user」）|
 | managed-chat-execution 005 #5 | 不确定 | `message.updated` 已让 providerStarted 先于 transform 落盘；测期望 false。基线既有，未判 |
 | managed-session-lifecycle 022 #5 | 不确定 | EngineerCaseCaptured 1≠2。基线既有，未判 |
-| capability-enforcement 025 P15 | 负载抖动 | P8 并发下 rg 先退出（ESRCH），单跑 3/3 绿 |
+| capability-enforcement 025 P15 | 证据不足，不要写成已解决 | P8 并发下 rg 先退出（ESRCH），单跑 3/3 绿。这只是一次观察，不是裁定，也不是已解决。
 
 仍悬：OMP `askPreviousScope`+`scope.kind=resetScope` 静默丢（待裁，未动）；被 skip 的独立 reset 档案链路尚无注解路径等价新测；scope 注解 schema 未承载「收尾后不得 reset」（delegation-038 第 5 例 skip 后的欠账）。
+
+## 待裁补缺（本轮）
+
+已有记录只补缺，不把待裁改成裁定。
+
+仍待裁定，上文已写，此处不改写：capability-enforcement 026 的 keepLast 零副作用；`askPreviousScope` 与 `scope.kind=resetScope` 同用时静默丢弃；capability-enforcement 009 空 session；work 019 第 4 例；time-capability 004 的 `setTimeout`；js-semantic 与 requirement-system 017 无 WHAT。
+
+补上的事实：`requirements/js-semantic-surface/WHAT.md`、`requirements/requirement-system/WHAT.md` 两份文件都在，[002] 与 [017] 条款也在。上文「无 WHAT」指 017 点名的测没有对应条款（mce 016、dispatch-protocol 016、crash-reconciliation 022、work 056/057），不是文件缺失。不代裁。
+
+有实现声称、未见裁定，故仍待裁。不得回滚，也不得代裁，不升格为已裁定，也不写成已解决：
+- 畸形 identity carrier 按缺省处理。
+- 受管 intent 缺持久 authority 时，改为边界级显式失败。
+
+树里没有这两项的报告路径，不编出处。先前报告指向主仓 `5dd99b875`、子模块 `c8d18b9`、generation 462；这不是本轮读回的当前树事实。`wanxiangli-ce-replay-wt` 不删。
+
+## phase/step 档案（建议分类，不是裁定）
+
+只收回下面三处。约 22 处里其余仍未收回，不在此补完，也不逐处代裁。建议分类不是负责人裁定。
+
+1. `ExecutionPermits.IllegalTransition` 在 `wanxiangli/src/permit/ExecutionPermits.fs:115`。本轮读到第 115 行是 Rejection 用例 `IllegalTransition`，不是函数体。托付原意：守的是 completeRelease 只能从同一 Release 的 Releasing 完成，Pending/Committed 必须拒绝。建议保留。不是裁定。
+2. `ChatAdmissionFlightPhase` 在 `src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs:54`。本轮读到 `Running` / `Finished`。第 1155 行在 `Phase.Value = Running` 时交回已有 `Work`，否则新开航班。建议保留到有计算表达式接过这个合并。不是裁定。
+3. `ChatAdmissionTransactionStep` 在 `src/Wanxiangshu/Interaction/Admission/ChatAdmissionTransaction.fs:23`。本轮读到的是步骤名枚举。托付：没有用当前 step 决定下一步，顺序就是 task 顺序；形态符合指南第 2 节要去掉的 phase/step 标签。指南点的是形状，不是逐字类型名；本轮在 docs 里用 phase/step 只命中本交接文件，不另编指南路径。`ChatAdmissionTransactionSurface.fs` 有 `CrashB`/`AcquireLease`、`CrashC`/`LeaseTarget`、`CrashD`/`ProjectHost` 匹配臂。这些名字是否仍被依赖，未测量。未测量前不删。不是裁定。
+
+## 待裁补缺（续，不代裁）
+
+不重复上文已写的待裁名单。
+
+work 019 第 4 例仍待裁。不改测试，也不改代码。`requirements/work/tests/019.test.mjs` 109-123 期望 `binding-unavailable` 或 `review-unavailable`。源码路径是 `ToolRegistry.reviewMember` 不看任期；空账走到 lifecycle `finishActive` `Asked`，返回 `ok=true`、`kind=Asked`，并打开初始任期。`binding-unavailable` 当前无调用方。与第 3 例承认的开工路径相反。
+
+交接表排除清单外，没有同时写明期望行为和当前偏差的可修项。不据此开修。
+
+scope 注解 schema 缺少「收尾后不得 reset」，只是缺口，没有字段名，不代设计。
+
+`arg-estimate` 旧路径名没有指定替代名，不改。
+
+## 另记（只补缺，不代裁）
+
+reset 043／047／049／050 两宿主文案不一致，补测试等于代裁。只记下缺口，不补等价新测，也不裁定哪一家文案为准。
+
+P15 证据不足，不要写成已解决。上表类别已从「负载抖动」改成这句话。单跑绿不能升格成已解决。
+
+lsof 留删：文档里原先没有这条。留还是删，未裁定、不代裁。本轮不删任何调用。
