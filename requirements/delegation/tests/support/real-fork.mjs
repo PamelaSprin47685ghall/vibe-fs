@@ -99,7 +99,6 @@ export const childTurn = async (hooks, runtime, child, run, prose, material, awa
       {
         name: `child-program-${run}`,
         intent: 'Observe this child program result before the host reports the provider turn ending.',
-        remainingScopeTurnsEstimate: 3,
         program: `class Js extends JsProgram { async run() { return { answer: ${JSON.stringify(material)} }; } }`,
       },
       { sessionID: child, agent: role, callID: `call-${run}`, messageID: run },
@@ -121,8 +120,7 @@ export const forkCall = (hooks, owner, name, charge, callID = 'call-fork-' + (++
     {
       program: `class Js extends JsProgram { async run() { return await this.fork({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)} }, []); } }`,
           name: callID,
-          intent: 'Wait for this delegation receipt within the single admitted request window.',
-          remainingScopeTurnsEstimate: 3
+          intent: 'Wait for this delegation receipt within the single admitted request window.'
         },
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )
@@ -133,8 +131,7 @@ export const resumeCall = (hooks, owner, name, charge, callID = 'call-resume-' +
     {
       program: `class Js extends JsProgram { async run() { return await this.resume({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)}${attach === undefined ? '' : `, attach: ${JSON.stringify(attach)}`} }, []); } }`,
           name: callID,
-          intent: 'Wait for this delegation receipt within the single admitted request window.',
-          remainingScopeTurnsEstimate: 3
+          intent: 'Wait for this delegation receipt within the single admitted request window.'
         },
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )

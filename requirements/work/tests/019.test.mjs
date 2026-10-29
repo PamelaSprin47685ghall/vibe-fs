@@ -32,7 +32,6 @@ const runManagerProgram = async (hooks, sessionID, body) =>
       { program: `class Js extends JsProgram { async run() { ${body} } }`,
           name: 'manager-019-' + (++programSequence),
           intent: 'Observe this manager business result within one request deadline.',
-          remainingScopeTurnsEstimate: 3,
         },
       { sessionID, agent: 'manager' },
     ),
