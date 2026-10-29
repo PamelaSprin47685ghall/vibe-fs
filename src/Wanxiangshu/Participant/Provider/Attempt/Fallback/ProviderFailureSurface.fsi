@@ -20,6 +20,8 @@ module ProviderFailureSurface =
     /// Exercise the real retry engine with observable admission and redispatch ports.
     /// Failure, execution key, ProviderRun and RequestKind come from the policy input;
     /// current logical identity and budget come from the supplied projection.
+    val stopWaitVerdict: alreadyAdmitted: bool -> stopWait: string -> string
+    val delegateRetryObservation: verdictName: string -> string
     val retryAttempt:
         input: obj -> current: obj -> admit: (obj -> Task<string>) -> redispatch: (obj -> Task<unit>) -> Task<string>
 

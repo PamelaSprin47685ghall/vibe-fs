@@ -592,9 +592,32 @@ module ProviderFailureSurface =
                 match result with
                 | RetryVerdict.Dispatched -> "Dispatched"
                 | RetryVerdict.Superseded -> "Superseded"
+                | RetryVerdict.ReceiptUnknown -> "ReceiptUnknown"
+                | RetryVerdict.WaitDenied -> "WaitDenied"
                 | RetryVerdict.Terminal _ -> "Terminal"
         }
 
+    let stopWaitVerdict (alreadyAdmitted: bool) (stopWait: string) : string =
+        match Retry.verdictUnlessContinuing alreadyAdmitted stopWait with
+        | None -> "Continue"
+        | Some RetryVerdict.Superseded -> "Superseded"
+        | Some RetryVerdict.ReceiptUnknown -> "ReceiptUnknown"
+        | Some RetryVerdict.WaitDenied -> "WaitDenied"
+        | Some RetryVerdict.Dispatched -> "Dispatched"
+        | Some (RetryVerdict.Terminal _) -> "Terminal"
+
+    let delegateRetryObservation (verdictName: string) : string =
+        let verdict =
+            match verdictName with
+            | "Dispatched" -> RetryVerdict.Dispatched
+            | "Superseded" -> RetryVerdict.Superseded
+            | "ReceiptUnknown" -> RetryVerdict.ReceiptUnknown
+            | "WaitDenied" -> RetryVerdict.WaitDenied
+            | other -> RetryVerdict.Terminal other
+
+        match Retry.observeDelegateRetry verdict with
+        | Ok () -> "Ok"
+        | Error reason -> "Error:" + reason
     /// Record one confirmed provider failure through the production ledger using
     /// an opaque JournalHandle. Only `ExecutionFailurePolicy` may licence the
     /// advance against the single `ProviderFailureBudget.DefaultBudget`, and no

@@ -10,6 +10,8 @@ open Wanxiangshu.Participant.Provider.Attempt
 type RetryVerdict =
     | Dispatched
     | Superseded
+    | ReceiptUnknown
+    | WaitDenied
     | Terminal of reason: string
 
 type RetryAttempt =
@@ -27,6 +29,23 @@ type RetryPorts =
 /// Single retry engine shared by the ordinary turn path and
 /// dedicated delegate children (delegation-023 / execution-failure-policy-003 / provider-attempt-recovery-019).
 module Retry =
+
+    let verdictUnlessContinuing (alreadyAdmitted: bool) (stopWait: string) : RetryVerdict option =
+        if alreadyAdmitted then
+            Some RetryVerdict.Superseded
+        else
+            match stopWait with
+            | "Stopped" -> None
+            | "Denied" -> Some RetryVerdict.WaitDenied
+            | _ -> Some RetryVerdict.ReceiptUnknown
+
+    let observeDelegateRetry (verdict: RetryVerdict) : Result<unit, string> =
+        match verdict with
+        | RetryVerdict.Dispatched
+        | RetryVerdict.Superseded -> Ok()
+        | RetryVerdict.ReceiptUnknown -> Error "stop receipt did not arrive"
+        | RetryVerdict.WaitDenied -> Error "stop wait was denied"
+        | RetryVerdict.Terminal reason -> Error reason
 
     let private decision (input: RetryAttempt) =
         let budget =
@@ -67,7 +86,8 @@ module Retry =
     let attempt (ports: RetryPorts) (input: RetryAttempt) : Task<RetryVerdict> =
         match (decision input).Resolution with
         | ExecutionFailureResolution.RetryFreshAttempt authorization -> admitAndRedispatch ports input authorization
-        | ExecutionFailureResolution.PreserveCurrentFact
-        | ExecutionFailureResolution.AwaitAcceptanceReconciliation _ -> Task.FromResult RetryVerdict.Superseded
+        | ExecutionFailureResolution.PreserveCurrentFact -> Task.FromResult RetryVerdict.Superseded
+        | ExecutionFailureResolution.AwaitAcceptanceReconciliation _ ->
+            Task.FromResult(RetryVerdict.Terminal input.Error)
         | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
         | ExecutionFailureResolution.TerminalizeProviderStarted _ -> Task.FromResult(RetryVerdict.Terminal input.Error)
