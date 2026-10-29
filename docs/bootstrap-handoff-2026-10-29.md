@@ -3,7 +3,7 @@
 | 仓 | HEAD | 备注 |
 |---|---|---|
 | vibe-fs | `bb8bcc07` | Scope 续收口 |
-| wanxiangli | `0645400` | scope-retention 持久 journal + retractions |
+| wanxiangli | `31cc992` | scope-retention 持久 journal + retractions |
 
 ## Stash（保留）
 - 主仓 `stash@{0}`：PluginTransforms/managed-chat 半成品（已被 5dd99b87 覆盖）
