@@ -3324,8 +3324,7 @@ module Adapter =
         let settleProgress (sid: string) =
             bindProgress sid
             let epoch = scopeEpoch sid
-            // Estimate Stall/ResetDue no longer open Advisor (WP0).
-            let _items: obj array = unbox (scopeProgress?settlePending(sid, epoch))
+            // PRODUCT-RETIRED (WP0): no estimate settlement; retention advisorDue only.
             reportRetentionAdvisor sid epoch
 
         let registerScopeProgressTool () =

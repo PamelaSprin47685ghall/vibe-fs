@@ -1506,11 +1506,6 @@ module PluginHooks =
                     let started: Task<obj> = unbox (advisorFlow?trigger(sessionId, epoch, id, question))
                     observeAdvisorTask sessionId started
 
-            let observeSettledProgress (_sessionId: string) (_epoch: string) (_item: obj) =
-                // Estimate-based Stall/ResetDue no longer opens Advisor (WP0).
-                // Retention advisorDue is polled below after settlement.
-                ()
-
             let maybeRetentionAdvisor (sessionId: string) (epoch: string) =
                 if not (String.IsNullOrWhiteSpace sessionId || String.IsNullOrWhiteSpace epoch) then
                     scopeRetention?ensureEpoch(sessionId, epoch) |> ignore
@@ -1533,14 +1528,11 @@ module PluginHooks =
                 if not (String.IsNullOrWhiteSpace durableScope) then
                     scopeProgress?ensureEpoch(sessionId, durableScope) |> ignore
                     scopeRetention?ensureEpoch(sessionId, durableScope) |> ignore
+                // PRODUCT-RETIRED (WP0): no estimate settlement and no refusal on
+                // historical scope-progress health. scope-progress only carries the
+                // epoch fallback; Advisor opens from retention advisorDue alone.
                 let active: obj = scopeProgress?status(sessionId)
-                if not (isNull active?ok) && not (unbox<bool> active?ok) then
-                    failwith ("Cannot settle Provider round without reliable Scope progress: " + string active?reason)
-                let epoch = if isNull active?epoch then "" else string active?epoch
-                let settled: obj array =
-                    if String.IsNullOrWhiteSpace epoch then [||]
-                    else unbox (scopeProgress?settlePending(sessionId, epoch))
-                settled |> Array.iter (observeSettledProgress sessionId epoch)
+                let epoch = if isNull active || isNull active?epoch then "" else string active?epoch
                 // Prefer journal epoch for retention; fall back to progress epoch.
                 let retentionEpoch =
                     if not (String.IsNullOrWhiteSpace durableScope) then durableScope else epoch
