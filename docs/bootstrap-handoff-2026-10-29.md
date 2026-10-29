@@ -38,4 +38,4 @@
   - proposals：Scope进度 §5／§9 补现行注，§6 注更正为「steer 资源沿用旧路径名、内容 retention」；跨Scope §1／§5／§6 补现行注。
   - scope-progress：不拆包；宿主三处 import（OMP Adapter、PluginHooks、ScopeReset）及 PluginHooks epoch 回退处加边界注释（仅 epoch 记账存活，estimate API 历史）。
 - **仍欠**：scope-progress 包内 durable／estimate 实现与测（PACKAGE-HISTORICAL，拆包需另裁）；被 skip 的 OpenCode／OMP reset 档案链路（043／047／049／050）尚无注解路径等价新测；`arg-estimate`／`missing-estimate` 资源路径名残留；`requirements/**/WHAT` 中旧句未全扫；wx `ce-replay-wt`（勿贸然删）；上列裁定仍悬。
-- **测况**：见本轮回报（改过文件均 `node --check` 过）。
+- **测况**（本机 build gen42 实跑）：pair-hint 018 5/5；repo 049 3/3、064 11/11；capability-enforcement 006 14 过 2 skip；context-compression/043 6 过 2 skip；omp-negotiate-physical 2 过 1 skip；advisor 007 系全过/skip。scope-hni-physical 17 过 8 败 8 skip（基线 15a7b718：14 过 19 败）；omp-scope-seam 11 过 6 败 7 skip（基线 10 过 9 败）。剩余失败均为基线既有：negotiate 回执文案（`Questions accepted`／`Clarification requested`）、OMP scope 协议标题（`Scope & Context Management`）、negotiation-005 期望 `resetScope` 在 agent config 显式 deny、delegation-034 期望「resetScope unavailable until first negotiate」——需另判是测旧还是产品回归，未臆改。
