@@ -33,11 +33,18 @@ module ScopeAnnotationGate =
         if isNullish scope then
             Error "scope annotation required on every tool call (see common law «Scope»)"
         else
-            match ctx.ProviderRunId, ctx.ToolCallId with
-            | None, _
-            | _, None -> Error "scope annotation requires provider run id and tool call id"
-            | Some run, Some call ->
-                let beatId = ProviderRunIdentity.value run
+            match ctx.ToolCallId with
+            | None -> Error "scope annotation requires tool call id"
+            | Some call ->
+                let callText = ToolCallId.value call
+                // OpenCode pairs a provider run; OMP tool context may carry none —
+                // fall back to the call id so same-turn meToo still groups.
+                let runText =
+                    match ctx.ProviderRunId with
+                    | Some run -> ProviderRunIdentity.value run
+                    | None -> callText
+
+                let beatId = runText
 
                 let epoch =
                     let e = epochOf ctx
@@ -48,8 +55,8 @@ module ScopeAnnotationGate =
                         ctx.SessionId,
                         epoch,
                         toolName,
-                        ProviderRunIdentity.value run,
-                        ToolCallId.value call,
+                        runText,
+                        callText,
                         beatId,
                         scope
                     )
