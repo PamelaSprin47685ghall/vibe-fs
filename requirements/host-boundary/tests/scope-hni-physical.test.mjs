@@ -401,8 +401,8 @@ test('WHAT[delegation-negotiation-004] registered negotiate sends ephemeral BTW 
     // PRODUCT-RETIRED: standalone resetScope tool removed (c7a80d58); the premature standalone-reset refusal step is dropped; an annotation-path (scope.kind=resetScope) equivalent is not asserted here.
     assert.equal(negotiationRequired(child), true, 'gate is locked before the first negotiate')
     const result = await hooks.tool.negotiate.execute(
-      { questions: 'Which parser? Preserve which invariant?' },
-      { sessionID: child, agent: 'engineer', callID: 'negotiate-1' },
+      { questions: 'Which parser? Preserve which invariant?', scope: { kind: 'keepLast' } },
+      { sessionID: child, agent: 'engineer', callID: 'negotiate-1', messageID: 'msg-negotiate-1' },
     )
     assert.match(result, /Questions accepted|问题已受理/)
     const outgoingGuidance = () => runtime.prompts.filter(prompt =>
@@ -446,7 +446,9 @@ test('WHAT[delegation-negotiation-005] dedicated Advisor has no tools in Host co
   const allowed = Object.entries(permission).filter(([, status]) => status === 'allow').map(([name]) => name).sort()
   assert.deepEqual(allowed, [])
   assert.equal(permission.external_directory, 'deny', 'Advisor never receives broad external path permission')
-  for (const name of ['skill', 'assume', 'fetch', 'bash-honeypot', 'todowrite-for-engineer', 'negotiate', 'resetScope', 'askPreviousScope']) {
+  // PRODUCT-RETIRED standalone-resetScope: no resetScope tool exists, so Host config has no key to deny;
+  // reset is a scope.kind annotation on tools the Advisor already cannot call.
+  for (const name of ['skill', 'assume', 'fetch', 'bash-honeypot', 'todowrite-for-engineer', 'negotiate', 'askPreviousScope']) {
     assert.equal(permission[name], 'deny', name + ' must be explicitly denied in Host agent config')
     assert.equal(rolePredicate(name, 'advisor'), false, name + ' must be denied at the product tool admission layer')
   }
@@ -466,7 +468,7 @@ test('WHAT[delegation-negotiation-006] user-facing root hides negotiate while a 
     assert.equal(message.tools.negotiate, false, 'the root provider request MUST NOT expose negotiate')
     assert.equal(message.tools.fetch, true, 'unrelated tools remain unchanged')
     await assert.rejects(
-      hooks['tool.execute.before']({ sessionID: root, tool: 'negotiate', callID: 'n-root-006' }, { args: { questions: 'Bad root attempt' } }),
+      hooks['tool.execute.before']({ sessionID: root, tool: 'negotiate', callID: 'n-root-006' }, { args: { questions: 'Bad root attempt', scope: { kind: 'keepLast' } } }),
       /user-facing sessions/,
       'even forged tool calls must be stopped before execution',
     )
@@ -474,7 +476,11 @@ test('WHAT[delegation-negotiation-006] user-facing root hides negotiate while a 
 
   const { withRealFork, forkCall } = await import('../../delegation/tests/support/real-fork.mjs')
   await withRealFork('ses-parent-negotiate-006', async ({ hooks, createdIds }) => {
-    const receipt = await forkCall(hooks, 'ses-parent-negotiate-006', 'Ada', 'Current instruction only')
+    // The manager already sits in an open Scope (prior reset elided); the fork call carries keepLast.
+    const { scopeRetention } = await import('wanxiangli/scope-retention')
+    scopeRetention.ensureEpoch('ses-parent-negotiate-006', '0')
+    scopeRetention.seed('ses-parent-negotiate-006', 4)
+    const receipt = await forkCall(hooks, 'ses-parent-negotiate-006', 'Ada', 'Current instruction only', undefined, { kind: 'keepLast' })
     assert.match(receipt, /Ada/)
     assert.equal(createdIds.length, 1)
     const child = createdIds[0]
@@ -487,7 +493,7 @@ test('WHAT[delegation-negotiation-006] user-facing root hides negotiate while a 
     assert.notEqual(message.tools?.negotiate, false, 'a managed child must not lose first negotiation')
     await hooks['tool.execute.before'](
       { sessionID: child, tool: 'negotiate', callID: 'n-child-006' },
-      { args: { questions: 'Which parser should I use?' } },
+      { args: { questions: 'Which parser should I use?', scope: { kind: 'keepLast' } } },
     )
   })
 })
@@ -515,8 +521,8 @@ test('WHAT[delegation-negotiation-007] detached queue receipt cannot masquerade 
       ({ data: { info: { role: 'assistant' }, parts: [{ type: 'text', text: 'The answer.' }] } })
     runtime.nextPromptReceiptOnly()
     const response = await hooks.tool.negotiate.execute(
-      { questions: 'Which file?' },
-      { sessionID: child, agent: 'engineer', callID: 'neg-queued-1' },
+      { questions: 'Which file?', scope: { kind: 'keepLast' } },
+      { sessionID: child, agent: 'engineer', callID: 'neg-queued-1', messageID: 'msg-neg-queued-1' },
     )
     assert.match(response, /Questions accepted|问题已受理/)
     for (let i = 0; i < 80 && !runtime.prompts.some(item =>
@@ -547,7 +553,7 @@ test('WHAT[context-compression-039] real OpenCode system transform upgrades stal
   assert.equal(output.system, system, 'reconcile an existing section in place')
   assert.equal(system.length, 2)
   assert.equal(system[0], 'unrelated host prompt')
-  assert.match(system[1], /Scope & Context Management|Scope 与上下文/)
+  assert.match(system[1], /## Scope and context|## Scope 与上下文/)
   assert.doesNotMatch(system[1], /\[System:|Then call resetScope immediately/)
   const first = system[1]
   await transform({ sessionID: 'ce017-stale-scope' })(output)
@@ -567,7 +573,7 @@ test('WHAT[context-compression-039] real OpenCode system transform upgrades stal
   await transform({ sessionID: 'ce017-fresh-scope' })(fresh)
   assert.equal(fresh.system.length, 2)
   assert.equal(fresh.system[0], 'an independent system prompt')
-  assert.match(fresh.system[1], /Scope & Context Management|Scope 与上下文/)
+  assert.match(fresh.system[1], /## Scope and context|## Scope 与上下文/)
   assert.doesNotMatch(fresh.system[1], /\[System:/)
 })
 
@@ -1312,8 +1318,8 @@ test('WHAT[delegation-negotiation-036] a temporary SDK lease rejection never bec
     }
     try {
       const accepted=await hooks.tool.negotiate.execute(
-        {questions:'What evidence is reliable?'},
-        {sessionID:child,agent:'engineer',callID:'negotiate-lease-036'})
+        {questions:'What evidence is reliable?',scope:{kind:'keepLast'}},
+        {sessionID:child,agent:'engineer',callID:'negotiate-lease-036',messageID:'msg-negotiate-lease-036'})
       assert.match(String(accepted),/Questions accepted|问题已受理/)
       await Promise.race([completed,new Promise((_,reject)=>setTimeout(()=>reject(new Error('temporary cleanup not observed')),3000))])
       assert.equal(seen.length,1,'an SDK protocol failure is not a blank LLM answer and must not generate another user prompt')
@@ -1357,8 +1363,8 @@ test('WHAT[delegation-negotiation-037] thrown temporary provider admission/capac
     }
     try {
       const receipt=await hooks.tool.negotiate.execute(
-        {questions:'What should the worker investigate next?'},
-        {sessionID:child,agent:'engineer',callID:'negotiate-037'})
+        {questions:'What should the worker investigate next?',scope:{kind:'keepLast'}},
+        {sessionID:child,agent:'engineer',callID:'negotiate-037',messageID:'msg-negotiate-037'})
       assert.match(String(receipt),/Questions accepted|问题已受理/)
       await Promise.race([completed,new Promise((_,reject)=>setTimeout(()=>reject(new Error('cleanup not observed')),3000))])
       assert.equal(prompted.length,1,'transport capacity rejection cannot be confused with an incomplete assistant response')
@@ -1402,8 +1408,8 @@ test('WHAT[delegation-negotiation-038] a normally completed empty SDK reply term
     }
     try {
       const receipt=await hooks.tool.negotiate.execute(
-        {questions:'What should the worker investigate next?'},
-        {sessionID:child,agent:'engineer',callID:'negotiate-038'})
+        {questions:'What should the worker investigate next?',scope:{kind:'keepLast'}},
+        {sessionID:child,agent:'engineer',callID:'negotiate-038',messageID:'msg-negotiate-038'})
       assert.match(String(receipt),/Questions accepted|问题已受理/)
       await Promise.race([completed,new Promise((_,reject)=>setTimeout(()=>reject(new Error('cleanup not observed')),3000))])
       assert.equal(prompted.length,1,'a completed empty answer is an explicit host failure, not grounds for a fictional follow-up')

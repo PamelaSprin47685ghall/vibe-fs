@@ -114,13 +114,15 @@ export const childTurn = async (hooks, runtime, child, run, prose, material, awa
 
 let callSequence = 0
 
-/** `this.fork` through the real plugin surface. */
-export const forkCall = (hooks, owner, name, charge, callID = 'call-fork-' + (++callSequence)) =>
+/** `this.fork` through the real plugin surface. Optional `scope` is the flat
+ * annotation every tool call carries (common law «Scope»); omitted = legacy call shape. */
+export const forkCall = (hooks, owner, name, charge, callID = 'call-fork-' + (++callSequence), scope) =>
   hooks.tool['todowrite-for-manager'].execute(
     {
       program: `class Js extends JsProgram { async run() { return await this.fork({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)} }, []); } }`,
           name: callID,
-          intent: 'Wait for this delegation receipt within the single admitted request window.'
+          intent: 'Wait for this delegation receipt within the single admitted request window.',
+          ...(scope === undefined ? {} : { scope }),
         },
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )

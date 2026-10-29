@@ -109,7 +109,16 @@ function createOmpTestEnvironment() {
             return { Text: 'Clarification requested (receipt ' + admitted.receipt + '). Negotiation is complete and the timeline continues; resetScope is available now. Do not wait for an answer; if the delegator\'s answer is obtained, it may arrive later as a steer.', Truncated: false, IsError: false, Details: null }
           },
         }
-        await ports.Tools.Register(ofArray([negotiateSpec]))
+        // A plain (retention-charged) product tool so reset-annotation gates can be exercised;
+        // negotiate/askPreviousScope are retention-exempt and not reset carriers.
+        const probeSpec = {
+          Name: 'probe',
+          Description: 'Fixture product tool.',
+          Schema: new JsonSchema(JSON.stringify({ type: 'object', properties: {}, required: [] })),
+          Admission: null,
+          Execute: async () => ({ Text: 'probe body ran', Truncated: false, IsError: false, Details: null }),
+        }
+        await ports.Tools.Register(ofArray([negotiateSpec, probeSpec]))
       }
       const hooks = {
         OnSignal: async () => {},
@@ -216,19 +225,19 @@ test('WHAT[context-compression-034] OMP system projection supplies protocol fact
   const handler = env.eventHandlers.get('before_agent_start')
   const result = await handler({ systemPrompt: ['base prompt'] }, sessionCtx)
   assert.ok(result?.systemPrompt)
-  const section = result.systemPrompt.find(p => p.includes('## Scope & Context Management'))
+  const section = result.systemPrompt.find(p => p.includes('## Scope and context'))
   assert.ok(section, 'scope protocol is present')
   assert.doesNotMatch(section, /\[System:|Then call resetScope immediately|If you are not busy/)
-  assert.match(section, /Calling \x60resetScope\x60 removes the old scope/)
+  assert.match(section, /\x60resetScope\x60 clears prior-scope process context/)
 
   const stale = '## Scope & Context Management (\x60resetScope\x60)\n[System: Then call resetScope immediately, before doing anything else.]'
   const replaced = await handler({ systemPrompt: ['base prompt', stale] }, sessionCtx)
-  const updated = replaced.systemPrompt.filter(p => p.includes('## Scope & Context Management'))
+  const updated = replaced.systemPrompt.filter(p => p.includes('## Scope and context') || p.includes('## Scope & Context Management'))
   assert.equal(updated.length, 1, 'old scope fragment is replaced, not duplicated')
   assert.doesNotMatch(updated[0], /\[System:|Then call resetScope immediately/)
   const oldChinese = '## Scope 与上下文\n[System: 由模型自己判断现在是否应重置]'
   const repairedChinese = await handler({ systemPrompt: ['base prompt', oldChinese] }, sessionCtx)
-  const scopeLines = repairedChinese.systemPrompt.filter(p => p.includes('## Scope 与上下文') || p.includes('## Scope & Context Management'))
+  const scopeLines = repairedChinese.systemPrompt.filter(p => p.includes('## Scope 与上下文') || p.includes('## Scope and context') || p.includes('## Scope & Context Management'))
   assert.equal(scopeLines.length, 1, 'Chinese stale scope segment is replaced, never duplicated')
   assert.doesNotMatch(scopeLines[0], /由模型自己判断|\[System:/)
 })
@@ -478,8 +487,8 @@ test('WHAT[context-compression-034] OMP before_agent_start injects scope protoco
   const result1 = await beforeAgentStartHandler(initialEvent, sessionCtx)
   assert.ok(result1 && result1.systemPrompt, 'before_agent_start returned systemPrompt')
   assert.ok(
-    result1.systemPrompt.some((p) => p.includes('## Scope & Context Management (`resetScope`)')),
-    'systemPrompt must contain ## Scope & Context Management (`resetScope`) section',
+    result1.systemPrompt.some((p) => p.includes('## Scope and context')),
+    'systemPrompt must contain the current ## Scope and context section',
   )
 
   // Idempotency: repeated call does not duplicate section
@@ -744,7 +753,8 @@ test('WHAT[delegation-034] OMP negotiate tool registration, schema, and role too
   await activateSession(env, 'ses_omp_negotiate_reg')
   const negotiateDef = env.registeredTools.find((t) => t.name === 'negotiate')
   assert.ok(negotiateDef, 'negotiate tool registered on pi')
-  assert.deepEqual(negotiateDef.parameters.required, ['questions'])
+  // Every tool carries the required flat scope annotation (common law «Scope»); negotiate is retention-exempt, not annotation-exempt.
+  assert.deepEqual(negotiateDef.parameters.required, ['questions', 'scope'])
 
   const catalog = env.getObservedCatalog()
   assert.ok(catalog, 'Agents catalog port was bound')
@@ -768,7 +778,7 @@ test('WHAT[delegation-034] OMP delegated assignment requires negotiate before fi
   // Current contract: no standalone resetScope tool; any product tool carries
   // scope.kind=resetScope. A premature reset annotation is refused before the tool body runs.
   assert.equal(env.registeredTools.find((t) => t.name === 'resetScope'), undefined, 'no standalone resetScope tool')
-  const carrier = env.registeredTools.find((t) => t.name !== 'negotiate' && t.parameters?.properties?.scope)
+  const carrier = env.registeredTools.find((t) => t.name === 'probe' && t.parameters?.properties?.scope)
   assert.ok(carrier, 'a product tool carries the scope annotation')
   const prematureOutcome = await carrier.execute(
     'call_premature_1',
@@ -913,7 +923,7 @@ test('WHAT[delegation-034] End-to-end negotiate: immediate ack before answer, na
 
   const immediateAck = await negotiateDef.execute(
     'call_neg_1',
-    { questions: 'Which JSON parser should I use?' },
+    { questions: 'Which JSON parser should I use?', scope: { kind: 'keepLast' } },
     null,
     null,
     childCtx,
@@ -988,14 +998,14 @@ test('WHAT[context-compression-048] OMP registers askPreviousScope and refuses t
   const ctx = await activateSession(env, sid)
   const tool = env.registeredTools.find(item => item.name === 'askPreviousScope')
   assert.ok(tool, 'the mandatory first tool must exist in OMP as well as OpenCode')
-  assert.deepEqual(tool.parameters.required, ['questions'])
+  assert.deepEqual(tool.parameters.required, ['questions', 'scope'])
   assert.equal(tool.parameters.properties.questions.type, 'string')
   const catalog = await env.getObservedCatalog().Roles()
   for (const agent of catalog.fields[0]) {
     assert.equal(agent.ToolPolicy.get('askPreviousScope'), true,
       'every role that receives the pending reminder must be able to call the corresponding tool')
   }
-  const output = await tool.execute('exact-omp-call', { questions: 'Why was parser B rejected?' }, null, null, ctx)
+  const output = await tool.execute('exact-omp-call', { questions: 'Why was parser B rejected?', scope: { kind: 'keepLast' } }, null, null, ctx)
   const prose = contentText(output.content)
   assert.match(prose, /NoPreviousScope|durable journal|previous Scope/i)
   assert.equal(output.details.answerDelivered, false,
