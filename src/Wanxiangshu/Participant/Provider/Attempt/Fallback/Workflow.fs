@@ -247,7 +247,7 @@ module ProviderRecoveryWorkflow =
         kind = Some PromptAuthority.ContinuationKind.ProviderRetryAttempt
         && establishedRun = Some providerRun
 
-    let private continueSameProvider
+    let internal continueSameProvider
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (durable: AgentJournal)
@@ -274,7 +274,8 @@ module ProviderRecoveryWorkflow =
                         observer
 
                 return observeWorkContinuation durable turn authorization observer error continuation
-            | _ -> return RetryVerdict.Superseded
+            | Some _ -> return RetryVerdict.Superseded
+            | None -> return RetryVerdict.Terminal "No active authority profile"
         }
 
     let private redispatchAfterFailure
