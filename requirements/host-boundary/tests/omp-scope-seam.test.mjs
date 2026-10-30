@@ -1539,3 +1539,170 @@ test('WHAT[interaction-authority-024] OMP every role auto-nudges each NEW tool-f
     clearSessionState(sid)
   }
 })
+
+
+test('askPreviousScope carrying scope.kind=resetScope refuses at the negotiate gate instead of silently dropping the reanchor', async () => {
+  const env = createOmpTestEnvironment()
+  await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+  const sid = 'ses_omp_reanchor_gate_locked'
+  const ctx = await activateSession(env, sid)
+  // The negotiate gate only speaks for a delegated assignment: bind one so
+  // negotiationRequired(sid) is true and the gate actually fires.
+  bindDelegation(sid, 'ses_omp_reanchor_gate_parent')
+  assert.equal(negotiationRequired(sid), true, 'a fresh delegated assignment requires negotiate first')
+  const tool = env.registeredTools.find((t) => t.name === 'askPreviousScope')
+  assert.ok(tool, 'askPreviousScope must be registered')
+  const outcome = await tool.execute('reanchor-gate-1', {
+    questions: 'Which rule did the old scope establish?',
+    scope: { kind: 'resetScope', newScopeGoal: 'g', newScopeRetentionBudget: 4 },
+  }, null, null, ctx)
+  assert.ok(outcome && outcome.content, JSON.stringify(outcome))
+  assert.match(contentText(outcome.content), /unavailable until the first negotiate/)
+})
+
+test('plain askPreviousScope keeps its durable-evidence failure semantics', async () => {
+  const env = createOmpTestEnvironment()
+  await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+  const sid = 'ses_omp_reanchor_plain'
+  const ctx = await activateSession(env, sid)
+  const tool = env.registeredTools.find((t) => t.name === 'askPreviousScope')
+  assert.ok(tool, 'askPreviousScope must be registered')
+  const outcome = await tool.execute('plain-ask-1', { questions: 'What did the old scope decide?', scope: { kind: 'keepLast' } }, null, null, ctx)
+  assert.ok(outcome && outcome.content)
+  assert.match(contentText(outcome.content), /NoPreviousScope|durable journal|previous Scope/i)
+  assert.equal(outcome.details.answerDelivered, false)
+})
+
+
+
+test('askPreviousScope carrying scope.kind=resetScope commits the reanchor before asking in the new epoch', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { execFileSync } = await import('node:child_process')
+  const workspace = mkdtempSync(join(tmpdir(), 'omp-reanchor-success-'))
+  execFileSync('git', ['init', '-q', workspace])
+  let journalHandle = null
+  const sid = 'omp-reanchor-success-001'
+  try {
+    const env = createOmpTestEnvironment()
+    const model = { provider: 'anthropic', id: 'claude-3-5-sonnet' }
+    const liveCtx = {
+      cwd: workspace,
+      model,
+      sessionManager: {
+        getSessionId: () => sid,
+        getSessionDir: () => workspace,
+        getHeader: () => ({ parentSession: null }),
+      },
+    }
+    await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+    await env.eventHandlers.get('session_start')({}, liveCtx)
+
+    const acquire = await acquireSharedForWorkspace(workspace, process.pid, new Date().toISOString())
+    assert.ok(acquire?.ok, 'acquireSharedForWorkspace must succeed')
+    journalHandle = acquire.journal
+
+    const providerHook = env.eventHandlers.get('before_provider_request')
+    assert.ok(providerHook, 'before_provider_request hook must be registered')
+    await providerHook({ payload: {
+      messages: [
+        { role: 'system', content: 'SYSTEM_REANCHOR_SENTINEL_065' },
+        { role: 'user', content: 'USER_REANCHOR_SENTINEL_065' },
+      ],
+      tools: [{ name: 'read', description: 'Read file tool' }],
+      system: ['SYSTEM_REANCHOR_SENTINEL_065'],
+    } }, liveCtx)
+    assert.ok(outboundViewStore.tryGetSealed(sid), 'precondition: a real provider request sealed an outbound snapshot')
+
+    const tool = env.registeredTools.find((t) => t.name === 'askPreviousScope')
+    assert.ok(tool, 'askPreviousScope must be registered')
+
+    const outcome = await tool.execute('call-reanchor-success-065', {
+      questions: 'Which evidence did the old scope retain?',
+      scope: {
+        kind: 'resetScope',
+        newScopeGoal: 'epoch after reanchor',
+        newScopeRetentionBudget: 6,
+        oldScopeVerboseVerbatim: 'old scope verbatim sentinel 065',
+      },
+    }, null, null, liveCtx)
+
+    assert.ok(outcome && outcome.content, JSON.stringify(outcome))
+    const prose = contentText(outcome.content)
+    assert.match(prose, /askPreviousScope accepted|receipt is durable/,
+      'the ask body must run against the archived previous scope after the reanchor commits')
+    assert.doesNotMatch(prose, /NoPreviousScope|unavailable until/)
+    assert.equal(outcome.details.answerDelivered, false, 'acceptance never proves answer delivery')
+    assert.equal(outcome.details.receiptRecorded, true)
+
+    const snap = AgentJournalModule_snapshot(JournalHandle__get_Journal(journalHandle))
+    const proj = AgentProjection_tryFind(SessionIdModule_create(sid), snap.AgentProjections)
+    assert.ok(proj?.PrefixEpoch, 'the reanchor must commit a PrefixEpoch — silently dropping it leaves this undefined')
+    assert.equal(proj.PrefixEpoch.EpochId?.fields?.[0] ?? proj.PrefixEpoch.EpochId, 1n, 'the first reanchor advances the epoch to 1n')
+    assert.ok(proj.PrefixEpoch.LastScopeArchive, 'the closed scope must be archived before the new epoch begins')
+    assert.equal(outboundViewStore.tryGetSealed(sid), undefined, 'single-drain: the sealed snapshot is consumed by the archive')
+  } finally {
+    if (journalHandle && typeof journalHandle.Dispose === 'function') {
+      try { journalHandle.Dispose() } catch {}
+    }
+    rmSync(workspace, { recursive: true, force: true })
+  }
+})
+
+test('askPreviousScope carrying scope.kind=resetScope propagates a refused reanchor and never asks in the closed epoch', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { execFileSync } = await import('node:child_process')
+  const workspace = mkdtempSync(join(tmpdir(), 'omp-reanchor-refused-'))
+  execFileSync('git', ['init', '-q', workspace])
+  let journalHandle = null
+  const sid = 'omp-reanchor-refused-066'
+  try {
+    const env = createOmpTestEnvironment()
+    const liveCtx = {
+      cwd: workspace,
+      model: { provider: 'anthropic', id: 'claude-3-5-sonnet' },
+      sessionManager: {
+        getSessionId: () => sid,
+        getSessionDir: () => workspace,
+        getHeader: () => ({ parentSession: null }),
+      },
+    }
+    await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+    await env.eventHandlers.get('session_start')({}, liveCtx)
+
+    const acquire = await acquireSharedForWorkspace(workspace, process.pid, new Date().toISOString())
+    assert.ok(acquire?.ok, 'acquireSharedForWorkspace must succeed')
+    journalHandle = acquire.journal
+
+    const tool = env.registeredTools.find((t) => t.name === 'askPreviousScope')
+    assert.ok(tool, 'askPreviousScope must be registered')
+
+    // No real provider request has sealed an outbound snapshot for this session.
+    assert.equal(outboundViewStore.tryGetSealed(sid), undefined, 'precondition: nothing sealed')
+
+    const outcome = await tool.execute('call-reanchor-refused-066', {
+      questions: 'Which evidence did the old scope retain?',
+      scope: { kind: 'resetScope', newScopeGoal: 'refused epoch', newScopeRetentionBudget: 4 },
+    }, null, null, liveCtx)
+
+    assert.ok(outcome && outcome.content, JSON.stringify(outcome))
+    const prose = contentText(outcome.content)
+    assert.match(prose, /no complete archived system\/messages\/model observation/,
+      'a refused commit must surface the typed refusal, not silently collapse into NoPreviousScope')
+    assert.doesNotMatch(prose, /NoPreviousScope/)
+    assert.equal(outcome.details.answerDelivered, false)
+    assert.equal(outcome.details.receiptRecorded, false, 'the ask body must not run when the reanchor commit was refused')
+
+    const snap = AgentJournalModule_snapshot(JournalHandle__get_Journal(journalHandle))
+    const proj = AgentProjection_tryFind(SessionIdModule_create(sid), snap.AgentProjections)
+    assert.equal(proj?.PrefixEpoch, undefined, 'a refused reanchor commits no epoch')
+  } finally {
+    if (journalHandle && typeof journalHandle.Dispose === 'function') {
+      try { journalHandle.Dispose() } catch {}
+    }
+    rmSync(workspace, { recursive: true, force: true })
+  }
+})

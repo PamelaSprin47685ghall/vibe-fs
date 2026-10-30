@@ -1642,6 +1642,57 @@ module Adapter =
                               let sid = ctxSessionId ctx
                               match applyOmpScopeAnnotation "askPreviousScope" sid (stringOf callId) arguments with
                               | Error reason -> return ompPriorAnswer false reason
+                              | Ok receipt when unbox<bool> (receipt?reanchor) = true ->
+                                  // scope.kind=resetScope rides on this call: commit the
+                                  // reanchor first (same gate + commit as ordinary tools),
+                                  // then run the askPreviousScope body in the new epoch.
+                                  if Surface.negotiationRequired sid then
+                                      return
+                                          ompPriorAnswer
+                                              false
+                                              "scope.kind=resetScope is unavailable until the first negotiate(questions) call has been accepted."
+                                  elif Surface.isPreviousScopePending sid then
+                                      return
+                                          ompPriorAnswer
+                                              false
+                                              "scope.kind=resetScope is unavailable until askPreviousScope(questions) has been called."
+                                  else
+                                      match runScopeReanchor with
+                                      | None ->
+                                          return
+                                              ompPriorAnswer
+                                                  false
+                                                  "scope.kind=resetScope refused: scope journal not bound yet"
+                                      | Some commit ->
+                                          let goal =
+                                              if isNull receipt?goal then "" else stringOf receipt?goal
+
+                                          let oldV =
+                                              if isNull receipt?oldVerbatim then "" else stringOf receipt?oldVerbatim
+
+                                          let budget =
+                                              if isNull receipt?remaining then 0
+                                              else
+                                                  try unbox<int> receipt?remaining
+                                                  with _ -> 0
+
+                                          let! committed = commit sid callId goal (if String.IsNullOrWhiteSpace oldV then None else Some oldV) budget
+
+                                          let refused =
+                                              try unbox<bool> (committed?details?refused)
+                                              with _ -> false
+
+                                          if refused then
+                                              let text =
+                                                  try
+                                                      let content: obj array = unbox committed?content
+                                                      stringOf (content.[0]?text)
+                                                  with _ ->
+                                                      "scope.kind=resetScope refused"
+
+                                              return ompPriorAnswer false text
+                                          else
+                                              return! ompPriorExecute journalOpt (stringOf callId) arguments ctx start
                               | Ok _ ->
                                   return! ompPriorExecute journalOpt (stringOf callId) arguments ctx start
                           }
