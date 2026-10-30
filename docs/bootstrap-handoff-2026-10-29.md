@@ -147,7 +147,11 @@ capability-enforcement 009 第 2 例补一句，不改上文表。这是短路�
 
 scope-progress 包与出口都在，不拆。宿主不再写估计，仍读估计日志认 epoch。上文「不拆包」不动。
 
-回执没来仍被收成 Superseded 并 Ok 的旧状，笔记称已按指南派工改成未知不得冒充。AbortedObserved 仍是合法观察种类，现行重启不喂它；LegacyFalseAbort 拒绝路径保留。本轮在 *.fs 见到这些符号，只作定位，不解释成裁定：wanxiangli/src/assembly/DurableWork.fs:200、wanxiangli/src/assembly/DurableWork.fs:202、wanxiangli/src/chat-execution/ChatExecutionLaw.fs:293、wanxiangli/src/handle-lifecycle/HandleLifecycleLaw.fs:201、wanxiangli/src/handle-lifecycle/HandleLifecycleLaw.fs:214、wanxiangli/src/lifecycle/State.fs:624、wanxiangli/src/lifecycle/Work.fs:213、wanxiangli/src/lifecycle/Work.fs:216、wanxiangli/src/lifecycle/Work.fs:220、wanxiangli/src/session/Message.fs:14、wanxiangli/src/session/Message.fs:60、wanxiangli/src/session/Message.fs:62、wanxiangli/src/session/Message.fs:85、wanxiangli/src/session/Ownership.fs:30、wanxiangli/src/session/Ownership.fs:168、wanxiangli/src/session/Ownership.fs:172、wanxiangli/src/session/Ownership.fs:173、wanxiangli/src/session/Ownership.fs:176、wanxiangli/src/session/Ownership.fs:267、src/Wanxiangshu/Mission/Lifecycle/DurableWorkHost.fs:286、src/Wanxiangshu/Mission/Lifecycle/DurableWorkHost.fs:327、src/Wanxiangshu/Mission/Lifecycle/DurableWorkHost.fs:332、src/Wanxiangshu/Mission/Planning/PlanTools.fs:29、src/Wanxiangshu/Execution/Session/ChatExecution/Surface.fs:630、src/Wanxiangshu/Execution/Session/ChatExecution/Surface.fs:632。这不是新裁定，也不回滚 `04d4a9a8`。
+回执没来仍被收成 Superseded 并 Ok 的旧状，笔记称已按指南派工改成未知不得冒充。Abort 不再是合法观察，观察格已删除，已推送主仓 382805833，子模块 ffc0d1f8，generation 465；现行重启不喂它；LegacyFalseAbort 仍在 ChildRecovery.fs:89 与 .fsi:68。本轮在 *.fs 见到这些符号，只作定位，不解释成裁定：wanxiangli/src/assembly/DurableWork.fs:200、wanxiangli/src/assembly/DurableWork.fs:202、wanxiangli/src/chat-execution/ChatExecutionLaw.fs:293、wanxiangli/src/handle-lifecycle/HandleLifecycleLaw.fs:201、wanxiangli/src/handle-lifecycle/HandleLifecycleLaw.fs:214、wanxiangli/src/lifecycle/State.fs:624、wanxiangli/src/lifecycle/Work.fs:213、wanxiangli/src/lifecycle/Work.fs:216、wanxiangli/src/lifecycle/Work.fs:220、wanxiangli/src/session/Message.fs:14、wanxiangli/src/session/Message.fs:60、wanxiangli/src/session/Message.fs:62、wanxiangli/src/session/Message.fs:85、wanxiangli/src/session/Ownership.fs:30、wanxiangli/src/session/Ownership.fs:168、wanxiangli/src/session/Ownership.fs:172、wanxiangli/src/session/Ownership.fs:173、wanxiangli/src/session/Ownership.fs:176、wanxiangli/src/session/Ownership.fs:267、src/Wanxiangshu/Mission/Lifecycle/DurableWorkHost.fs:286、src/Wanxiangshu/Mission/Lifecycle/DurableWorkHost.fs:327、src/Wanxiangshu/Mission/Lifecycle/DurableWorkHost.fs:332、src/Wanxiangshu/Mission/Planning/PlanTools.fs:29、src/Wanxiangshu/Execution/Session/ChatExecution/Surface.fs:630、src/Wanxiangshu/Execution/Session/ChatExecution/Surface.fs:632。这不是新裁定，也不回滚 `04d4a9a8`。
+
+「回执未知」此前没有记上。普通路径曾把 ReceiptUnknown 收成 unit 完成，AcceptanceUnknown 被折成 Superseded 再 Ok()。指南禁止未知冒充成功。旁路已推送 `5ec7e159a`。不要写成待裁已经裁完。
+后到的一读不是本笔亲读，不把上一句升格成当前树裁定，也不要写成已经改完。observeDelegateRetry（Retry.fs）把 ReceiptUnknown 收成 Error，不是 Ok。已收成 Error 的不要改回。不要把这一读改写成仍收成 Ok。同一读里，Workflow.fs 仍把 ReceiptUnknown 和 Dispatched、Superseded 一起收成 unit，未知在这里仍被收成完成；Superseded 仍收成 Ok()，输入是 Superseded，不是 ReceiptUnknown。
+第150行曾把 AbortedObserved 写成仍是合法观察种类，并点了 HandleLifecycleLaw.fs:214。那是写笔记时的定位。其后隔离验收读到第214行是空行，观察格删除已测绿，当时产品提交尚未在本笔记里回报落地。本笔补上已推送：主仓 382805833，子模块 ffc0d1f8，generation 465；观察格已删除；LegacyFalseAbort 仍在 ChildRecovery.fs:89 与 .fsi:68。不另立裁定，不回滚。
 
 lsof 留删仍未裁。本轮检索 lsof，命中 2 处：docs/bootstrap-handoff-2026-10-29.md:123；requirements/verification-system/tests/e2e/support/process-host.js:245。上文「本轮不删任何调用」仍然有效。本轮不删。
 
@@ -157,7 +161,7 @@ createSession 传输超时仍是 Unknown。NotStarted 只用于未绑定 manager
 
 ChatAdmissionTransactionStep 的展示字符串可有可无。CrashB/C/D 的中断点是枚举臂。未裁定，不删。上文第 3 条已写未测量前不删，此处只补这两句，不改成删留裁定。
 
-askPreviousScope 同带 resetScope，不改。本轮读到 ScopeAnnotationGate.fs:135 为 `| Ok _ -> return! inner args ctx`。上文「静默丢、待裁是拒收还是走同一 reset 路径」不改写成已修。
+askPreviousScope 同带 resetScope，不改。本轮读到 ScopeAnnotationGate.fs:135 为 `| Ok _ -> return! inner args ctx`。上文「静默丢、待裁是拒收还是走同一 reset 路径」不改写成已修。丢掉的是成功侧，失败不丢。omp Adapter.fs:1681。拒收还是走同一 reset，仍未裁，不改。
 
 
 ## 待裁补缺（P15 与符号位置，不代裁、不回滚）
@@ -213,3 +217,137 @@ AuthorityRootAppendFailure：本轮 `rg --no-ignore` 全树零命中。
 ```
 
 上文已有的「畸形 identity carrier」「缺持久 authority」两条实现声称，不因这次检索升格为裁定，也不改写成已解决。
+
+PromptIngress.resolveDecision（src/Wanxiangshu/Interaction/Dispatch/Ingress.fs 41-64）及同文件辅助不把失败或未知收成 Ok、Superseded 或六个旧拒收名。不代裁 ChatAdmissionIntent.resolve。
+本笔读到 Ingress.fs 第 41–64 行及同文件辅助 tryActiveHumanRootAgent、enrichHostMessage、acceptedExecutionEvidence，对得上上一句；resolveDecision 末尾仍交给 ChatAdmissionIntent.resolve，不代裁。
+另记，出处是后到的一读，本笔没有亲读这些文件，不代裁，也不删：「回执没来就撤掉已准入恢复」这条因果当前树没有；已准入不再重投是 alreadyAdmitted。身份两处 IntentRejected 是落地前真不变量，不删。time004 仍是 Sessions.fs:85 的原生 setTimeout，不代裁。别的未读修复不要写成已经改完。
+
+DispatchSurface.fs:810-815 把多种准入失败收成 outcome Superseded，error 字段仍区分。未裁，不改。
+
+当前树 authority 快照缺失是 AdmissionLaw.fs:132 的 invalidOp，不是用户可见拒收，不是 DurableAuthorityUnavailable。缺 session 才是 missing-session 拒收。抛出之后宿主是否改写，未读。不要写成已裁定。
+
+委派补记：acceptedRootReplay 返回 Some 时，AdmissionLaw.admit 不调用 resolveValid，MissingSession 不会在这条路径上跑。本笔读到 AdmissionLaw.fs:144，admit 是 acceptedRootReplay input |> Option.defaultWith (fun () -> resolveValid input)，返回 Some 时不调用 resolveValid。第39行只是拒收名 MissingSession，不在函数体内。第128行的 MissingSession 拒收臂落在 resolveValid 体内，不在 acceptedRootReplay 体内。上一笔把这一行误算进 acceptedRootReplay，那句作废。这不是裁定。
+
+HandleLifecycleLaw.fs 源码检索不到 AbortedObserved。同目录测试 001.test.mjs:85-86 与 AGENTS.md:13 仍有这个字符串，不把「不再匹配」写成全目录已净。
+
+dist/Execution/Delegation/Fork/ChildRecoverySurface.js:71-73 仍把 aborted 收成 HostObservation。源码 src/Wanxiangshu/Execution/Delegation/Fork/ChildRecoverySurface.fs 的 observationsOf 已无该臂。未重编，不手工改 dist。
+
+ReceiptUnknown 不变成脚本 dispatched 或 superseded。
+
+src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs:204 的 aborted () 返回 Ok()。契约未读，不改。
+
+钩子 throw 之后已读层不改写成拒收，外层调用未读。
+
+本笔读到隔离树 /tmp/wxs-abort-dist-verify 的 dist/Execution/Delegation/Fork/ChildRecoverySurface.js，aborted 与 AbortedObserved 都没有命中。委派称这次重编基于已推送 382805833，build generation 1，EXIT 0。没有合入，没有手改主树 dist。主树 dist/Execution/Delegation/Fork/ChildRecoverySurface.js:71-73 仍有旧臂，那是旧构建，不是这次提交的产物。
+
+tryContinuationAdmission 只分类，在 src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs，本笔读到的窗口没有 Reject、invalidOp 或 raise。不拒绝不改写。这不是裁定。
+
+当前树重读，不是 git 钉死。src/Wanxiangshu/Execution/Delegation/Fork/ChildRecoverySurface.fs 的 observationsOf 没有 aborted 臂，只收 parent-cancelled、deadline、gone、active、restore。这不是裁定。
+
+src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs 的 observationsOfJs 也不收 aborted。这不是裁定。
+
+生产调用 chat.message hooks 的宿主层本笔未读，不能写成用户看不见异常。
+
+本笔读到 src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs:121，TerminalOutcome.Aborted 的箭头收成 Error，不是 Ok()。aborted () 是否只被测试调用，本笔没有做齐调用检索，不写成只被测试调用。这不是裁定。
+
+本笔读到 src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs:1210-1235。continueClassifiedChatMessage 把 journal 与 admissionTransaction 放在同一次匹配里；托管意图要继续，必须 Some durable 与 Some createTransaction 同时在。单独缺 createTransaction 而 journal 仍在，没有单独的用户路径，和两者都缺一样落入通配，走到 invalidOp，注释写明这不是用户可见拒收。未改文件。这不是裁定。
+
+本笔重读 src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Retry.fs：第90到91行 AwaitAcceptanceReconciliation 收到 RetryVerdict.Terminal input.Error，这一臂不再落到 Superseded。第46行 ReceiptUnknown 仍是 Error。第44到45行真 Dispatched 与真 Superseded 仍是 Ok()。回执折算测试本笔未跑。旁路已推送 `5ec7e159a`。这不是裁定。
+
+本笔读到 src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs 第124行：| _ -> ProviderFailureReplay.Superseded。通配收成 Superseded，这一行不是 Ok()。EpisodeSuperseded 的映射不在这一窗口，不写成已经见到映射。已读到第124行之前的类型窗口没有未知臂。未裁定不改，未改文件。
+
+本笔读到 src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Retry.fs 第34到35行：if alreadyAdmitted then /             Some RetryVerdict.Superseded。委派称已准入且 stop 回执还没分成 Stopped 或 Denied 时不看那串回执、直接 Superseded，随后可能变成 Ok() 或 ()。本笔重读第33到40行，alreadyAdmitted 为真时在 match stopWait 之前就返回 Superseded，不看回执。测试未跑，未裁定前不要写成已修好。真 Superseded 不得改成撤销。未改产品代码。
+
+本笔重读 src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Retry.fs 第33到40行：alreadyAdmitted 为真时直接 Some RetryVerdict.Superseded，不进入 stopWait 匹配。未准入且回执未分类走第40行 ReceiptUnknown；已准入时不看回执，同一条臂收成 Superseded。税是已准入且回执未分类时不看回执就 Superseded。requirements/provider-attempt-recovery/tests/025.test.mjs 第11行锁住 stopWaitVerdict(true, 'Stopped') 为 Superseded，这是测试锁住的真取代，不是税。同文件第6到7行只断言 stopWaitVerdict(false, 'TimedOut') 为 ReceiptUnknown、不是 Superseded，全文没有 stopWaitVerdict(true, 'TimedOut')。025 不锁已准入且 TimedOut。上一句写成测试锁没有读到，那句作废。旁路已推送 `5ec7e159a`。不要写成待裁已经裁完。真 Superseded 不得改成撤销。未改产品代码。这不是裁定。
+
+委派称隔离树 generation 1 上 019 与 025 绿；旁路已推送 `5ec7e159a`。本笔没有亲见这次跑的回执，不把绿写成亲见。不要写成整条已修好。已准入且 Stopped 仍是真取代。025 没锁已准入且 TimedOut。Retry.fs 第34到35行本笔重读仍是 alreadyAdmitted 直接 Superseded。未改产品代码。这不是裁定。
+
+界面会不会把 invalidOp 贴进对话，OpenCode 二进制无源码，本笔未读。不写成用户看不见，也不写成已经贴进对话。
+
+已准入且 Stopped 必须仍是 Superseded。已准入且未分类回执在 Retry.fs 第34到35行本笔重读仍不看回执，直接 Superseded。这条还没修。未改产品代码。
+
+本笔读到 HookPolicy.fs:107 是 HostKey = "chat.message"，HostSignalBootstrap.fs:1371 是注释。生产调用 chat.message hooks 的点不在这两处已读路径里。OpenCode 二进制未读。不把键名写成调用，也不写成全仓没有。未改产品代码。
+
+委派称回执折算已推送 b58443ef。本笔没有亲见这次提交，不把已推送写成亲见。ReceiptUnknown 不再收成成功、AwaitAcceptanceReconciliation 收成 Terminal、已准入且 Stopped 仍是真取代，上文已按源码记下，不重复成验收。未改产品代码。这不是裁定。
+
+本笔重读 src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Retry.fs 第34到35行：alreadyAdmitted 为真时在 match stopWait 之前返回 Superseded。未分类回执只在 else 里才到第40行 ReceiptUnknown，已准入走不到那里。这条还没修，不要写成已修好。未改产品代码。
+
+Retry.fsi 在委派所称的 `5ec7e159a` 里。本笔没有跑 git。本笔没有读 diff。文件在 src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Retry.fsi，只确认它存在，没有对照提交。未改产品代码。
+
+本笔读到 requirements/verification-system/tests/e2e/support/process-host.js 第245行：execSync(`lsof -ti tcp:${port} | xargs kill -9`, {。这一处会执行 lsof，而且会 kill。留删未裁。生产树本笔没有再全库检索，不写成只有这一处。未改产品代码。这不是裁定。
+
+旁路源码已改。旁路里已准入且 Stopped 仍是 Superseded；已准入且 TimedOut 与未分类收成 ReceiptUnknown，不再 Ok。复用的是现有臂，不是新裁决。不把上文主树重读改写成已修好。
+
+Retry.fsi 最新那一刀没动，但工作树里它本来就脏。diff 已经读过：加了 ReceiptUnknown、WaitDenied、verdictUnlessContinuing、observeDelegateRetry；注释是超时绝不是取代，Ok 只留给真派出和真取代，与现在的实现同向。其后旁路已推送 `5ec7e159a`。委派已核旁路测绿，主仓 HEAD 为 `5ec7e159a`。不要写成待裁已经裁完。上文「本笔没有读 diff」不改写。
+
+managed-chat-execution 005 第5例缺的仍是 providerStarted 先后，WHAT 没定布尔，不改断言。
+
+旁路差分开已经绿：隔离树 generation 1；025 两过零失败；019 六过零失败，GAP-139 的 todo 不是红。不把整条写成已修好。已准入且 Stopped 仍是 Superseded。已准入且 TimedOut 是 ReceiptUnknown，观察是 Error，不是 Ok。旁路已推送 `5ec7e159a`（`Retry.fs`、`Retry.fsi`、`025.test.mjs`）。模型由宿主定为 xai/grok-4.7。这一笔按委派补记，不把绿写成本笔亲见的回执，不改写其余已有判断，不代裁，不回滚，未改产品代码。
+
+ProviderTransient 加 ProviderStarted 不会得到 AwaitAcceptanceReconciliation，recordConfirmedFailure 进不了那一臂。
+
+missing-estimate 与 arg-estimate 仍是活路径，不删。
+
+Projection.fs 第124行不发明终局。
+
+IngressCodec.fs 第318行仍把 MalformedText 写成 ExplicitAgent=None，形态未裁定。
+
+## 待裁补缺（推送入账，不代裁、不回滚）
+
+旁路那一刀已推送 `5ec7e159a`（`b58443ef5..5ec7e159a`），没有 force。三个文件是 `Retry.fs`、`Retry.fsi`、`025.test.mjs`，+20 −7。已准入且未分类的停机回执不再冒充成功。`docs/bootstrap-handoff-2026-10-29.md` 没进这次提交。上文的提交状态已改成已推送 `5ec7e159a`，不回滚，也不把待裁写成已经裁完。本笔没有跑 git。委派所核：第 35–36 行已准入且 `Stopped` 仍是 `Superseded`；第 38 行已准入的 `TimedOut` 走 `ReceiptUnknown`；第 44 行观察是 `Error`，不是 `Ok`；第 42–43 行真派出和真取代仍是 `Ok()`。隔离树 generation 1：025 两过，019 六过，GAP-139 的 todo 不是红。本笔不把这次绿写成亲见回执。
+
+OpenCode 丢掉的是 `ScopeReset.commit` 已经返回的 `Ok` 串；失败的 `Result Error` 原样返回。`JournalAppendException` 是抛出，不是这条失败。omp 的 `askPreviousScope` 入口丢掉的是还没调用 `ompCommitResetScope` 的 `reanchor=true` 对象；错误不丢，但包进了 `ompPriorAnswer`。失败形状不同。拒收还是并到同一条 reset，未裁。
+
+`CrashB`、`CrashC`、`CrashD` 仍由 `012.test.mjs` 第 61 行传入，`ChatAdmissionTransactionSurface.fs` 第 427–432 行仍按这三个字符串中断，不删。
+
+## 待裁补缺（observationsOf / LegacyFalseAbort，不代裁、不回滚）
+
+LegacyFalseAbort 留删未裁，不代裁。
+
+## 待裁补缺（只补缺句，不代裁、不回滚）
+
+本笔读到 `src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs` 第855行是 `| ChatAdmissionIntent.Decision.Reject _ -> None`。Decision.Reject 返回 None，不是 IntentRejected。不代裁，不改。
+
+ChatAdmissionFlightPhase 本笔只在 HostSignalBootstrap.fs:1155 读到 Phase 取值，不裁定删留。
+
+## 待裁补缺（HEAD 与 failurePoint，不代裁、不回滚）
+
+委派已核主仓 HEAD 为 `5ec7e159a`。
+
+CrashB、CrashC、CrashD 仍是 `requirements/managed-chat-execution/tests/012.test.mjs` 第61行传入的 failurePoint。`ChatAdmissionTransactionSurface.fs` 第427–432行仍按这三个字符串中断，不删。
+
+## 待裁补缺（身份拒绝与钩子，不代裁、不回滚）
+
+委派称身份对不上的拒绝仍在 `IPromptJournal.Append` 之前返回，不删。本笔检索到的 Append 位置：无命中。先后没有在同一窗口里亲自排过的，不编成已读顺序。不代裁，不改。
+
+委派称 `PluginHostInterop` 三处不把 `Decision.Reject` 贴进对话。本笔检索命中 0 处：无命中。不代裁，不改。
+
+委派称 Surface 的 `IntentRejected` 对象只进测试返回值。本笔在 src 的 *.fs 见到生产路径 18 处、测试路径 0 处。生产命中：src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs:1010；src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs:185；src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs:197；src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs:385；src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs:405；src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs:416；src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs:426；src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs:447；src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs:493；src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs:504；src/Wanxiangshu/Interaction/Admission/ChatAdmissionTransactionSurface.fs:107；src/Wanxiangshu/Execution/Session/ChatExecution/Surface.fs:221；src/Wanxiangshu/Execution/Session/ChatExecution/Surface.fs:223；src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs:30；src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs:44；src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs:1214；src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs:212；src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs:325。不把生产命中改写成没有，也不代裁。
+
+## 待裁补缺（四段控制流仍无单一主人，不收成）
+
+上文已写指南第 49 行四段尚未收成单一计算表达式。此处只补缺，不改写那一段，也不代裁。
+
+委派称四段控制流仍没有单一主人。lifecycle 的 WorkBuilder 不是这四段的收成。未有主人前不把它们收成一段计算表达式。不代裁，不改产品代码。旁路仍是已推送的 `5ec7e159a`。
+
+本笔检索到 WorkBuilder：wanxiangli/src/lifecycle/Program.fs:44；wanxiangli/src/lifecycle/Program.fs:52。这是位置，不是「四段的收成」的裁定。
+
+## 指针（2026-10-30，不代裁）
+
+主仓 HEAD `a3e646aaa125d7b82ae3a29df7da4d5bca127b0d`。万象理检出 `4ce40f2c9a072401ae17d1474dacfb667952fef9`（detached）。模块 `refs/heads/main` 的 loose ref 仍是 `f1d01a034669163bb1dbf0ae3a711f2398e657a0`，工作树 `wanxiangli-ce-replay-wt` 的 HEAD 指向 `refs/heads/main`。不删。
+
+`0c48fc278..a3e646aaa` 与万象理 `4c017370a..4ce40f2` 各四笔，都是 scope/relay：自解锁 reset、后任看见自己的回合、定向 nudge、retention 估计按大小中立、meToo 与到达先后无关、全 meToo 先拒后改为记成一次 keepLast。不是指南自举的计算表达式重写，也没有关闭下面四项。generation 以委派所说 gen467 为准，未另验。工作树当时只脏这一份交接，未暂存。
+
+裁定仍悬，不代裁，也不把已提交的实现写成已追认：
+1. 两项设计裁定追认（交接只写了「E1 已 A+A」，正文没有展开 E1）。不与「畸形 identity carrier 按缺省」「缺持久 authority 改为边界级显式失败」这两条已提交实现合并。
+2. phase/step 约 22 处逐处裁定。只收回过三处建议，建议不是裁定。
+3. 「22 处」清单是否完备。
+4. `wanxiangli-ce-replay-wt` 去留。
+
+在这四项有裁定之前，不删 phase/step，不把一轮对话、委托与 Join、打断与续跑、咨询与答复收成一段计算表达式，不删该工作树。交接里其余标了待裁的，同样不代裁。
+
+## 静态调查补记（2026-10-30，不代裁、不回滚）
+
+本笔重读当前树：`ReceiptUnknown` 现行两处收法——Retry（`src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Retry.fs`）收成 Error；Fallback/Workflow（同目录 `Workflow.fs`）转 `notifyFailure`，不再收成 unit。上文「Workflow.fs 仍把 ReceiptUnknown 收成 unit」是写笔记时的历史观察，不是当前树事实。
+
+正常缺省 agent 经 codec 判为缺省，不走原 `MalformedIdentityCarrier` 路径；真实宿主未验证，不写成已验。
