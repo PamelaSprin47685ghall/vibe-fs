@@ -177,3 +177,79 @@ test('WHAT[durable-events-021] an uncut historical Journal fault suppresses only
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('WHAT[durable-events-021] a foreign writer rejected in a shared Journal stream quarantines only its own chain, never another writer\'s committed facts', async () => {
+  const dir = withTemp((base) => base)
+  const eventsDir = path.join(dir, 'wanxiangshu', 'events')
+  mkdirSync(eventsDir, { recursive: true })
+  const session = 'ses_shared_owner'
+
+  const handleLinked = ({ runtime, handle, child, seq, id }) =>
+    canonicalEventLine({
+      event_id: id,
+      event_type: 'JournalEnvelope',
+      parents: [],
+      payload: {
+        EventId: ['EventId', id],
+        Fact: [
+          'Agent',
+          [
+            'Execution',
+            [
+              'HandleLinked',
+              {
+                Byname: handle,
+                CanonicalRole: 'Engineer',
+                ChildSessionId: ['SessionId', child],
+                Handle: ['Agent', ['AgentHandleId', handle]],
+                Ownership: 'DurableParentHandle',
+                ParentSessionId: ['SessionId', session],
+                TargetAgent: 'engineer',
+              },
+            ],
+          ],
+        ],
+        LocalSeq: ['LocalSeq', String(seq)],
+        ObservedAt: `9999-01-01T00:00:0${seq}.000+00:00`,
+        RuntimeId: ['RuntimeId', runtime],
+        Stream: ['Session', ['SessionId', session]],
+      },
+      payload_refs: [],
+      stream_id: `journal/session/${session}`,
+    })
+
+  // Two processes drove the same session concurrently, each against its own
+  // Current. The k-way merge interleaves them: owner A1, foreign B1 (rejected:
+  // the handle cannot change its child), then owner A2. A2 never depended on B1.
+  writeFileSync(
+    path.join(eventsDir, 'owner-writer.ndjson'),
+    [
+      handleLinked({ runtime: 'rt_owner', handle: 'h-shared', child: 'ses_owner_child', seq: 1, id: '1'.repeat(40) }),
+      handleLinked({ runtime: 'rt_owner', handle: 'h-owner-later', child: 'ses_owner_later', seq: 2, id: '3'.repeat(40) }),
+    ].join(''),
+  )
+  writeFileSync(
+    path.join(eventsDir, 'foreign-writer.ndjson'),
+    [
+      handleLinked({ runtime: 'rt_foreign', handle: 'h-shared', child: 'ses_foreign_child', seq: 1, id: '2'.repeat(40) }),
+      handleLinked({ runtime: 'rt_foreign', handle: 'h-foreign-later', child: 'ses_foreign_later', seq: 2, id: '4'.repeat(40) }),
+    ].join(''),
+  )
+
+  try {
+    const booted = await journal.JournalSurface_bootWithWriterId(dir, 'reload-proof', 'rt_reload', 4243, '2026-01-02T00:00:00Z')
+    assert.equal(booted.ok, true, `replay should boot: ${JSON.stringify(booted.error)}`)
+    const handles = journal.JournalSurface_snapshot(booted.journal).sessionProjections[session]?.handles?.handles ?? []
+    const byHandle = Object.fromEntries(handles.map((h) => [h.handle, h.childSessionId]))
+    assert.equal(byHandle['agent:h-shared'], 'ses_owner_child', 'the first committed binding wins')
+    assert.equal(
+      byHandle['agent:h-owner-later'],
+      'ses_owner_later',
+      "a foreign writer's rejected fact must not erase the owner's later committed facts on reload",
+    )
+    assert.equal(byHandle['agent:h-foreign-later'], undefined, "the rejected writer's own tail stays quarantined")
+    journal.JournalSurface_dispose(booted.journal)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
