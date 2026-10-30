@@ -235,3 +235,9 @@ Manager 对仍活跃的 Engineer／DevOps 执行 `resume` 时，已有子会话�
 Manager、Orchestrator、Plan 负责长程工作。它们无工具调用的自然 stop 不是收尾，只要工作未结束就该被 nudge 续上。[021]／[037]／[039] 的迟到咨询停机只适用于以 prose 收尾的角色（Engineer、DevOps 等）；会话角色是长程角色时，排队的 `negotiate`／`askPreviousScope` 答复按普通工作放行，它本身就是续上工作的 nudge，不得 `AbortSession`，不得登记 `CompletedContinuationStops`。角色取答复消息或其前一条 assistant 的 `agent`（缺时取 `mode`）。
 
 现场依据：2026-10-28 Manager `ses_e7ed7cdb2ffe…`（“指南.txt 重构指南实施”）10:56:42 UTC 以 prose、无工具调用结束回合 `msg_18227b36a…`（finish=stop）；同刻代理答复 `msg_18227b433…` 作为咨询 steer 落地；10:56:51 `loop step=4` 后 13 ms `cancel`，`msg_18227d63d…` 为 `MessageAbortedError`。Manager 就此停住，直到 11:00:36 负责人再发消息。验收：`requirements/delegation/tests/041.test.mjs`（未修复时 manager／orchestrator／plan 的答复被停、`abortedIds=[sid]`；修复后不停；engineer 照旧停）。
+
+## [042] 重启恢复以持久 Accepted 的物理消息定 Root
+
+重启恢复的终态 assistant 只回答它自己的物理父消息；最后一条 user 消息可能是重试的新物理消息，其物理 ID 不是 Authority Root。恢复必须按 `assistant.ParentId` 的精确物理消息读取持久 `ChatExecution.Accepted`，用该记录同时查询交付见证并编码完成体；不得把物理 ID 提升为 Root。Accepted 与 `assistant.ParentId` 必须精确相符，且其 Root 必须对应该 handle／child 的 canonical admitted work；任一缺失或不相符时只作为观察（`Unreadable`，恢复等待），不得猜测 Root 或补造完成。已存在 `HandleWorkCompleted` 的 durable 终态不经过该快照路径，重启后仍按原工作正常 join，且不得重复写入完成。
+
+验收：`requirements/delegation/tests/042.test.mjs`（重试用例在旧实现下把重试物理 ID 当 Root，交付见证查询与 canonical work 均不匹配，恢复失败；修复后以原 Root 结算并 join 到重试回合的散文。已完成工作用例验证重启恢复不要求 Accepted、不重复写入完成，join 仍返回材料。缺失 Accepted 用例验证恢复只观察为 `RecoveryIncomplete`、不查询交付见证、不写完成，工作保持 Active）。

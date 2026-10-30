@@ -73,6 +73,10 @@ export const HOST_PHYSICAL_CANARY_FILES = new Set([
   'requirements/work/tests/host/008.test.mjs',
   // Exact assistant terminal event -> typed lifecycle observer payload, including run identity.
   'requirements/managed-session-lifecycle/tests/029.test.mjs',
+  // Restart recovery canary: the test must construct the exact physical
+  // SessionMessage and ChatExecution.Accepted records and read the real
+  // journal projection to prove that a retry's physical id is not its root.
+  'requirements/delegation/tests/042.test.mjs',
   // Physical-exit canary: the child must reach the real Diagnostic.fatal and
   // FatalProcess.trip links — a wire-level invariant, not a test seam.
   'requirements/host-boundary/tests/fixtures/fatal-process-child.fixture.mjs',

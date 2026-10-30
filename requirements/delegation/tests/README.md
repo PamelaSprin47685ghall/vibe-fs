@@ -32,6 +32,7 @@ e1合并的gen77官方510文件与完整36文件integration均0 fail。003实际
 | 024—026 | 同名/同角色复用、own child delta、因果完成/失败、实际 fork 接收与不确定发送后果；Host event port 保留身份（父到子 `DelegationHandoff` delta tracking 已随显式 charge 传递与共享 ANCHOR 地址空间退役）。026 的重启未交付子工作用例现名 `RESTART_PENDING_CHILD_WORK_is_voided_at_load_and_join_reports_it_once_without_hang`：加载期把上一进程遗留、已无法交付的子工作**作废**（不是完成），horizon 名册把它显示为 `voided`，join 以 `voided` 报告一次后该工作退役并离开名册（scoped 情形被 abandon 的是工作单元格，底层 handle 绑定仍可复用，`summary` 读出终态），同一目录上再起一个进程不再重复报告 | 所有 terminal 分支、进程 crash cuts、未知接收的后续收敛 |
 | 028、029 | 当前编译清单的直接/传递闭包、额度及反向注入检测；部分源码词形审计 | 各 locality 独立真实编译、类型隔离和实际 capability 行为；路径/词形只是当前结构审计 |
 | 031 | 连续完成复用同一 child 并交付 bounded view、旧 root 拒绝、parent supersede 取消、完成与删除在两种顺序下各结算一次（`HandoffCheckpointSettlement` 已随父到子 `DelegationHandoff` 退役） | 真正重复 terminal；SyncDelegate 不替 fork 证明 |
+| 042 | 重启恢复按 `assistant.ParentId` 读取持久 `ChatExecution.Accepted`：重试物理 ID 不再被提升为 Root，交付见证与完成体共用同一 durable Root；已有 `HandleWorkCompleted` 的 durable 终态不要求 Accepted、不重复写入，join 仍返回材料；缺失 Accepted 只观察为 `RecoveryIncomplete` | 真实 OS 重启后的完整 Host 接线；用例直接驱动生产恢复入口与真实 journal |
 
 `support` 只建立真实 runtime 所需的临时 journal、可控物理端口和清理。tool schema stub 仅支持构造工具，不证明真实 Host schema validation。等待同时考虑 prompt 与 invocation 拒绝，避免将合法拒绝误作挂死。新建角色限制不改变历史解码。
 
