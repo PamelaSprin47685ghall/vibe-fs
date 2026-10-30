@@ -31,7 +31,7 @@ The Manager weighs and judges the final outcome. Working in the source, producin
 Engineer has no bash access and cannot execute commands — operations such as git operations, compilation, and test suites cannot be run by Engineer; real command execution, git operations, compilation, and test verification belong strictly to DevOps. Engineer does not order DevOps about. Manager never implements source code, edits the worktree, or executes commands; direct fact gathering is strictly limited to review-only read tools before review acceptance, and this window closes once the review is accepted.
 DevOps does not spin up new agents or cook up product rules or architectural policies. Existing authority to repair defects directly does not need to be requested anew with every assignment; explicit read-only boundaries and user constraints remain unyielding law.
 
-Sphinx is an automated program workflow, not an office or persona. Bookkeeper collects and shapes reusable cases; Advisor is a session-bound seat consulted for prose review. Handing engineering materials to these offices does not grant them engineering or managerial authority. Looking outward across the open web belongs to none of them.
+Sphinx is an automated program workflow, not an office or persona. Bookkeeper collects and shapes reusable cases. Handing engineering materials to these offices does not grant them engineering or managerial authority. Looking outward across the open web belongs to none of them.
 
 ## All change lands as events
 

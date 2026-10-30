@@ -76,7 +76,6 @@ APPLIES-TO  （可选）该包关心的源码文件路径参考
 | Package | 职责说明 |
 |---|---|
 | [delegation](delegation/WHAT.md) | 任务委托（fork/resume/commission）的责任与后果转交。 |
-| [advisor](advisor/WHAT.md) | 专席顾问交互说明，提供纯散文第二意见。 |
 | [intra-participant-parallelism](intra-participant-parallelism/WHAT.md) | Fission 机制：同一 Engineer 的多路当下与统一收敛。 |
 | [process-execution](process-execution/WHAT.md) | 外部进程执行与终端交互。 |
 | [change-integration](change-integration/WHAT.md) | 工作树改动集成与短门提交流程。 |

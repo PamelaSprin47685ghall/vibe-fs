@@ -917,13 +917,6 @@ type ToolRuntimeScope
             let key = SessionId.value parentSessionId
             obtainWorkDevOpsTask parentSessionId key
 
-    /// Advisor advice is a continuation into a working session, so physical
-    /// acceptance arrives only after that session finishes its current turn.
-    /// Thirty minutes bounds a hopeless wait without turning a long turn into
-    /// Unknown; the durable Process stays single-flight meanwhile.
-    [<Literal>]
-    let AdvisorSteerAcceptanceBudgetMs = 1_800_000
-
     /// Best-effort negotiate answer delivery: every failed step is recorded
     /// (receipt, recipient, delegator, stage, reason). Recording only — no
     /// decision reads it.
@@ -1053,15 +1046,10 @@ type ToolRuntimeScope
         (answer: string)
         (receipt: string)
         (confirm: string -> string -> bool)
-        (awaitPhysical: bool)
         : Task<Result<unit, string>> =
         let target = SessionId.create recipient
         let directory = directoryFor recipient |> Option.orElse workspaceDirectory
-        // A busy worker lands the steer only after its current turn ends. The
-        // admission default (10s) would declare Unknown while the Host is still
-        // holding a perfectly good queued message, so advice waits far longer.
-        let budget = if awaitPhysical then Some AdvisorSteerAcceptanceBudgetMs else None
-        let observer = privateConsultationObserver recipient receipt confirm budget
+        let observer = privateConsultationObserver recipient receipt confirm None
 
         let consultationPort = DispatchSessionPort.ofSessionPort sessions |> DispatchSessionPort.forConsultation
 
@@ -1080,10 +1068,7 @@ type ToolRuntimeScope
         match journal, active, last with
         | None, _, _ -> Task.FromResult(Error "No AgentJournal: cannot enqueue visible negotiation guidance")
         | Some _, Some current, _ ->
-            if awaitPhysical then
-                HostForkBusyNudge.sendObservedAwait sessions journal target current directory answer observer
-            else
-                HostForkBusyNudge.sendObserved sessions journal target current directory answer observer
+            HostForkBusyNudge.sendObserved sessions journal target current directory answer observer
         | Some durable, None, Some closed ->
             // A completed child needs a new owned logical run, not a
             // continuation of a closed run. Both paths share Dispatcher.
@@ -1095,7 +1080,7 @@ type ToolRuntimeScope
                 (LlmFacing.renderInstruction answer)
                 closed.IdentitySeed
                 directory
-                (if awaitPhysical then PromptDispatcher.AwaitMode.Await else PromptDispatcher.AwaitMode.Detached)
+                PromptDispatcher.AwaitMode.Detached
                 (Some observer)
             |> TaskValue.map (Result.map ignore)
         | Some _, None, None -> Task.FromResult(Error "Negotiation recipient has no previous managed authority profile")
@@ -1114,7 +1099,7 @@ type ToolRuntimeScope
 
             confirmed
 
-        sendConsultationSteer recipient answer receipt confirm false
+        sendConsultationSteer recipient answer receipt confirm
 
     let scopeArchive (sessionText: string) : Result<Wanxiangshu.Context.Prefix.ArchivedScope, string> =
         let current =
@@ -1148,7 +1133,7 @@ type ToolRuntimeScope
         if not (isCurrent ()) then
             Task.FromResult(Error "stale previous Scope answer: target epoch is no longer current")
         else
-            sendConsultationSteer recipient answer receipt confirm false
+            sendConsultationSteer recipient answer receipt confirm
 
     let parseVerifiedScope (sessionText: string) (text: string) : Result<obj, string> =
         let decoded: Result<obj, string> =
@@ -1363,18 +1348,6 @@ type ToolRuntimeScope
 
     member _.SendNegotiationSteer(recipient: string, answer: string, receipt: string) =
         sendNegotiationSteer recipient answer receipt
-
-    member _.SendAdvisorSteer(recipient: string, answer: string, processId: string, isCurrent: unit -> bool) =
-        task {
-            if not (isCurrent ()) then
-                return Error "stale Advisor answer: source Scope is no longer current"
-            else
-                let! delivered = sendConsultationSteer recipient answer processId (fun _ _ -> isCurrent ()) true
-                if not (isCurrent ()) then
-                    return Error "stale Advisor answer: Scope advanced before physical steer confirmation"
-                else
-                    return delivered
-        }
 
     member _.AttachPreviousScopeTransport(ask: string -> obj -> string -> Task<Result<string, string>>) =
         askArchivedScope <- Some ask

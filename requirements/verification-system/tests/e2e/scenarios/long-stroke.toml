@@ -85,7 +85,7 @@ const recordRoutingDecision = (role, purpose, model) => {
 }
 
 export default function route(role, running, previous, purpose) {
-  if (!new Set(['manager', 'orchestrator', 'engineer', 'devops', 'plan', 'advisor']).has(role)) {
+  if (!new Set(['manager', 'orchestrator', 'engineer', 'devops', 'plan']).has(role)) {
     throw new Error('unexpected managed role: ' + role)
   }
 

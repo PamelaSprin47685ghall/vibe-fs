@@ -84,9 +84,9 @@ fork 首 prompt typed 渲染的正文**只有本次 Assignment 指令**，不再
 
 ## [021] 父到子只传当前指令、历史依靠主动协商
 
-父到子、同步委托、dag、DevOps 与 Advisor 请求只发送本次 charge / intent，**不传任何调用方历史、完整 post-scope 视图、`[[context]]`、筛选数组或附件 view**，也不附加父方未完成的活跃回合。子方只能从收到的当前指令开始，缺少必要事实时用 `negotiate(questions: string)` 向委托者提问；不得擅自推定未提供的上下文。charge 是任务本身（以 `# ...` 注释头呈现），协商返回的事实只是新的 steer，并不克隆 authority。
+父到子、同步委托、dag 与 DevOps 请求只发送本次 charge / intent，**不传任何调用方历史、完整 post-scope 视图、`[[context]]`、筛选数组或附件 view**，也不附加父方未完成的活跃回合。子方只能从收到的当前指令开始，缺少必要事实时用 `negotiate(questions: string)` 向委托者提问；不得擅自推定未提供的上下文。charge 是任务本身（以 `# ...` 注释头呈现），协商返回的事实只是新的 steer，并不克隆 authority。
 
-`askPreviousScope`、`negotiate` 和 Advisor 的异步答复只在实际发往 provider 的 transform 边界裁决：以真实物理消息标识咨询答复，查其之前最近一条已完成 assistant 回合；该回合没有工具调用时中断本次续跑，不依赖可能被排队消息拖住的 work 或 session 终态。有工具调用、没有可确认的前一回合、答复之后已有 assistant 回合（答复已在活循环中被消费），以及当前输入是操作员消息或新 assignment 时不得据此中断。该判断只读未投影的 Host 历史，且每次出站请求只裁决一次（见 [037]）。此判断只决定本次咨询续跑，不把自然 stop 写成 Work 完成事实。拦截只作用于出站请求副本；已落地的答复保留在会话历史中，后续真正续上的任务仍可使用，不设会话级永久禁令。
+`askPreviousScope` 与 `negotiate` 的异步答复只在实际发往 provider 的 transform 边界裁决：以真实物理消息标识咨询答复，查其之前最近一条已完成 assistant 回合；该回合没有工具调用时中断本次续跑，不依赖可能被排队消息拖住的 work 或 session 终态。有工具调用、没有可确认的前一回合、答复之后已有 assistant 回合（答复已在活循环中被消费），以及当前输入是操作员消息或新 assignment 时不得据此中断。该判断只读未投影的 Host 历史，且每次出站请求只裁决一次（见 [037]）。此判断只决定本次咨询续跑，不把自然 stop 写成 Work 完成事实。拦截只作用于出站请求副本；已落地的答复保留在会话历史中，后续真正续上的任务仍可使用，不设会话级永久禁令。
 
 ## [022] 建议性工具次数
 
@@ -188,7 +188,7 @@ OpenCode 暂时建立一个作为接收方子会话的临时孙会话，Host 中
 
 `Detached` 回执仅证明本次调用已提交持久发送，**不等于真实回答已抵达子会话**；只有 Dispatcher 的 `PhysicalAccepted` 观察者在真实物理用户消息被接纳后，按接收方、回执、委派代际确认，才结算该答复回执。首次 `resetScope` 的门禁只看 negotiate 是否受理，与答复是否送达无关。伪造的 part.metadata 或出站 provider 文本不能结算回执。不得把「工具已发送」或临时会话已创建等同于答复已送达。
 
-**user-facing session 不提供协商工具。** 在 OpenCode 的 `chat.message` 钩子里，凡 `IsManagedChild = false` 的根会话，其真实 `UserMessage.tools.negotiate` 必须显式为 `false`，因此工具不进入该次 LLM 请求可用列表；`tool.execute.before` 仍必须对根会话伪造的协商调用硬拒绝。受委托子会话和 Advisor 必须保留工具。本判定按真实物理会话父子身份，**不能按 Manager / Engineer 等角色统一禁用**，以免误杀同角色子代理的首次协商。
+**user-facing session 不提供协商工具。** 在 OpenCode 的 `chat.message` 钩子里，凡 `IsManagedChild = false` 的根会话，其真实 `UserMessage.tools.negotiate` 必须显式为 `false`，因此工具不进入该次 LLM 请求可用列表；`tool.execute.before` 仍必须对根会话伪造的协商调用硬拒绝。受委托子会话必须保留工具。本判定按真实物理会话父子身份，**不能按 Manager / Engineer 等角色统一禁用**，以免误杀同角色子代理的首次协商。
 
 
 ## [036] Busy 子代理必须即时 steer 而不是等待空闲
@@ -201,7 +201,7 @@ Manager 对仍活跃的 Engineer／DevOps 执行 `resume` 时，已有子会话�
 
 ## [037] 咨询停机只读原始历史，不得误停已消费答复的活循环
 
-`askPreviousScope`／`negotiate`／Advisor 答复的迟到停机（[021]）只在进入普通 transform 各阶段之前、对 Host 交来的未投影消息历史裁决一次。投影之后的出站副本不得再拿来裁决：已提交的 `resetScope` 会退休最新 reset 之前的普通工具 part 与思考；`resetScope` 自身及 `assume`／`negotiate`／`askPreviousScope`／`advisor` 的调用照常保留，但答复之前那条只调普通工具（如 `todowrite`）的 assistant 回合在 OpenCode 副本里只剩 `step-start`／`step-finish` 空壳，仍带 `time.completed`，于是看起来像“已完成且无工具调用”。旧判据只看答复**之前**最近的 assistant，从不看答复之后的回合，所以随后那条保留下来的 `resetScope` 也救不了它。答复之后已有 assistant 回合时，答复已在活循环里被消费，本次请求是普通续跑，同样不得中断。
+`askPreviousScope`／`negotiate` 答复的迟到停机（[021]）只在进入普通 transform 各阶段之前、对 Host 交来的未投影消息历史裁决一次。投影之后的出站副本不得再拿来裁决：已提交的 `resetScope` 会退休最新 reset 之前的普通工具 part 与思考；`resetScope` 自身及 `assume`／`negotiate`／`askPreviousScope` 的调用照常保留，但答复之前那条只调普通工具（如 `todowrite`）的 assistant 回合在 OpenCode 副本里只剩 `step-start`／`step-finish` 空壳，仍带 `time.completed`，于是看起来像“已完成且无工具调用”。旧判据只看答复**之前**最近的 assistant，从不看答复之后的回合，所以随后那条保留下来的 `resetScope` 也救不了它。答复之后已有 assistant 回合时，答复已在活循环里被消费，本次请求是普通续跑，同样不得中断。
 
 现场依据：2026-10-28 00:11:47 UTC，Engineer `ses_e80299a17ffe…` 接到前一 Scope 答复后继续工作并走 `scope.kind=resetScope`；下一步开始 48 ms 后被插件 `session.abort`（opencode.log `message=cancel`），此后再无消息，Manager join 一直等待。opencode.log 在 2026-10-27/28 共 11 例相同形态（紧接 `resetScope`、最后一条 user 为 `wanxiangshu_consultation_steer` 答复、之后零消息）。旧实现在各阶段之后对投影副本第二次调用 `StopCompletedContinuation`，且只看答复之前的 assistant：该会话原始尾部为 `askPreviousScope` → `todowrite` → 答复 → `todowrite` → `resetScope`，原始历史判定看到 `todowrite` 不停；投影后同一回合只剩空壳，第二次判定命中“已完成且无工具”而停机。验收：`requirements/delegation/tests/037.test.mjs`——答复后已有回合（含随后 `resetScope`）不发 AbortSession；完成且无工具的回合之后才落地的答复仍停机。
 
@@ -232,6 +232,6 @@ Manager 对仍活跃的 Engineer／DevOps 执行 `resume` 时，已有子会话�
 
 ## [041] 长程角色不因迟到咨询而停
 
-Manager、Orchestrator、Plan 负责长程工作。它们无工具调用的自然 stop 不是收尾，只要工作未结束就该被 nudge 续上。[021]／[037]／[039] 的迟到咨询停机只适用于以 prose 收尾的角色（Engineer、DevOps 等）；会话角色是长程角色时，排队的 Advisor／`negotiate`／`askPreviousScope` 答复按普通工作放行，它本身就是续上工作的 nudge，不得 `AbortSession`，不得登记 `CompletedContinuationStops`。角色取答复消息或其前一条 assistant 的 `agent`（缺时取 `mode`）。
+Manager、Orchestrator、Plan 负责长程工作。它们无工具调用的自然 stop 不是收尾，只要工作未结束就该被 nudge 续上。[021]／[037]／[039] 的迟到咨询停机只适用于以 prose 收尾的角色（Engineer、DevOps 等）；会话角色是长程角色时，排队的 `negotiate`／`askPreviousScope` 答复按普通工作放行，它本身就是续上工作的 nudge，不得 `AbortSession`，不得登记 `CompletedContinuationStops`。角色取答复消息或其前一条 assistant 的 `agent`（缺时取 `mode`）。
 
-现场依据：2026-10-28 Manager `ses_e7ed7cdb2ffe…`（“指南.txt 重构指南实施”）10:56:42 UTC 以 prose、无工具调用结束回合 `msg_18227b36a…`（finish=stop）；同刻 Advisor 答复 `msg_18227b433…` 作为咨询 steer 落地；10:56:51 `loop step=4` 后 13 ms `cancel`，`msg_18227d63d…` 为 `MessageAbortedError`。Manager 就此停住，直到 11:00:36 负责人再发消息。验收：`requirements/delegation/tests/041.test.mjs`（未修复时 manager／orchestrator／plan 的答复被停、`abortedIds=[sid]`；修复后不停；engineer 照旧停）。
+现场依据：2026-10-28 Manager `ses_e7ed7cdb2ffe…`（“指南.txt 重构指南实施”）10:56:42 UTC 以 prose、无工具调用结束回合 `msg_18227b36a…`（finish=stop）；同刻代理答复 `msg_18227b433…` 作为咨询 steer 落地；10:56:51 `loop step=4` 后 13 ms `cancel`，`msg_18227d63d…` 为 `MessageAbortedError`。Manager 就此停住，直到 11:00:36 负责人再发消息。验收：`requirements/delegation/tests/041.test.mjs`（未修复时 manager／orchestrator／plan 的答复被停、`abortedIds=[sid]`；修复后不停；engineer 照旧停）。

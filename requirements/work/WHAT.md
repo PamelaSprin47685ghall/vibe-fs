@@ -27,7 +27,7 @@
 review 是唯一的生命周期入口。updates 是 `{ key, value | null }` 数组：已有键覆盖、缺失键新增、value 为 null 删除该键。空数组不删除已有键。
 
 - 允许后果：初任空账只写 QuestionRequested，问句是「我需要干什么？」，不写 Reviewed，不推进里程碑。真实答复后仍是同一任。第一次非空账写 Reviewed 并进入工作期。其后账被清空才在同一笔写下旧任退休、Context Barrier、后任打开与继任提示。接任第一次空账只推进里程碑，不新建任期，不建屏障，并在该次 review 记下下一里程碑提示。待执行上的空 review 预留一次 Manager 启动，不消耗待执行。收尾空账且无真实资源阻塞则结案。已完成后只有新的真实操作员消息重开执行任期恰好一次。
-- 禁止后果：不得用 Promoted 或 Stayed 锁定晋级资格。晋级只能由本次 review 的已证事实直接推进。不得把空数组当成清空已有义务。Advisor steer 与其他代理答复不得重开已完成的工作。
+- 禁止后果：不得用 Promoted 或 Stayed 锁定晋级资格。晋级只能由本次 review 的已证事实直接推进。不得把空数组当成清空已有义务。非操作员的代理答复不得重开已完成的工作。
 - 失败后果：已完成的工作再收到 review 时拒绝，零写。updates 含空 key 时拒绝。效果尚未确认时，另一笔 review 拒绝。
 
 ## [004] 询问尚未答复时的动作
@@ -180,7 +180,7 @@ review 是唯一的生命周期入口。updates 是 `{ key, value | null }` 数�
 生命周期由不可变 wanxiangli 事实驱动并投影状态。结束工具名是 review。
 
 - 允许后果：投影只通过 [001] 的事实更新。`QuestionRequested` 是询问，不是 Reviewed。`Reviewed` 只在非空账时写入，同一任期可以多次。`IncumbencyRetired` 只出现在接力或结案。`ContextBarrier` 只出现在接力。`MilestoneAdvanced` 只出现在接任第一次空账。`DeliveryRequested` 只预留 Manager 启动，不退休待执行。`DeliverySessionBound` 只表示会话已绑定，不表示底稿已被接受。`DeliveryAdmitted` 才表示真实受理。`StopObliged` 只出现在结案。已完成后的操作员消息只写一笔新的 `IncumbencyOpened`。同一事件的重复重放必须保持幂等。
-- 禁止后果：同一 work 同时至多一个活跃任期。已退休任期不复活。不得用 Promoted 或 Stayed 记录资格。不得另建第二份里程碑或任期账本。空账询问不改写里程碑。Advisor steer 与其他代理答复不得重开已完成的工作。
+- 禁止后果：同一 work 同时至多一个活跃任期。已退休任期不复活。不得用 Promoted 或 Stayed 记录资格。不得另建第二份里程碑或任期账本。空账询问不改写里程碑。非操作员的代理答复不得重开已完成的工作。
 - 失败后果：同一身份异载荷、已完成后再 review、或半对接力，整笔拒绝，零写。严禁跳过或猜测损坏记录。
 
 ## [023] 里程碑单向推进
@@ -225,9 +225,9 @@ Plan 的里程碑单向前进：事实与取舍、理解与路径、流程与伪
 
 Manager、Orchestrator 与 Plan 的目标义务独立于物理回合：空 stop、合格收尾散文或进度小结均不证明目标完成；Manager 与 Plan 严禁静默停止。作为对等收敛规则，子代理角色（Engineer、DevOps）豁免催促（nudge）并允许自然停机（context-compression [037]），其自然停机只交回末轮 assistant 散文（渲染为 `# ...` 注释）。
 
-- 允许后果：对非豁免角色（Manager、Orchestrator、Plan），没有有效交接/完成事实，也没有 [049] 的用户等待时，新的自然停机必须在真实 idle 许可上得到同运行 nudge：提示指出尚未解除的任务义务与下一步；Manager 保留当前评审/工作/收尾提示，并说明 `join` 可以临时等待后台工作；Orchestrator 保留委任与接续职责；Plan 提醒 `devops` 与 `review` 的职责；空账 review 是等待用户的入口。Engineer 与 DevOps 彻底免除 nudge 催促，允许在工作完成后自然停机并交回成果。internal 末梢 Advisor/Bookkeeper 沿专用提交事实收敛，不承担结案义务。
+- 允许后果：对非豁免角色（Manager、Orchestrator、Plan），没有有效交接/完成事实，也没有 [049] 的用户等待时，新的自然停机必须在真实 idle 许可上得到同运行 nudge：提示指出尚未解除的任务义务与下一步；Manager 保留当前评审/工作/收尾提示，并说明 `join` 可以临时等待后台工作；Orchestrator 保留委任与接续职责；Plan 提醒 `devops` 与 `review` 的职责；空账 review 是等待用户的入口。Engineer 与 DevOps 彻底免除 nudge 催促，允许在工作完成后自然停机并交回成果。internal 末梢 Bookkeeper 沿专用提交事实收敛，不承担结案义务。
 - 禁止后果：不得先发布 Completed 或关闭逻辑运行，再尝试催促；不得以无后台句柄、有正式文本或缺工作投影当作目标已完成。相同终态重复通知幂等，后续新的偷停仍须提醒，不因之前已经 nudge 过一次而永久静默。无 idle 许可时等待真实闲置，不抢占正在运行的工具。严禁对 Engineer 或 DevOps 发送完成催促 nudge。
-- 边界：已退休 run、旧权威回执、已交付工作、显式用户取消不被复活。provider 故障仍交给既有失败 owner；提醒或存储失败必须可见，不能伪造已发送或已完成。internal 末梢 Advisor/Bookkeeper 沿各自的专用提交事实收敛，不以一段公开工具回执为完成证据，也不让一段内部散文解除外层目标义务。
+- 边界：已退休 run、旧权威回执、已交付工作、显式用户取消不被复活。provider 故障仍交给既有失败 owner；提醒或存储失败必须可见，不能伪造已发送或已完成。internal 末梢 Bookkeeper 沿专用提交事实收敛，不以一段公开工具回执为完成证据，也不让一段内部散文解除外层目标义务。
 
 ## [028] devops 契约（同步委派固定 DevOps）
 
@@ -276,7 +276,7 @@ Plan 角色与各阶段使用的指导文档必须在资源目录中中英双语
 
 Plan 的里程碑与任期机制不得污染其他角色；[027] 明确规定的长程连续性与豁免除外。
 
-- 允许后果：Orchestrator 的既有角色合同不变。Engineer 与 DevOps 在工作完成后以有正文的自然终态交回材料（context-compression [037]），但无正文无工具的空终态仍须 nudge；Manager 与 Plan 保持长程连续性，严禁静默停止，并只用宿主生命周期 `review` 驱动里程碑、接力、启动与结案（[003]、[025]、[026]）。internal 末梢 Advisor/Bookkeeper 沿专用提交事实收敛。Manager 的空账询问走 review，`review` 的业务判断不变。
+- 允许后果：Orchestrator 的既有角色合同不变。Engineer 与 DevOps 在工作完成后以有正文的自然终态交回材料（context-compression [037]），但无正文无工具的空终态仍须 nudge；Manager 与 Plan 保持长程连续性，严禁静默停止，并只用宿主生命周期 `review` 驱动里程碑、接力、启动与结案（[003]、[025]、[026]）。internal 末梢 Bookkeeper 沿专用提交事实收敛。Manager 的空账询问走 review，`review` 的业务判断不变。
 - 禁止后果：非 Plan 角色严禁获取 `todowrite-for-plan` 或 `ask`；宿主注册工具面已无 `devops` 这一名称，DevOps 调查只以编程面成员 `this.devops(intent)` 形态承载，不构成任何角色的宿主工具面。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
 - 失败后果：任何非 Plan 回归测试失败均表明破坏了全局不变量，改动必须判定为不合格。
 
@@ -323,7 +323,7 @@ work lifecycle 的唯一 durable owner 是 wanxiangli：Work 负责规则和规�
 
 ## [037] 已完成后的重开
 
-已完成之后，只有新的真实操作员消息重开执行任期恰好一次。Advisor steer 与其他代理答复重开零次。
+已完成之后，只有新的真实操作员消息重开执行任期恰好一次。非操作员的代理答复重开零次。
 
 - 允许后果：重开在同一 work 账本上写入一笔新的 IncumbencyOpened。新任期是 Originator，里程碑是「执行」。旧任期不复活，原记录不删除。同一消息重放不再造第三任。
 - 禁止后果：严禁在尚未完成时重开。严禁借重开推进或回退里程碑、复活旧任期或清除已有事实。严禁在恢复或调度时自动重开。退休记录严禁删除。
@@ -420,7 +420,7 @@ Plan 的编程面（`todowrite-for-plan`）携带 `js.ask(question)`：程序内
 
 ## [052] Manager 交付之后的正常新循环与末任收尾
 
-收尾空账且真实资源阻塞已解除时结案，不另开验收任期。已完成之后，只有新的真实操作员消息重开执行恰好一次。Advisor steer 与其他代理答复重开零次。旧退休记录不删除，同一消息重放不再造第三任。
+收尾空账且真实资源阻塞已解除时结案，不另开验收任期。已完成之后，只有新的真实操作员消息重开执行恰好一次。非操作员的代理答复重开零次。旧退休记录不删除，同一消息重放不再造第三任。
 
 工作期的 Manager 不因某次空账获得或失去资格。任期仍活跃、且没有真实资源阻塞时，Fork、Resume、Join 与后续 review 保持可用。收尾仍有真实阻塞时不得结案。已完成后再 review 拒绝。
 

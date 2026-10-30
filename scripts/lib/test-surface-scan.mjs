@@ -1528,8 +1528,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Tools/ToolRuntimeScopeSurface.js',
     owner: 'work',
-    laws: ['WORK-009', 'WORK-044', 'advisor-005', 'advisor-007'],
-    lawOwners: { 'advisor-005': 'advisor', 'advisor-007': 'advisor' },
+    laws: ['WORK-009', 'WORK-044'],
     source: 'src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs',
     representation: 'json',
     kind: 'resource',

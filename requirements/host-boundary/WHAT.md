@@ -44,8 +44,6 @@
 
 在向底层提供者交付消息前，必须对空白内容进行安全补占位符处理，并在连续出现的两条用户消息之间插桩无语义的助手消息，防止底层协议报校验错误。
 
-**专席 Advisor 的独立出站投影例外：**专席的持久原文包含只有 reasoning、没有普通正文的 assistant 回合，或相邻的两条 user 载体时，不得给模型捏造 `assistant "."`（它会把此兼容占位错认成自己前次的真实答复）。仅在专席的 Provider 请求副本中省略没有正文也没有工具效果的 reasoning-only assistant，合并相邻 user 消息及其原始文字；从不修改原始会话、reasoning 的持久事实或已经产生的真实 assistant prose。普通角色仍受上述 Provider 非空与交替规则约束。判断专席身份依据持久的 CanonicalRole，而不是 user 消息文字。以 HOST-011 的 HNI 正反例和已建立真实 AcceptedChatExecution、ProviderRun 的 OpenCode 正式 transform 反例验证。
-
 ## [012] SessionID 与 CallID 定位唯一性
 
 依据 `SessionID + CallID` 在完整快照中解析原始调用分段时，必须证明其能唯一确定对应的运行上下文与追踪范围；若匹配出现歧义或无法定位，必须安全失败。
@@ -175,13 +173,13 @@ omp 入口模块（`src/Wanxiangshu/Composition/Omp/` 下携带 `[<ExportDefault
 
 ## [036] 宿主功能性角色与自动 compaction 隔离契约
 
-宿主内置的功能性代理（title、compaction、summary、explore、generate）服务于宿主自身的生命周期与元数据维护，不隶属于万象术受托治理的 managed roles（manager、orchestrator、engineer、devops、plan、advisor）：
+宿主内置的功能性代理（title、compaction、summary、explore、generate）服务于宿主自身的生命周期与元数据维护，不隶属于万象术受托治理的 managed roles（manager、orchestrator、engineer、devops、plan）：
 
 1. **请求级系统所有权与视图隔离**：OpenCode 1.19.4 的 system hook 不携带当前 agent，且先于 chat.params；title 可复用 managed 会话及用户消息。只有以万象术自有角色提示词完整字节开头（后接换行或结束）的请求，才进入产品 system 改写与出站快照；临时协商沿专用前缀投影处理。其他请求原样保留，即使自定义功能性提示词、与 managed 请求同会话交错，或在尾部引用产品提示词，也不得注入 Scope 或污染快照。禁止用宿主英文提示词片段、历史用户 agent 或会话身份猜当前角色；
 2. **历史会话压缩服从 as-is 语义**：`session.compacting` 只授权该会话紧接的一次 `messages.transform` 旁路，读取时即消费，不延续到 system/params 或后续普通请求。宿主传入当前存活上下文的什么内容，就原样提供给压缩模型；绝不恢复前任已被 tenure cut 裁切的历史，也不得注入预算后缀。其他会话不受影响；
 3. **宿主自动 compaction 策略保留**：万象术不得物理禁用宿主自动压缩。配置钩子必须保留 `auto=true, prune=false, autocontinue=true`，允许宿主自发触发安全压缩，且该压缩不推进 Scope epoch、不扣减计费估计、不更改在途委托事实；
 4. **准入与执行旁路**：功能性角色在 `chat.message` 中不受 managed lease 约束或强加 tools 屏蔽，允许其无阻碍直接执行。
-5. **参数隔离**：chat.params 以实际调用的 agent 为准，非 managed 请求不得结算 Scope 进度、触发 Advisor、覆盖模型快照或记录 managed 模型容量；宿主参数原样保留。
+5. **参数隔离**：chat.params 以实际调用的 agent 为准，非 managed 请求不得结算 Scope 进度、覆盖模型快照或记录 managed 模型容量；宿主参数原样保留。
 6. **共享历史中的作者身份**：产品在请求副本追加的 Scope 提醒必须将每个文本 part 标记为宿主原生 `synthetic=true`，不伪装成真实用户消息。OpenCode 的后台 title 与普通请求变换可共享同一数组；变换后 title 的真实用户计数必须仍只包含原始用户消息，不能因产品提醒从一条变成两条而静默取消自动命名。
 
 2026-10-27 实测：上一轮仅 system/params 旁路不能修复 title。未标记的 Scope steer 使真实 DevOps 会话不发出 title 请求；补齐 synthetic 后，OpenCode 1.19.4 在开启插件的真实 DevOps 新会话中发出 `small=true agent=title`，并将持久标题更新为「自动标题生成诊断」。普通 DevOps 模型请求在诊断上限被停止，此证据仅证明后台自动标题完成，不冒充普通任务完成。

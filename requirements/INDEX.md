@@ -1,6 +1,6 @@
 # 规范包索引 (Package Index)
 
-当前索引收录 **49 个活跃功能说明包**与 **1 个历史包**（`epistemic-reasoning`；`institutional-learning` 已整包退役）。
+当前索引收录 **48 个活跃功能说明包**与 **1 个历史包**（`epistemic-reasoning`；`institutional-learning` 已整包退役）。
 包的划分服务于理解总流程中的各个子领域，不是官僚条款，亦不作为 AI 验收法庭的依据。
 
 ## 1. 规范与消融 (Requirement & Ablation)
@@ -55,7 +55,6 @@
 | Package | 说明 |
 |---|---|
 | `delegation` | 任务派工与责任移交。 |
-| `advisor` | 专席顾问协商与散文反馈。 |
 | `intra-participant-parallelism` | Fission 同一参与者多路并发与收敛。 |
 | `process-execution` | 外部进程执行与时限管理。 |
 | `change-integration` | 代码提交与集成短门。 |

@@ -20,8 +20,8 @@ identical `{{placeholder}}` sets, and protocol identifier parity (AC20).
 ## One current account of the work
 
 The public prompt catalog contains Orchestrator, Manager, Engineer, DevOps, and
-Plan. Bookkeeper and Advisor have separate internal prompts. Sphinx is
-program-controlled work, not another role to dispatch.
+Plan. Bookkeeper has a separate internal prompt. Sphinx is program-controlled
+work, not another role to dispatch.
 Retired role names must not resolve to an Engineer prompt or appear as public
 catalog aliases. Historical decoding is not permission to load a live prompt.
 

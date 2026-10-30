@@ -83,7 +83,6 @@ SUITE_GROUPS=(
   "managed-chat-execution|requirements/managed-chat-execution/tests/"
   "interaction-authority|requirements/interaction-authority/tests/"
   "host-boundary|requirements/host-boundary/tests/"
-  "advisor|requirements/advisor/tests/"
   "knowledge-reuse|requirements/knowledge-reuse/tests/"
   "prefix-stability|requirements/prefix-stability/tests/"
   "participant-horizon|requirements/participant-horizon/tests/"

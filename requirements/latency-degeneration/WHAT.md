@@ -120,11 +120,11 @@ dispose 收尾。
 启动／取消／丢弃与 idle，断言受理的中断恰好续行或返回一次；旧实现的最小反例为
 `[["step-end"]]`。
 
-## [012] 看门狗自己的 Abort 不是 Advisor / SyncDelegate 的答案
+## [012] 看门狗自己的 Abort 不是 SyncDelegate 的答案
 
-Advisor 咨询与 SyncDelegate 调用一见 `Aborted` 就立即失败（DidNotAnswer / "run aborted"）。
+SyncDelegate 调用一见 `Aborted` 就立即失败（DidNotAnswer / "run aborted"）。
 看门狗的中断就是一次宿主 Abort，随后由看门狗续跑或返回 `Failed`；把它当成答案，
-等于还没续就把咨询判死，用户只看到「advisor 被打断」而不知原因。宿主在发出中断
+等于还没续就把咨询判死，用户只看到「咨询被打断」而不知原因。宿主在发出中断
 **之前**为该 session 记一次（`DegenerationInterrupts.record`，宿主拒绝则撤回），
 上述消费者各持一个游标，每次中断只豁免一条 `Aborted`；续跑失败时看门狗返回的
 `Failed` 带 `degeneration continuation unavailable: …` 原因，照常让咨询失败。
@@ -135,8 +135,8 @@ Fork 的 Join 本来就把 `Aborted` 当观察，不受影响。
 真机事件序（OpenCode 1.18.29，`/event` 实录）：assistant `message.updated`（开始）→ 工具 part
 `pending → running → completed` → **之后**才有同一 assistant 的 `finish=tool-calls` + `time.completed`。
 工具在 Provider step 内执行，[008] 依赖的终态事件要等工具全部返回才到。旧实现因此把 `join`、bash、
-咨询（advisor / askPreviousScope）、`negotiate` 等长工具的执行时间都算成模型延迟；阈值随快速步骤收紧
-（无地板，几秒级）后，长工具几乎必被看门狗 Abort——这就是「经常被打断」「advisor 都被打断」的来源。
+咨询（askPreviousScope）、`negotiate` 等长工具的执行时间都算成模型延迟；阈值随快速步骤收紧
+（无地板，几秒级）后，长工具几乎必被看门狗 Abort——这就是「经常被打断」「咨询都被打断」的来源。
 
 宿主 `tool.execute.before` 一到，就把该 session 的在途测量按工具边界结束（`LatencyWatchdog.ToolStarted`，
 样本是模型自己的耗时）。中断已在途时仍按 [011] 停放、由回执决定续跑。同一步的并行工具、无测量时的
