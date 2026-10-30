@@ -921,6 +921,37 @@ module ProcessEventLog =
               FileNames = group.FileNames
               LastActivityMs = writerActivityOf paths })
 
+    /// durable-events-006/013/017: cheap physical freshness witness for the
+    /// append boundary. It names every retained writer file and its canonical
+    /// file identity (dev/ino/mode/size/mtime/ctime) without reading a byte of
+    /// historical content. Every append and retention rewrite takes the
+    /// cross-process store lock, so an unchanged witness proves this process's
+    /// Current already contains every committed line; a changed witness only
+    /// forces a reload and never authorizes skipping one. This is a physical
+    /// hint, not durable or domain state and not a second authority.
+    let physicalInventory (commonDir: string) : string =
+        try
+            writerFileGroups commonDir
+            |> List.sortBy (fun group -> group.WriterId)
+            |> List.map (fun group ->
+                let files =
+                    group.FileNames
+                    |> List.sort
+                    |> List.map (fun name ->
+                        let path = join2 (eventsDirectory commonDir) name
+
+                        if existsSync path then
+                            name + "=" + statIdentity (statSync path)
+                        else
+                            name + "=missing")
+                    |> String.concat ","
+
+                group.WriterId + "[" + files + "]")
+            |> String.concat ";"
+        with _ ->
+            // An unreadable inventory must never look like a stable one.
+            "inventory-unavailable"
+
     let private setWriterActivity path activityMs =
         let seconds = activityMs / 1000.0
         utimesSync path seconds seconds
