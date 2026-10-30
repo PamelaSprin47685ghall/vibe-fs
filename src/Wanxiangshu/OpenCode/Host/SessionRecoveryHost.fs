@@ -86,7 +86,14 @@ type SessionRecoveryHost
         | _ ->
             eventKey event
             |> Option.map (fun key -> ChatExecutionProjection.byKey key projection |> Option.toList)
-            |> Option.defaultWith (fun () -> ChatExecutionProjection.current projection)
+            |> Option.defaultWith (fun () ->
+                ChatExecutionProjection.current projection
+                |> List.filter (fun state ->
+                    state.terminalDisposition.IsNone
+                    || match ModelRouting.observePhysicalResource state.key with
+                       | PhysicalResourceObservation.ResourceHeld _
+                       | PhysicalResourceObservation.ResourceUnknown _ -> true
+                       | _ -> false))
 
     let classifyProviderSnapshot (state: ChatExecutionState) (messages: TranscriptMessage list) =
         let matches =
@@ -107,14 +114,14 @@ type SessionRecoveryHost
         // ProviderPhysicalObservation.ReceiptAmbiguous -> fail closed to manual intervention
         | _ -> ProviderPhysicalObservation.ReceiptAmbiguous
 
-    let providerFromTranscript (state: ChatExecutionState) =
+    let providerFromTranscript messagesFor (state: ChatExecutionState) =
         task {
-            match! transcript.Messages state.key.SessionId with
+            match! messagesFor state.key.SessionId with
             | Error _ -> return ProviderPhysicalObservation.ReceiptMissing
             | Ok messages -> return classifyProviderSnapshot state messages
         }
 
-    let providerObservation (event: ChatExecutionRecoveryLifecycleEvent) (state: ChatExecutionState) =
+    let providerObservation messagesFor (event: ChatExecutionRecoveryLifecycleEvent) (state: ChatExecutionState) =
         match event with
         | ChatExecutionRecoveryLifecycleEvent.ExactAssistantStarted started ->
             Task.FromResult(ProviderPhysicalObservation.ProviderAlive started)
@@ -122,7 +129,9 @@ type SessionRecoveryHost
             Task.FromResult(ProviderPhysicalObservation.ProviderTerminal(started, disposition))
         | ChatExecutionRecoveryLifecycleEvent.SessionDeleted _ ->
             Task.FromResult(ProviderPhysicalObservation.ProviderAbsent state.key)
-        | _ -> providerFromTranscript state
+        | _ when state.terminalDisposition.IsSome ->
+            Task.FromResult(ProviderPhysicalObservation.ReceiptMissing)
+        | _ -> providerFromTranscript messagesFor state
 
     let lifecycleCancellation (event: ChatExecutionRecoveryLifecycleEvent) =
         match event with
@@ -445,10 +454,10 @@ type SessionRecoveryHost
             return result
         }
 
-    let recoverState (event: ChatExecutionRecoveryLifecycleEvent) (state: ChatExecutionState) =
+    let recoverState messagesFor (event: ChatExecutionRecoveryLifecycleEvent) (state: ChatExecutionState) =
         task {
             let! current = settleAcceptedCancellation event state
-            let! provider = providerObservation event current
+            let! provider = providerObservation messagesFor event current
 
             let sweepActions =
                 { actions with
@@ -490,13 +499,22 @@ type SessionRecoveryHost
         else
             invalidOp "supersession settlement requires the capacity owner's exact replacement evidence"
 
-    let recoverSignalledState event state =
+    let recoverSignalledState messagesFor event state =
         match event with
         | ChatExecutionRecoveryLifecycleEvent.SessionSuperseded _ -> settleOwnedSupersession state
-        | _ -> recoverState event state :> Task
+        | _ -> recoverState messagesFor event state :> Task
 
     member _.Signal(event: ChatExecutionRecoveryLifecycleEvent) : Task =
         task {
+            let messages = Dictionary<SessionId, _>()
+            let messagesFor sessionId =
+                match messages.TryGetValue sessionId with
+                | true, result -> result
+                | false, _ ->
+                    let result = transcript.Messages sessionId
+                    messages.[sessionId] <- result
+                    result
+
             let statesToRecover =
                 match event with
                 | ChatExecutionRecoveryLifecycleEvent.ProviderStartBoundaryRejected _ -> []
@@ -509,7 +527,7 @@ type SessionRecoveryHost
             | _ -> ()
 
             for state in statesToRecover do
-                do! recoverSignalledState event state
+                do! recoverSignalledState messagesFor event state
 
             sessionsToPulse event |> List.iter pulseDrain
         }
