@@ -14,6 +14,7 @@ WHAT 是合同。这里说明当前证据，不为恢复增加隐含规则。用
 | 018 | 实际插件 config hook 不注册显式续传命令；另保留旧文件名的结构审计 | 真正重启归位、中断历史可见性、全部观察者不触发副作用 |
 | 020 | 实际 canonical codec/fold、child load selection/void、取消结算桥接、JoinDrain；真实 child 结算的持久写入、失败传播和 journal 重开 | 插件激活顺序、普通执行前的结算门禁、真实命令不重放、模型绑定及进程崩溃 |
 | 021 | durable handle 按 id/byname 查询、真实 binding cache fallback、由已折叠 Fission fact 解析 lane | 所有 reuse/placement/await 入口的接线、真实重启、物理资源所有权 |
+| 023 | 真实插件双 incarnation：无关会话 transcript 读门控下的第一条件 admission 不阻塞（重）、本会话遗留恢复先于其准入（保序）、无关会话恢复不丢（最终结算）；journal 单元（屏障故障诚实传播、等待者共享单飞、故障后重试——重：旧实现永陷陈旧故障） | 屏障重试的世代链、重载切片与 `DurabilityActivated` 兜底的去重、无关会话慢恢复的顺序切换 |
 
 011 的接缝构造已授权的输入夹具，调用生产 permit/membership 函数；它不实际恢复这些成员。009 的 trace 检查器确实拒绝所给的乱序夹具，但合法 fixture 不是产品真实执行记录。所谓 `crashScenario` 的旧函数名实际仅驱动 handle projection，002/012 不再把它称为进程崩溃证明。
 

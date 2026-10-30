@@ -165,3 +165,14 @@ Engineer/DevOps 的自然停止必须使父 join 取得一次真正可消费的�
 真实事故（2026-10-25 UTC）：21:25 父 Manager resume(backport-runtime) 后 join；该子 Engineer 21:28:28 将 ChatExecution.Terminal(Completed) 写入 event sourcing 且有非空终态正文，但父 HandleWorkCompleted 从未追加，Join 停留在 external:child-completion。不能对磁盘日志直接补造 completion。
 
 先红后绿的物理证明：tests/029.test.mjs 从真实 fork 到新 assistant message.updated 的自然 stop，故意不发送 session.idle：旧实现得到 JOIN-HUNG，精确终态唤醒修复后得到父 join 的真实报告与 Retired 墓碑。不同 physical parentID 的伪 Completed 不结算。host-boundary/tests/005.test.mjs 与 tests/028.test.mjs 进一步保护身份/失败与未知持久化结果不被伪成功。
+
+
+## [030] 会话级取消结算必须归还保留信用，取消 drain 才能收敛
+
+会话级结算入口（`SessionRecoveryHost.SignalSession`，承载 `SessionCancelled`/`SessionDeleted` 的逐 key 结算）在结算完该会话全部 key 之后，必须取消该 session 名下全部 retained continuation input 并完成由此解锁的旧 exact capacity 归还（[027] 的同一操作在取消链上的落地），然后脉冲 drain。
+
+- 真实事故（2026-10-30 UTC）：父 `ses_e744ea0b5ffeHmjXtfLQPgI266`（Manager）在 join；子 `ses_e744e6b7effeTdACLz9fwBjugt`（devops）08:49:42.968 ProviderStarted、08:49:43.142 Cancelled，此后无 continuation claim、无 HandleCompleted/Abandoned，父 join 长期等待；宿主日志 08:49:43.180 后整体静默。被取消（而非删除）的会话，其终态执行的确切信用被保留输入持有（`HeldForInput`，`observePhysicalResource` 报 `ResourceHeld`），`sessionDrained` 永不成立，`drainTermination`/`DrainChatRecovery` 的 `Drain` 无限等待——共享信号管线上的第一条后续 admission 随之停滞。
+- 允许后果：与 [027] 相同——只取消该 session 名下的保留，按 exact `admissionOwner.ReleasePhysical` 路径回放挂起的旧 key 归还；最后一份保留撤销后旧 credit 立即归还；归还完成后旧 execution 不得再出现在 shared capacity 快照中。取消 drain 只在「逐 key 已结算 + 信用已归还」后脉冲完成。
+- 禁止后果：不取消其他 session 的保留；不使用 `ReleaseExecution`/`ReleaseSession` 等 force 路径；不对未结算执行（非终态或 manual intervention）谎报 drain——`Drain` 的等待语义不变。取消未必意味着工作失败：本条不写任何新 Terminal、不改写既有终态、不放弃任何未结算义务；保留未取消时不得宣称归还完成。
+- 失败后果：保留取消回放对 `AlreadyApplied`/`StaleFence` 幂等接受（视同归还完成并清除挂起记录）；对 `Conflict` 不得吞没——以带 exact key 信息的 `InvalidOperationException` 显式暴露，保留挂起记录，使「取消已完成、归还未完成」不被静默改写。重复结算幂等：保留已取消时无第二次释放副作用。
+- 回归：`tests/030.test.mjs` 在真实 journal 与真实共享 capacity 上驱动保留输入持有信用的会话级取消：drain 必须收敛（而非挂起）、终态保持唯一 Cancelled、旧 credit 归还、无关会话的租约与事实原样不动。

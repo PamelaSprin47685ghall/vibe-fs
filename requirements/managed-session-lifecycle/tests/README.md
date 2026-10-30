@@ -14,6 +14,7 @@
 - 019 保留实际 execution interpreter 的局部验证，GAP-126 的 cancel/delete drain 断言已落地（见下文 session019 核对段）。021 的真实 fatal 链仍缺证明。022 运行真实 Casebook：有/无 draft、Bookkeeper 不可用、归档读取与重复拒绝；尚未观察 identity 去留及五类 typed settlement。
 - 023 调用实际身份解析，区分拒绝旧活跃身份与历史恢复。024 只证明 handle 拒绝第二个活动绑定及 road 保留给定模型；不是 crash、模型固定或 PTY 排空证明。
 - 025 保留上游的真实 HostForkRuntime 与 ToolRuntimeScope 场景。DevOps 工作先经真实 dispatcher physical acceptance 建立 scoped work，两处 Surface 显式接收同一 canonical journal，不用临时 Root 或无 journal 的 InstallRun。受控 PTY port 结束后清记账；DevOps run 终态结算时在 PTY 端口边界观察到终止效果，其名下 PTY 计数归零且其他会话的 PTY 存活。端口未启动 OS 进程，**「TERM 后真实退出并按需升级 KILL」这一半仍是未证义务**，现由 `test.todo` 单独保留，不因上面那条已转真而消失。
+- 030 WHAT[managed-session-lifecycle-030]：真实 journal + 真实共享 capacity 上驱动会话级取消结算——保留输入持有信用的 session 在 `signalSessionCancelled` 后 `drainSession`（生产 `Drain`，取消收尾与删除链同一 await）必须收敛：终态唯一 Cancelled、旧 credit 归还（快照查证）、drain 先等后成、无关会话租约原样。不证明 OS 级进程退出、共享管线其他 await 点、或 HostBootstrap 取消分支的结算归属（那部分归取消修复所有者）。
 ...inable 失败解决，join 不无界等待；PERSIST-settled Source 且 durable work Active 时 join 经 pending Source 浮现失败、不挂 journal revision，未知 durable commit 保持 Active 不放行新工作。三例经 ToolSurface 受控故障注入（createRuntimeWithWorkRecordRead、prepareTerminalDelivery、injectPendingPersistFailure）驱动，sessionPort 为内存 harness。2026-10-17 首次真实运行：node --test 本包全套（184 例，170 过 0 败 14 todo）中三例全部通过。 [col 330]
 
 ## GAP-132 的 scoped work 回归
