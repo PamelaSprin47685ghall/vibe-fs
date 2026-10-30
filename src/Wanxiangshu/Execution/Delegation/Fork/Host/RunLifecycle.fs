@@ -569,6 +569,7 @@ module HostForkRunLifecycle =
             match! commitment with
             | Ok() -> return agentOutcome
             | Error error ->
+                logError "FORK-PERSIST" (sprintf "run %s completion append failed: %s" run.AgentId error)
                 return
                     AgentCompletion.failed
                         run.AgentId
@@ -623,6 +624,7 @@ module HostForkRunLifecycle =
             removeClaimedRun gate pendingRuns run
 
     let private deliverClaimSettlementFault (run: PendingHostRun) (error: exn) =
+        logError "FORK-PERSIST" (sprintf "run %s completion settlement faulted: %s" run.AgentId error.Message)
         // The claim consumed this run's only completion promise. An
         // unsettled Source strands the Fork await and the join ledger
         // forever — settle an explicit failure even when settlement
