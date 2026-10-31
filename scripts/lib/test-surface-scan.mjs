@@ -303,11 +303,11 @@ export const SURFACE_MANIFEST = [
       'PAR-020',
       'PAR-021',
       'EFFECT-ACCOUNTING-004',
-      'VERIFICATION-SYSTEM-008',
+      'verification-system-008',
     ],
     lawOwners: {
       'EFFECT-ACCOUNTING-004': 'effect-accounting',
-      'VERIFICATION-SYSTEM-008': 'verification-system',
+      'verification-system-008': 'verification-system',
     },
     source: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fs',
     representation: 'opaque-capability',
@@ -1497,7 +1497,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Verification/TemporalSurface.js',
     owner: 'verification-system',
-    laws: ['VERIFICATION-SYSTEM-007'],
+    laws: ['verification-system-007'],
     source: 'src/Wanxiangshu/Verification/TemporalSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
