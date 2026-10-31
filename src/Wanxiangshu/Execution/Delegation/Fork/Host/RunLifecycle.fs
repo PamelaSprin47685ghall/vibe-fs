@@ -317,10 +317,10 @@ module HostForkRunLifecycle =
             let! observed = childViewForRun run.ChildId result.ProviderRun
 
             let prose =
-                if System.String.IsNullOrWhiteSpace result.TerminalText then
+                if System.String.IsNullOrWhiteSpace result.TurnFormalText then
                     None
                 else
-                    Some result.TerminalText
+                    Some result.TurnFormalText
 
             // D2: the cell is peeked, never taken. Two entries (the terminal
             // subscription and the runtime's Complete) read the same child
@@ -821,11 +821,14 @@ module HostForkRunLifecycle =
                 // 另行核对。
                 None
 
+    /// WHAT[context-compression-037]: the handback prose of a natural stop is
+    /// the terminal turn's formal body text; reasoning and tool parts stay
+    /// with the child.
     let private terminalProse (result: AgentRunResult) : string option =
-        if System.String.IsNullOrWhiteSpace result.TerminalText then
+        if System.String.IsNullOrWhiteSpace result.TurnFormalText then
             None
         else
-            Some result.TerminalText
+            Some result.TurnFormalText
 
     let private resolveView (view: ViewResolution option) : Task<string option> =
         match view with

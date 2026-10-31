@@ -48,7 +48,7 @@ fork 成功只表示该 Byname 已承接 charge。续做按 Byname 找到既有 
 
 ## [011] 普通完成结束同步批次
 
-不设独立 return 工具或双重 await。被委托方的普通 Assistant completion（自然停机，无未决工具调用）结束批次，由宿主交回该终态轮次的 assistant 散文（渲染为 `# ...` 注释），不捕获被委托方的完整 post-scope 视图。
+不设独立 return 工具或双重 await。被委托方的普通 Assistant completion（自然停机，无未决工具调用）结束批次，由宿主交回该终态轮次的 assistant 散文（渲染为 `# ...` 注释），不捕获被委托方的完整 post-scope 视图。交回的散文只取该终态轮次的正文文本（assistant `text` part）；思考（reasoning/thinking）与工具调用、工具结果一律不随交接，也不以会话级文本冒充正文。
 
 ## [012] Canonical 正文与 sibling 引用
 
