@@ -201,7 +201,7 @@ Fork 子代理的在途运行（agentId、因果令牌、子会话、角色、�
 
 ## [036] Busy 子代理必须即时 steer 而不是等待空闲
 
-Manager 对仍活跃的 Engineer／DevOps 执行 `resume` 时，已有子会话的 `BusyAgentNudge` 必须明确使用 `delivery: "steer"`（SDK body 与顶层载体一致）。它沿原 LogicalRun 和身份种子保存真实 PromptKey，供正在运行的子代理在下一模型步骤优先消费，不允许退化成 `queue` 等待 idle，也不创建新 assignment。宿主发送者不另发 `AbortSession`；若 SDK 为消费 steer 切换旧 Provider attempt，须按真实 Provider 终态核对，不把任何 `Cancelled` 一概认作非预期中断。
+Manager 对仍活跃的 Engineer／DevOps 执行 `resume` 时，已有子会话的 `BusyAgentNudge` 必须明确使用 `delivery: "steer"`（SDK body 与顶层载体一致）。是否 steer 由产品在发送选项上给出；OpenCode 适配只把它翻译成协议字段，不读取来源名。它沿原 LogicalRun 和身份种子保存真实 PromptKey，供正在运行的子代理在下一模型步骤优先消费，不允许退化成 `queue` 等待 idle，也不创建新 assignment。宿主发送者不另发 `AbortSession`；若 SDK 为消费 steer 切换旧 Provider attempt，须按真实 Provider 终态核对，不把任何 `Cancelled` 一概认作非预期中断。
 
 普通 Busy steer 不伪装成 `wanxiangshu_consultation_steer=true`，咨询消息仍单独按最近一轮 assistant 已完成且无工具调用的判据裁决，不限定为咨询发起回合；degeneration 的 `ProviderRetryAttempt` 也不改变。SDK 入队确认不等于模型消费，物理接纳与 PromptKey 恢复仍按原合同处理。
 
@@ -248,6 +248,4 @@ Manager、Orchestrator、Plan 负责长程工作。它们无工具调用的自�
 
 重启恢复的终态 assistant 只回答它自己的物理父消息；最后一条 user 消息可能是重试的新物理消息，其物理 ID 不是 Authority Root。恢复必须按 `assistant.ParentId` 的精确物理消息读取持久 `ChatExecution.Accepted`，用该记录同时查询交付见证并编码完成体；不得把物理 ID 提升为 Root。Accepted 与 `assistant.ParentId` 必须精确相符，且其 Root 必须对应该 handle／child 的 canonical admitted work；任一缺失或不相符时只作为观察（`Unreadable`，恢复等待），不得猜测 Root 或补造完成。已存在 `HandleWorkCompleted` 的 durable 终态不经过该快照路径，重启后仍按原工作正常 join，且不重复写入完成。
 
-测试：`requirements/delegation/tests/042.test.mjs`。重试用例在旧实现下把重试物理 ID 当 Root，交付见证与 canonical work 都不匹配、恢复失败；修复后以原 Root 结算并 join 到重试回合的散文。已完成工作用例确认重启恢复不要求 Accepted、不重复写入完成，join 仍返回材料。缺失 Accepted 用例确认恢复只观察为 `RecoveryIncomplete`，不查询交付见证、不写完成，工作保持 Active。
-
-验收：`requirements/delegation/tests/042.test.mjs`（重试用例在旧实现下把重试物理 ID 当 Root，交付见证查询与 canonical work 均不匹配，恢复失败；修复后以原 Root 结算并 join 到重试回合的散文。已完成工作用例验证重启恢复不要求 Accepted、不重复写入完成，join 仍返回材料。缺失 Accepted 用例验证恢复只观察为 `RecoveryIncomplete`、不查询交付见证、不写完成，工作保持 Active）。
+`requirements/delegation/tests/042.test.mjs` 覆盖这三条路径：重试用例在旧实现下把重试物理 ID 当 Root，交付见证查询与 canonical work 均不匹配，恢复失败；修复后以原 Root 结算并 join 到重试回合的散文。已完成工作用例验证重启恢复不要求 Accepted、不重复写入完成，join 仍返回材料。缺失 Accepted 用例验证恢复只观察为 `RecoveryIncomplete`、不查询交付见证、不写完成，工作保持 Active。
